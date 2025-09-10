@@ -296,9 +296,10 @@ class YesChefAPI {
       if (response.ok) {
         const data = await response.json();
         this.log('✅ Grocery lists fetched:', {
-          count: data.lists?.length || 0
+          count: data.grocery_lists?.length || 0
         });
-        return { success: true, lists: data.lists || [] };
+        // Backend returns 'grocery_lists', normalize to 'lists' for compatibility
+        return { success: true, lists: data.grocery_lists || [] };
       } else {
         const errorText = await response.text();
         this.error('Get grocery lists failed:', {
@@ -309,6 +310,43 @@ class YesChefAPI {
       }
     } catch (error) {
       this.error('Get grocery lists error:', error);
+      return { 
+        success: false, 
+        error: 'Cannot connect to backend - check server',
+        details: error.message 
+      };
+    }
+  }
+
+  async getGroceryListDetails(listId) {
+    this.log('Getting grocery list details for ID:', listId);
+    
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Authentication required' };
+    }
+
+    try {
+      const response = await this.debugFetch(`/api/grocery-lists/${listId}`, {
+        headers: this.getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        this.log('✅ Grocery list details fetched:', {
+          id: listId,
+          name: data.grocery_list?.list_name
+        });
+        return { success: true, list: data.grocery_list };
+      } else {
+        const errorText = await response.text();
+        this.error('Get grocery list details failed:', {
+          status: response.status,
+          error: errorText
+        });
+        return { success: false, error: 'Failed to fetch grocery list details' };
+      }
+    } catch (error) {
+      this.error('Get grocery list details error:', error);
       return { 
         success: false, 
         error: 'Cannot connect to backend - check server',
@@ -349,6 +387,42 @@ class YesChefAPI {
     } catch (error) {
       this.error('Save grocery list error:', error);
       return { success: false, error: 'Network error' };
+    }
+  }
+
+  async updateGroceryList(listId, listData) {
+    this.log('Updating grocery list:', {
+      id: listId,
+      name: listData.list_name,
+      itemCount: Array.isArray(listData.list_data) ? listData.list_data.length : 'complex'
+    });
+    
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Authentication required' };
+    }
+
+    try {
+      const response = await this.debugFetch(`/api/grocery-lists/${listId}`, {
+        method: 'PUT',
+        headers: {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(listData),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        this.log('✅ Grocery list updated successfully!');
+        return { success: true, list: data };
+      } else {
+        const errorText = await response.text();
+        this.error('Update grocery list failed:', errorText);
+        return { success: false, error: 'Failed to update grocery list' };
+      }
+    } catch (error) {
+      this.error('Update grocery list error:', error);
+      return { success: false, error: 'Network error - check connection' };
     }
   }
 
