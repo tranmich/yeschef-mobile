@@ -1,7 +1,37 @@
 /**
  * 🔄 SIMPLIFIED DRAG SYSTEM
  * 
- * A      console.log('🚫 PARENT DEBOUNCED: Too soon since last reorder');much simpler approach that avoids state timing issues
+ * A      consol    // Prevent spam: must be at least 100    
+      newItems.splice(toIndex, 0, draggedItemData);
+
+    setItems(newItems);
+    onReorder && onReorder(newItems, draggedItem, fromIndex, toIndex);
+    
+    // Reset processing flag after a short delay
+    setTimeout(() => {
+      isProcessing.current = false;
+      setRenderKey(prev => prev + 1); // Increment to force re-render
+    }, 50);
+  };t the new position
+    newItems.splice(toIndex, 0, draggedItemData);
+
+    setItems(newItems);
+    onReorder && onReorder(newItems, draggedItem, fromIndex, toIndex);t execution
+    if (now - lastExecutionTime.current < 100) {
+      return;
+    }('🚫 PARENT DEBOUNCED: Too soon since l    console.log(`📊 AFTER STATE:`, newItems.map((item, idx) => `${idx}: "${item.name}"`));
+    console.log(`✅ FINAL: Array has ${newItems.length} items`);
+    console.log(`🔍 DRAG DEBUG END\n`);
+
+    // Update state and notify parent
+    setItems(newItems);
+    onReorder && onReorder(newItems, draggedItem, fromIndex, toIndex);
+    
+    // Force complete re-render to fix UI update issues
+    setTimeout(() => {
+      console.log(`🔄 FORCING UI REFRESH with new render key`);
+      setRenderKey(prev => prev + 1); // Increment to force re-render
+    }, 50);order');much simpler approach that avoids state timing issues
  */
 
 import React, { useRef, useState } from 'react';
@@ -30,6 +60,7 @@ export const SimpleDraggableList = ({
   style 
 }) => {
   const [items, setItems] = useState(data);
+  const [renderKey, setRenderKey] = useState(0); // Force re-render counter
   
   // Bulletproof debouncing at the parent level to prevent ALL spam
   const lastExecutionTime = useRef(0);
@@ -46,22 +77,18 @@ export const SimpleDraggableList = ({
     
     // Prevent concurrent execution
     if (isProcessing.current) {
-      console.log('🚫 PARENT BLOCKED: Already processing a reorder');
       return;
     }
     
     // Only proceed if indices actually changed
     if (fromIndex === toIndex) {
-      console.log('🚫 PARENT SKIPPED: No position change');
       return;
     }
     
     isProcessing.current = true;
     lastExecutionTime.current = now;
     
-    console.log(`✅ PARENT EXECUTING: Moving "${draggedItem.name}" from ${fromIndex} to ${toIndex}`);
-
-    // Buttery smooth animation - fast and responsive
+    // Smooth animation
     LayoutAnimation.configureNext({
       duration: 180, // Quick but visible
       create: {
@@ -74,24 +101,21 @@ export const SimpleDraggableList = ({
       },
     });
 
-    // Smooth reordering algorithm
-    const newItems = [];
-    const draggedItemData = items[fromIndex];
-    const itemsWithoutDragged = items.filter((_, index) => index !== fromIndex);
+    // Simple and reliable reordering algorithm
+    const newItems = [...items];
+    const draggedItemData = newItems[fromIndex];
     
-    let adjustedToIndex = toIndex;
-    if (toIndex > fromIndex) {
-      adjustedToIndex = toIndex - 1;
-    }
+    // Remove the item from its original position
+    const removedItems = newItems.splice(fromIndex, 1);
     
-    for (let i = 0; i <= itemsWithoutDragged.length; i++) {
-      if (i === adjustedToIndex) {
-        newItems.push(draggedItemData);
-      }
-      if (i < itemsWithoutDragged.length) {
-        newItems.push(itemsWithoutDragged[i]);
-      }
-    }
+    // Insert it at the new position
+    newItems.splice(toIndex, 0, draggedItemData);
+    console.log(`🔄 STEP 4: Inserted item at position ${toIndex}`);
+    console.log(`🔄 STEP 4: Array now has ${newItems.length} items`);
+
+    console.log(`� AFTER STATE:`, newItems.map((item, idx) => `${idx}: "${item.name}"`));
+    console.log(`✅ FINAL: Array has ${newItems.length} items`);
+    console.log(`🔍 DRAG DEBUG END\n`);
 
     setItems(newItems);
     onReorder && onReorder(newItems, draggedItem, fromIndex, toIndex);
@@ -103,7 +127,9 @@ export const SimpleDraggableList = ({
   };
 
   React.useEffect(() => {
+    console.log(`🔄 DATA CHANGED: Updating items from ${items.length} to ${data.length}`);
     setItems(data);
+    setRenderKey(prev => prev + 1); // Force re-render when data changes
   }, [data]);
 
   return (
@@ -113,17 +139,21 @@ export const SimpleDraggableList = ({
       showsVerticalScrollIndicator={true}
       scrollEventThrottle={16}
     >
-      {items.map((item, index) => (
-        <SimpleDraggableItem
-          key={keyExtractor ? keyExtractor(item) : item.id}
-          item={item}
-          index={index}
-          totalItems={items.length}
-          onDrag={handleItemDrag}
-        >
-          {renderItem({ item, index })}
-        </SimpleDraggableItem>
-      ))}
+      {items.map((item, index) => {
+        const baseKey = keyExtractor ? keyExtractor(item) : item.id;
+        const uniqueKey = `${baseKey}-${renderKey}-${index}`; // Unique key with position
+        return (
+          <SimpleDraggableItem
+            key={uniqueKey}
+            item={item}
+            index={index}
+            totalItems={items.length}
+            onDrag={handleItemDrag}
+          >
+            {renderItem({ item, index })}
+          </SimpleDraggableItem>
+        );
+      })}
     </ScrollView>
   );
 };
@@ -151,13 +181,29 @@ const SimpleDraggableItem = ({
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: (evt, gestureState) => {
+        console.log(`🎯 START RESPONDER: Should set? YES`);
+        return true;
+      },
       onMoveShouldSetPanResponder: (evt, gestureState) => {
         // Less sensitive - require more movement to start drag
-        return Math.abs(gestureState.dy) > 8;
+        const shouldSet = Math.abs(gestureState.dy) > 8;
+        console.log(`🎯 MOVE RESPONDER: dy=${gestureState.dy}px, should set? ${shouldSet}`);
+        return shouldSet;
+      },
+
+      // CRITICAL: Block navigation gestures
+      onShouldBlockNativeResponder: () => {
+        console.log(`🛡️ BLOCKING native responder`);
+        return true;
+      },
+      onPanResponderTerminationRequest: () => {
+        console.log(`🚫 TERMINATION REQUEST: Denied`);
+        return false; // Don't let other gestures steal
       },
 
       onPanResponderGrant: () => {
+        console.log(`✅ DRAG GRANTED: Starting drag for "${item.name}"`);
         setIsDragging(true);
         // Set offset for smooth dragging
         pan.setOffset({
@@ -176,6 +222,11 @@ const SimpleDraggableItem = ({
       onPanResponderRelease: (evt, gestureState) => {
         setIsDragging(false);
         
+        console.log(`\n🎯 GESTURE DEBUG - ${new Date().toLocaleTimeString()}`);
+        console.log(`👆 Gesture dy: ${gestureState.dy}px`);
+        console.log(`📍 Item index: ${index}`);
+        console.log(`📏 Total items: ${totalItems}`);
+        
         // Only reorder if there was significant movement (more than 30px)
         if (Math.abs(gestureState.dy) > 30) {
           const itemHeight = 46;
@@ -187,10 +238,19 @@ const SimpleDraggableItem = ({
             finalTargetIndex = index + Math.round(gestureState.dy / itemHeight);
           }
           
+          console.log(`📐 Raw calculated index: ${finalTargetIndex}`);
+          
           finalTargetIndex = Math.max(0, Math.min(totalItems - 1, finalTargetIndex));
+          
+          console.log(`🎯 Final target index: ${finalTargetIndex}`);
+          console.log(`📋 Item being moved: "${item.name}"`);
+          console.log(`🎯 GESTURE DEBUG END\n`);
           
           // Call parent directly - it has the bulletproof debouncing
           onDrag(item, index, finalTargetIndex);
+        } else {
+          console.log(`🚫 Movement too small (${gestureState.dy}px), not reordering`);
+          console.log(`🎯 GESTURE DEBUG END\n`);
         }
 
         // Smooth return animation
@@ -213,7 +273,7 @@ const SimpleDraggableItem = ({
     ],
     zIndex: isDragging ? 1000 : 1,
     elevation: isDragging ? 20 : 0, // High elevation for floating effect
-    opacity: isDragging ? 0.95 : 1, // Slight transparency when dragging
+    opacity: 1, // Always visible - no transparency issues
   };
 
   return (
@@ -263,47 +323,47 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   draggableItem: {
-    backgroundColor: 'white',
-    marginVertical: 0.5, // Minimal margin for tighter spacing
-    borderRadius: 4, // Smaller radius for cleaner look
-    overflow: 'hidden',
+    backgroundColor: 'transparent', // Let child control background
+    marginVertical: 0,
+    borderRadius: 0,
+    overflow: 'visible', // Don't clip child content
   },
   draggingItem: {
-    backgroundColor: '#fafafa', // Very subtle background change
+    backgroundColor: 'transparent', // Let child control background
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 }, // Balanced shadow
-    shadowOpacity: 0.15, // Subtle shadow
-    shadowRadius: 8, // Smooth shadow radius
-    borderWidth: 0.5, // Thinner border
-    borderColor: '#e5e7eb',
-    // Removed rotation for smoother feel
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    borderWidth: 0, // No border interference
+    borderColor: 'transparent',
   },
   itemContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   dragHandle: {
-    width: 24,
-    height: 44, // Fixed height to match grocery item height
+    width: 32,        // Increased from 24 for better touch area
+    height: 44,       // Keep same height to match grocery item
     justifyContent: 'center',
     alignItems: 'center',
-    paddingLeft: 6,
-    paddingRight: 2,
+    paddingLeft: 8,   // Increased from 6 for more space
+    paddingRight: 4,  // Increased from 2 for more space
   },
   dragDots: {
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 2,       // Added padding around dots for better touch
   },
   dotRow: {
     flexDirection: 'row',
-    marginVertical: 0.5,
+    marginVertical: 1, // Increased from 0.5 for more spacing
   },
   dot: {
-    width: 2.5,
-    height: 2.5,
-    borderRadius: 1.25,
-    backgroundColor: '#9ca3af',
-    marginHorizontal: 1,
+    width: 4,         // Increased from 2.5 for better visibility
+    height: 4,        // Increased from 2.5 for better visibility
+    borderRadius: 2,  // Updated to match new size
+    backgroundColor: '#6b7280', // Slightly darker for better visibility
+    marginHorizontal: 1.5, // Increased from 1 for better spacing
   },
   itemContent: {
     flex: 1,

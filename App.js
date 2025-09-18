@@ -2,17 +2,21 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { StyleSheet, Text, View, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, ActivityIndicator, ScrollView, TouchableOpacity, ImageBackground, Dimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import YesChefAPI from './src/services/YesChefAPI';
 import SimpleErrorBoundary from './src/components/SimpleErrorBoundary';
 import DevConsole from './src/components/DevConsole';
+import { Icon, IconButton } from './src/components/IconLibrary';
+import { ThemedText, typography, loadFonts } from './src/components/Typography';
 
 // Import our screens
 import GroceryListScreen from './src/screens/GroceryListScreen';
 import RecipeViewScreen from './src/screens/RecipeViewScreen';
 import RecipeCollectionScreen from './src/screens/RecipeCollectionScreen';
 import MealPlanScreen from './src/screens/MealPlanScreen';
+import FriendsScreen from './src/screens/FriendsScreen';
+import HomeScreen from './src/screens/HomeScreen';
 import DebugScreen from './src/screens/DebugScreen';
 import DragTestScreen from './src/screens/DragTestScreen';
 import LoginScreen from './src/screens/LoginScreen';
@@ -28,19 +32,15 @@ function CustomTabBar({ state, descriptors, navigation }) {
         horizontal 
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.tabScrollContainer}
-        snapToInterval={80} // Width of each tab
-        snapToAlignment="center"
-        decelerationRate="fast"
+        // FIXED: Remove snap behavior to allow free scrolling
+        // snapToInterval={80} // REMOVED - was causing snap-back
+        // snapToAlignment="center" // REMOVED - was centering forcefully  
+        // decelerationRate="fast" // REMOVED - was making it snap back quickly
+        decelerationRate="normal" // Natural scroll feel
+        bounces={false} // Disable elastic bounce at edges
+        directionalLockEnabled={true} // Lock to horizontal only
       >
         {/* Add Home button */}
-        <TouchableOpacity
-          style={[styles.customTab, { backgroundColor: '#f3f4f6' }]}
-          onPress={() => navigation.navigate('Grocery')} // Default home to Grocery
-        >
-          <Text style={styles.tabIcon}>🏠</Text>
-          <Text style={styles.tabLabel}>Home</Text>
-        </TouchableOpacity>
-        
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           const label = options.tabBarLabel !== undefined
@@ -121,16 +121,68 @@ function RecipeStack() {
   );
 }
 
+// 🎯 NEW: Stack Navigator for Meal Plan Stack (with recipe navigation)
+function MealPlanStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen 
+        name="MealPlanMain" 
+        component={MealPlanScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="RecipeDetail" 
+        component={RecipeViewScreen}
+        options={{ 
+          title: 'Recipe',
+          headerBackTitleVisible: false,
+          headerTintColor: '#111827',
+          headerStyle: {
+            backgroundColor: '#fafbfc',
+            borderBottomWidth: 1,
+            borderBottomColor: '#e5e7eb',
+          }
+        }}
+      />
+    </Stack.Navigator>
+  );
+}
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false); // Added missing state variable
+  const [fontsLoaded, setFontsLoaded] = useState(false);
 
-  // 🚨 Initialize simple logging for React Native
+  // Background images array (same as login screen)
+  const backgroundImages = [
+    require('./assets/images/backgrounds/login_background_avocado.jpg'),
+    require('./assets/images/backgrounds/login_background_fig.jpg'),
+    require('./assets/images/backgrounds/login_background_lemon.jpg'),
+    require('./assets/images/backgrounds/login_background_pasta.jpg'),
+    require('./assets/images/backgrounds/login_background_tomato.jpg'),
+  ];
+
+  // Randomly select a background image
+  const randomBackground = backgroundImages[Math.floor(Math.random() * backgroundImages.length)];
+
+  // 🚨 Initialize simple logging for React Native + Load fonts
   useEffect(() => {
     console.log('🚀 YesChef App Starting - React Native Mode');
+    loadCustomFonts();
   }, []);
+
+  const loadCustomFonts = async () => {
+    try {
+      await loadFonts(); // Re-enabled font loading
+      setFontsLoaded(true);
+      console.log('✅ Custom fonts loaded successfully');
+    } catch (error) {
+      console.error('❌ Error loading fonts:', error);
+      setFontsLoaded(true); // Continue anyway with system fonts
+    }
+  };
 
   useEffect(() => {
     checkExistingAuth();
@@ -176,14 +228,29 @@ export default function App() {
     console.log('✅ User logged out successfully');
   };
 
-  // Show loading screen while checking auth
-  if (isLoading) {
+  // Show loading screen while checking auth or loading fonts
+  if (isLoading || !fontsLoaded) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#28a745" />
-        <Text style={styles.loadingText}>Initializing YesChef...</Text>
-        <Text style={styles.loadingSubtext}>Preparing authentication...</Text>
-      </View>
+      <ImageBackground 
+        source={randomBackground} 
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      >
+        <View style={styles.loadingContainer}>
+          <View style={styles.loadingContent}>
+            <View style={styles.logoContainer}>
+              <View style={styles.logoPlaceholder}>
+                <Text style={styles.logoText}>YC</Text>
+              </View>
+            </View>
+            <ActivityIndicator size="large" color="#AAC6AD" />
+            <Text style={styles.loadingText}>Initializing YesChef...</Text>
+            <Text style={styles.loadingSubtext}>
+              {!fontsLoaded ? 'Loading custom fonts...' : 'Preparing authentication...'}
+            </Text>
+          </View>
+        </View>
+      </ImageBackground>
     );
   }
 
@@ -194,7 +261,7 @@ export default function App() {
 
   // Show main app if authenticated
   return (
-    <DevConsole>
+    // <DevConsole> {/* Temporarily disabled to fix React error */}
       <SimpleErrorBoundary>
         <GestureHandlerRootView style={{ flex: 1 }}>
         <NavigationContainer>
@@ -206,26 +273,37 @@ export default function App() {
             headerTitleStyle: styles.headerTitle,
           }}
         >
+        {/* 🏠 HOME - Explorer & Inspiration */}
+        <Tab.Screen 
+          name="Home" 
+          options={{
+            title: 'Home',
+            headerShown: false, // HomeScreen handles its own header
+            tabBarIcon: ({ color, size, focused }) => (
+              <Icon 
+                name={focused ? 'homeFilled' : 'home'} 
+                size={size} 
+                color={color}
+              />
+            ),
+          }}
+        >
+          {() => <HomeScreen user={user} onLogout={handleLogout} />}
+        </Tab.Screen>
+        
         {/* #1 PRIORITY - Grocery List (Store Companion) */}
         <Tab.Screen 
           name="Grocery" 
           component={GroceryListScreen}
           options={{
             title: 'Grocery List',
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ fontSize: 20, color }}>🛒</Text>
-            ),
-          }}
-        />
-        
-        {/* #2 PRIORITY - Recipe Reader (Cooking Companion) */}
-        <Tab.Screen 
-          name="Recipe" 
-          component={RecipeViewScreen}
-          options={{
-            title: 'Recipe',
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ fontSize: 20, color }}>👨‍🍳</Text>
+            headerShown: false, // Hide the navigation header since we have our own clean header
+            tabBarIcon: ({ color, size, focused }) => (
+              <Icon 
+                name={focused ? 'groceryTabFilled' : 'groceryTab'} 
+                size={size} 
+                color={color}
+              />
             ),
           }}
         />
@@ -237,8 +315,12 @@ export default function App() {
           options={{
             title: 'My Recipes',
             headerShown: false, // Let stack handle headers
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ fontSize: 20, color }}>📚</Text>
+            tabBarIcon: ({ color, size, focused }) => (
+              <Icon 
+                name={focused ? 'recipesTabFilled' : 'recipesTab'} 
+                size={size} 
+                color={color}
+              />
             ),
           }}
         />
@@ -246,35 +328,48 @@ export default function App() {
         {/* #4 BONUS - Meal Planning (Weekly Review) */}
         <Tab.Screen 
           name="Plan" 
-          component={MealPlanScreen}
+          component={MealPlanStack}
           options={{
             title: 'Meal Plan',
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ fontSize: 20, color }}>📅</Text>
+            headerShown: false, // Hide the navigation header since we have our own clean header
+            tabBarIcon: ({ color, size, focused }) => (
+              <Icon 
+                name={focused ? 'mealPlanTabFilled' : 'mealPlanTab'} 
+                size={size} 
+                color={color}
+              />
             ),
           }}
         />
         
-        {/* #5 DRAG TEST - Testing Drag & Drop Functionality */}
+        {/* #5 NEW - Friends & Collaboration */}
         <Tab.Screen 
-          name="DragTest"
+          name="Friends" 
+          component={FriendsScreen}
           options={{
-            title: 'Drag Test',
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ fontSize: 20, color }}>🔄</Text>
+            title: 'Friends',
+            headerShown: false, // Hide the navigation header since we have our own clean header
+            tabBarIcon: ({ color, size, focused }) => (
+              <Icon 
+                name={focused ? 'user-friends-filled' : 'user-friends'} 
+                size={size} 
+                color={color}
+              />
             ),
           }}
-        >
-          {() => <DragTestScreen />}
-        </Tab.Screen>
-
+        />
+        
         {/* #6 DEBUG - Development Testing (Hidden unless scrolled) */}
         <Tab.Screen 
           name="Debug"
           options={{
             title: 'Debug',
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ fontSize: 20, color }}>🔧</Text>
+            tabBarIcon: ({ color, size, focused }) => (
+              <Icon 
+                name={focused ? 'debugTabFilled' : 'debugTab'} 
+                size={size} 
+                color={color}
+              />
             ),
           }}
         >
@@ -284,27 +379,76 @@ export default function App() {
     </NavigationContainer>
     </GestureHandlerRootView>
     </SimpleErrorBoundary>
-    </DevConsole>
   );
 }
 
 const styles = StyleSheet.create({
+  // 🎨 Beautiful Loading & Background Styles
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
   loadingContainer: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.1)', // Much lighter overlay for brighter background
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
+  },
+  loadingContent: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.85)', // Reduced opacity to match login form
+    borderRadius: 20,
+    padding: 40,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 10.32,
+    elevation: 16,
+  },
+  logoContainer: {
+    marginBottom: 30,
+    alignItems: 'center',
+  },
+  logoPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)', // Reduced opacity for consistency
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+    marginBottom: 20,
+  },
+  logoText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1E40AF',
+    fontFamily: 'Nunito-ExtraBold',
   },
   loadingText: {
-    fontSize: 16,
-    color: '#111827',
-    marginTop: 12,
+    fontSize: 18,
+    color: '#1F2937',
+    marginTop: 16,
     fontWeight: '600',
+    fontFamily: 'Nunito-ExtraBold',
   },
   loadingSubtext: {
     fontSize: 14,
-    color: '#6b7280',
-    marginTop: 4,
+    color: '#6B7280',
+    marginTop: 8,
+    textAlign: 'center',
+    fontFamily: 'Nunito-Regular',
   },
   // 🎯 NEW: Custom Horizontal Scrolling Tab Bar Styles
   customTabBar: {
@@ -317,6 +461,9 @@ const styles = StyleSheet.create({
   tabScrollContainer: {
     paddingHorizontal: 16,
     alignItems: 'center',
+    // IMPROVED: Ensure content is wide enough for all tabs
+    minWidth: '100%', // Minimum full width
+    flexGrow: 1, // Allow growth beyond screen if needed
   },
   customTab: {
     width: 80,
@@ -352,6 +499,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
+    fontFamily: 'Nunito-ExtraBold',
     fontWeight: '600',
   },
 });

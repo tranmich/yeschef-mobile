@@ -124,57 +124,8 @@ const DevConsole = ({ children }) => {
     <View style={styles.container}>
       {children}
       
-      {/* Floating Error Indicator */}
-      {errorCount > 0 && (
-        <TouchableOpacity 
-          style={styles.errorIndicator}
-          onPress={() => setIsVisible(true)}
-        >
-          <Text style={styles.errorIndicatorText}>🚨 {errorCount}</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Console Toggle Button */}
-      <TouchableOpacity 
-        style={styles.consoleToggle}
-        onPress={() => setIsVisible(true)}
-      >
-        <Text style={styles.consoleToggleText}>📱</Text>
-      </TouchableOpacity>
-
-      {/* Console Modal */}
-      <Modal
-        visible={isVisible}
-        animationType="slide"
-        onRequestClose={() => setIsVisible(false)}
-      >
-        <View style={styles.consoleContainer}>
-          <View style={styles.consoleHeader}>
-            <Text style={styles.consoleTitle}>🚨 Dev Console ({logs.length} logs)</Text>
-            <View style={styles.consoleButtons}>
-              <TouchableOpacity onPress={shareLogs} style={styles.headerButton}>
-                <Text style={styles.headerButtonText}>📤</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={clearLogs} style={styles.headerButton}>
-                <Text style={styles.headerButtonText}>🗑️</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setIsVisible(false)} style={styles.headerButton}>
-                <Text style={styles.headerButtonText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <ScrollView style={styles.logContainer}>
-            {logs.map(log => (
-              <View key={log.id} style={getLogStyle(log.type)}>
-                <Text style={styles.logTimestamp}>{log.timestamp}</Text>
-                <Text style={styles.logType}>{log.type.toUpperCase()}</Text>
-                <Text style={styles.logMessage}>{log.message}</Text>
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      </Modal>
+      {/* DevConsole UI completely hidden - runs silently in background */}
+      {/* All console interception and error handling still active */}
     </View>
   );
 };

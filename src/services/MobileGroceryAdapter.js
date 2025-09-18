@@ -12,7 +12,7 @@ class MobileGroceryAdapter {
    * Extracts just the ingredient names while preserving references
    */
   static backendToMobile(backendListData) {
-    console.log('🔄 Converting backend to mobile format:', backendListData);
+    // console.log('🔄 DEBUG: Converting backend to mobile format:', JSON.stringify(backendListData, null, 2));
     
     if (!backendListData || !backendListData.list_data) {
       console.log('📋 No backend data, returning empty list');
@@ -21,6 +21,8 @@ class MobileGroceryAdapter {
 
     const mobileItems = [];
     const listData = backendListData.list_data;
+    
+    // console.log('🔍 DEBUG: list_data structure:', JSON.stringify(listData, null, 2));
     
     // Handle different backend data structures
     let sectionsData = null;
@@ -42,22 +44,42 @@ class MobileGroceryAdapter {
         checked: item.checked || false,
         _isMobileItem: true
       }));
-    } else if (typeof listData === 'object' && listData.ingredient_count) {
-      // Complex web format with direct sections (format 3) - September 8 style
-      console.log('📋 Using complex web format with direct sections');
-      console.log('📋 Ingredient count:', listData.ingredient_count);
-      sectionsData = {};
-      
-      // Extract known section names and convert to by_section format
+    } else if (typeof listData === 'object') {
+      // Check if this is direct section format (your current format)
       const knownSections = ['produce', 'meat_seafood', 'dairy', 'pantry', 'frozen', 'other'];
-      for (const sectionName of knownSections) {
-        if (listData[sectionName] && listData[sectionName].items) {
-          sectionsData[sectionName] = listData[sectionName].items;
-          console.log(`📋 Found section "${sectionName}" with ${listData[sectionName].items.length} items`);
-        }
-      }
+      const hasDirectSections = knownSections.some(section => 
+        listData[section] && Array.isArray(listData[section])
+      );
       
-      console.log(`📋 Total sections found: ${Object.keys(sectionsData).length}`);
+      if (hasDirectSections) {
+        // Direct sections format (your current backend format)
+        console.log('📋 Using direct sections format (September 2025 style)');
+        sectionsData = {};
+        
+        for (const sectionName of knownSections) {
+          if (listData[sectionName] && Array.isArray(listData[sectionName])) {
+            sectionsData[sectionName] = listData[sectionName];
+            console.log(`📋 Found direct section "${sectionName}" with ${listData[sectionName].length} items`);
+          }
+        }
+        
+        console.log(`📋 Total direct sections found: ${Object.keys(sectionsData).length}`);
+      } else if (listData.ingredient_count) {
+        // Complex web format with nested sections (older format)
+        console.log('📋 Using complex web format with nested sections');
+        console.log('📋 Ingredient count:', listData.ingredient_count);
+        sectionsData = {};
+        
+        // Extract known section names and convert to by_section format
+        for (const sectionName of knownSections) {
+          if (listData[sectionName] && listData[sectionName].items) {
+            sectionsData[sectionName] = listData[sectionName].items;
+            console.log(`📋 Found nested section "${sectionName}" with ${listData[sectionName].items.length} items`);
+          }
+        }
+        
+        console.log(`📋 Total nested sections found: ${Object.keys(sectionsData).length}`);
+      }
     }
 
     if (sectionsData) {
@@ -67,8 +89,8 @@ class MobileGroceryAdapter {
         if (Array.isArray(items)) {
           console.log(`📋 Processing section "${sectionName}" with ${items.length} items`);
           items.forEach(item => {
-            // Handle different item formats
-            let itemName = item.name || item.display_text || item.ingredient_name || 'Unknown Item';
+            // Handle different item formats - prefer display_text for full quantities
+            let itemName = item.display_text || item.name || item.ingredient_name || 'Unknown Item';
             
             mobileItems.push({
               id: `backend-${itemIndex++}`,
@@ -97,12 +119,100 @@ class MobileGroceryAdapter {
       listName
     });
 
-    // If original data exists, preserve its structure
-    if (originalBackendData && originalBackendData.list_data) {
-      return this.updateExistingBackendList(mobileItems, originalBackendData, listName);
+    // Check if items have section information from _backendRef
+    const hasBackendRefs = mobileItems.some(item => item._backendRef && item._backendRef.section);
+    
+    if (hasBackendRefs) {
+      // Preserve sectioned format for webapp compatibility
+      return this.createSectionedBackendList(mobileItems, listName, originalBackendData);
     } else {
-      return this.createNewBackendList(mobileItems, listName);
+      // Fall back to simple format for mobile-only lists
+      return this.createSimpleBackendList(mobileItems, listName, originalBackendData);
     }
+  }
+
+  /**
+   * Create sectioned backend list (webapp-compatible)
+   */
+  static createSectionedBackendList(mobileItems, listName, originalBackendData = null) {
+    console.log('✅ Creating sectioned backend list structure');
+    
+    // Initialize sections
+    const sections = {
+      produce: [],
+      meat_seafood: [],
+      pantry: [],
+      other: [],
+      dairy: []
+    };
+    
+    // Group items by section using _backendRef
+    mobileItems.forEach(item => {
+      const section = item._backendRef?.section || 'other';
+      const sectionKey = section.toLowerCase();
+      
+      // Map to standard section names
+      const normalizedSection = sections[sectionKey] ? sectionKey : 'other';
+      
+      sections[normalizedSection].push({
+        name: item.name,
+        checked: item.checked || false,
+        display_text: item.name, // Preserve display_text for web
+        recipes: item._backendRef?.originalData?.recipes || []
+      });
+    });
+    
+    const backendData = {
+      list_name: listName,
+      list_data: sections,
+      recipe_ids: originalBackendData?.recipe_ids || []
+    };
+
+    // If updating existing list, preserve the ID
+    if (originalBackendData && originalBackendData.id) {
+      backendData.id = originalBackendData.id;
+    }
+
+    console.log('✅ Sectioned backend data created:', {
+      listName,
+      sections: Object.keys(sections).map(s => `${s}: ${sections[s].length} items`),
+      hasId: !!backendData.id
+    });
+
+    return backendData;
+  }
+
+  /**
+   * Create simple backend list (mobile-optimized)
+   */
+  static createSimpleBackendList(mobileItems, listName, originalBackendData = null) {
+    console.log('✅ Creating simple backend list structure');
+    
+    // Convert mobile items to simple backend format
+    const listData = mobileItems.map(item => ({
+      id: item.id,
+      name: item.name,
+      checked: item.checked || false
+    }));
+
+    const backendData = {
+      list_name: listName,
+      list_data: listData,
+      recipe_ids: originalBackendData?.recipe_ids || []
+    };
+
+    // If updating existing list, preserve the ID
+    if (originalBackendData && originalBackendData.id) {
+      backendData.id = originalBackendData.id;
+    }
+
+    console.log('✅ Simple backend data created:', {
+      listName,
+      itemCount: listData.length,
+      hasId: !!backendData.id
+    });
+
+    return backendData;
   }
 
   /**

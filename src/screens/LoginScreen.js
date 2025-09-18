@@ -8,6 +8,10 @@ import {
   SafeAreaView,
   Alert,
   ActivityIndicator,
+  ImageBackground,
+  KeyboardAvoidingView,
+  Platform,
+  Dimensions,
 } from 'react-native';
 import YesChefAPI from '../services/YesChefAPI';
 
@@ -15,6 +19,20 @@ export default function LoginScreen({ onLoginSuccess }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Background images array
+  const backgroundImages = [
+    require('../../assets/images/backgrounds/login_background_avocado.jpg'),
+    require('../../assets/images/backgrounds/login_background_fig.jpg'),
+    require('../../assets/images/backgrounds/login_background_lemon.jpg'),
+    require('../../assets/images/backgrounds/login_background_pasta.jpg'),
+    require('../../assets/images/backgrounds/login_background_tomato.jpg'),
+  ];
+
+  // Randomly select a background image ONCE using useState to prevent re-selection on re-renders
+  const [randomBackground] = useState(() => 
+    backgroundImages[Math.floor(Math.random() * backgroundImages.length)]
+  );
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -50,156 +68,156 @@ export default function LoginScreen({ onLoginSuccess }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>🍳 YesChef Mobile</Text>
-        <Text style={styles.subtitle}>Your intelligent cooking companion</Text>
+    <ImageBackground 
+      source={randomBackground} 
+      style={styles.backgroundImage}
+      resizeMode="cover"
+    >
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+          <View style={styles.content}>
+          {/* Logo Placeholder */}
+          <View style={styles.logoContainer}>
+            <View style={styles.logoPlaceholder}>
+              <Text style={styles.logoText}>YC</Text>
+            </View>
+          </View>
 
-        <View style={styles.form}>
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Enter your email"
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoComplete="email"
-          />
+          {/* Floating Login Form */}
+          <View style={styles.floatingForm}>
+            
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor="#9CA3AF"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+            />
 
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Enter your password"
-            secureTextEntry
-            autoComplete="password"
-          />
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor="#9CA3AF"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoComplete="password"
+            />
 
-          <TouchableOpacity 
-            style={[styles.loginButton, isLoading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <Text style={styles.loginButtonText}>🔐 Login</Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.createButton} onPress={handleCreateAccount}>
-            <Text style={styles.createButtonText}>Need an account?</Text>
-          </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]} 
+              onPress={handleLogin}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.loginButtonText}>Sign In</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
-
-        <View style={styles.features}>
-          <Text style={styles.featuresTitle}>What you can do:</Text>
-          <Text style={styles.feature}>🛒 Smart grocery lists with offline sync</Text>
-          <Text style={styles.feature}>📚 Import recipes from any website</Text>
-          <Text style={styles.feature}>👨‍🍳 Step-by-step cooking mode</Text>
-          <Text style={styles.feature}>📅 Intelligent meal planning</Text>
-        </View>
-
-        <Text style={styles.connectionInfo}>
-          Connected to: {YesChefAPI.baseURL}
-        </Text>
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
+const { width, height } = Dimensions.get('window');
+
 const styles = StyleSheet.create({
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  safeArea: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: 'rgba(0,0,0,0.1)',
   },
   content: {
     flex: 1,
-    padding: 20,
     justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
   },
-  title: {
+  logoContainer: {
+    marginBottom: 60,
+    alignItems: 'center',
+  },
+  logoPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 255, 255, 1)', // Reduced opacity to match form
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+  },
+    logoText: {
     fontSize: 32,
+    fontFamily: 'Nunito-ExtraBold', // Use consistent name
+    // fontWeight: 'bold', // REMOVED - conflicts with ExtraBold
+    color: '#FFFFFF', // Back to white
+    textAlign: 'center',
+  },
+  floatingForm: {
+    width: width * 0.85,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)', // Back to beautiful transparent white
+    borderRadius: 20,
+    padding: 25, // Slightly reduced padding since no title
+    // Removed shadow properties to eliminate the mystery square
+    borderWidth: 0, // Remove debug border
+    borderColor: 'transparent',
+  },
+  formTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#1F2937',
     textAlign: 'center',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginBottom: 40,
-  },
-  form: {
-    marginBottom: 40,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-    marginTop: 16,
+    marginBottom: 30,
+    fontFamily: 'Nunito-ExtraBold',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 16,
+    backgroundColor: 'transparent', // Clean transparent inputs
+    borderWidth: 1.5,
+    borderColor: 'rgba(156, 163, 175, 0.5)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
-    backgroundColor: '#ffffff',
+    marginBottom: 16,
+    color: '#1F2937',
+    fontFamily: 'Nunito-Regular',
   },
   loginButton: {
-    backgroundColor: '#28a745',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  loginButtonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  createButton: {
-    backgroundColor: 'transparent',
-    padding: 12,
-    alignItems: 'center',
+    backgroundColor: '#AAC6AD', // Ice mint color
+    borderRadius: 12,
+    paddingVertical: 16,
     marginTop: 8,
   },
-  createButtonText: {
-    color: '#6b7280',
-    fontSize: 14,
+  loginButtonDisabled: {
+    opacity: 0.7,
   },
-  features: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    marginBottom: 20,
-  },
-  featuresTitle: {
+  loginButtonText: {
+    color: '#FFFFFF',
     fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 12,
-  },
-  feature: {
-    fontSize: 14,
-    color: '#4b5563',
-    marginBottom: 8,
-    lineHeight: 20,
-  },
-  connectionInfo: {
-    fontSize: 12,
-    color: '#9ca3af',
+    fontWeight: 'bold',
     textAlign: 'center',
-    fontFamily: 'monospace',
+    fontFamily: 'Nunito-ExtraBold',
   },
 });

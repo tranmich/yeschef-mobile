@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -8,15 +9,24 @@ import {
   Alert,
   StyleSheet,
   SafeAreaView,
-  ActivityIndicator
+  ActivityIndicator,
+  Modal,
+  ScrollView,
+  ImageBackground,
+  StatusBar,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon, IconButton } from '../components/IconLibrary';
+import { ThemedText, typography } from '../components/Typography';
 import { SimpleDraggableList } from '../components/DragSystem';
 import YesChefAPI from '../services/YesChefAPI';
+import FriendsAPI from '../services/FriendsAPI';
 import OfflineSyncManager from '../services/OfflineSyncManager';
 import MobileGroceryAdapter from '../services/MobileGroceryAdapter';
 
-export default function GroceryListScreen() {
+export default function GroceryListScreen({ route, navigation }) {
+  // 🎨 Background Configuration (matches other screens)
+  const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/home_green.jpg');
+  
   const [groceryItems, setGroceryItems] = useState([]);
   const [newItem, setNewItem] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -26,6 +36,30 @@ export default function GroceryListScreen() {
   const [listTitle, setListTitle] = useState('My Grocery List');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editingItemId, setEditingItemId] = useState(null);
+  const [editingText, setEditingText] = useState(''); // Store editing text separately
+  
+  // Track editing state changes
+  const setEditingItemIdWithDebug = (itemId) => {
+    setEditingItemId(itemId);
+    
+    // When starting to edit, store the current text
+    if (itemId && !editingItemId) {
+      const item = groceryItems.find(item => item.id === itemId);
+      if (item) {
+        setEditingText(item.name);
+      }
+    }
+    
+    // When finishing editing, update the actual item
+    if (!itemId && editingItemId) {
+      setGroceryItems(prev => 
+        prev.map(item => 
+          item.id === editingItemId ? { ...item, name: editingText } : item
+        )
+      );
+      setEditingText('');
+    }
+  };
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   
   // Backend integration state
@@ -36,8 +70,75 @@ export default function GroceryListScreen() {
 
   // Initialize grocery list
   useEffect(() => {
-    initializeGroceryList();
+    // Check for generated grocery list first
+    if (global.tempGeneratedGroceryList) {
+      console.log('📋 Loading generated grocery list:', global.tempGeneratedGroceryList.items.length, 'items');
+      
+      // Load the generated items
+      setGroceryItems(global.tempGeneratedGroceryList.items);
+      setListTitle(global.tempGeneratedGroceryList.title);
+      
+      // Store item count before clearing
+      const itemCount = global.tempGeneratedGroceryList.items.length;
+      
+      // Clear the temporary list after loading
+      global.tempGeneratedGroceryList = null;
+      
+      setIsLoading(false);
+      
+      // Show success message
+      setTimeout(() => {
+        Alert.alert(
+          'Generated Grocery List Loaded!', 
+          `Loaded ${itemCount} items from meal plan.`
+        );
+      }, 500);
+      
+    } else if (route?.params?.generatedItems) {
+      // Handle navigation parameters (fallback)
+      console.log('📋 Loading grocery list via navigation params');
+      
+      setGroceryItems(route.params.generatedItems);
+      if (route.params.listTitle) {
+        setListTitle(route.params.listTitle);
+      }
+      setIsLoading(false);
+      
+    } else {
+      // Normal initialization - load saved lists
+      initializeGroceryList();
+    }
   }, []);
+
+  // Check for generated grocery list whenever screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      // Ensure status bar is set correctly when screen is focused
+      StatusBar.setBarStyle('dark-content', true);
+      
+      if (global.tempGeneratedGroceryList) {
+        console.log('📋 Loading generated list on focus:', global.tempGeneratedGroceryList.items.length, 'items');
+        
+        // Load the generated items
+        setGroceryItems(global.tempGeneratedGroceryList.items);
+        setListTitle(global.tempGeneratedGroceryList.title);
+        
+        // Store item count before clearing
+        const itemCount = global.tempGeneratedGroceryList.items.length;
+        
+        // Clear the temporary list after loading
+        global.tempGeneratedGroceryList = null;
+        
+        setIsLoading(false);
+        
+        // Show success message
+        Alert.alert(
+          'Generated Grocery List Loaded!', 
+          `Loaded ${itemCount} items from meal plan.`
+        );
+      }
+    }, [])
+  );
 
     const initializeGroceryList = async () => {
     try {
@@ -75,7 +176,10 @@ export default function GroceryListScreen() {
 
   const loadGroceryListById = async (listId) => {
     try {
-      console.log(`🔄 Loading grocery list details for ID: ${listId}`);
+      console.log(`\n🔄 LOAD LIST DEBUG - ${new Date().toLocaleTimeString()}`);
+      console.log(`📋 TRIGGER: Loading grocery list details for ID: ${listId}`);
+      console.log(`📱 CURRENT STATE: ${groceryItems.length} items locally`);
+      console.log(`📊 CURRENT ITEMS:`, groceryItems.map(item => item.name));
       
       const listResult = await YesChefAPI.getGroceryListDetails(listId);
       
@@ -88,6 +192,7 @@ export default function GroceryListScreen() {
         console.log(`✅ Converted to ${mobileItems.length} mobile items`);
         
         setGroceryItems(mobileItems);
+        console.log(`🔄 LOAD LIST DEBUG END - LIST REPLACED\n`);
         setListTitle(backendList.list_name || 'Grocery List');
         setCurrentBackendList(backendList);
         
@@ -142,23 +247,45 @@ export default function GroceryListScreen() {
         item.id === itemId ? { ...item, name: newName } : item
       )
     );
-    autoSave(); // Auto-save when item names are changed
+    
+    // ALSO update the stable ref immediately to prevent DragSystem refresh
+    if (stableDataRef.current) {
+      const index = stableDataRef.current.findIndex(item => item.id === itemId);
+      if (index !== -1) {
+        stableDataRef.current[index] = { ...stableDataRef.current[index], name: newName };
+      }
+    }
   };
 
   // Handle drag and drop reordering
   const handleReorder = (newItems) => {
+    console.log(`\n🏪 GROCERY SCREEN REORDER DEBUG - ${new Date().toLocaleTimeString()}`);
+    console.log(`📱 BEFORE: groceryItems has ${groceryItems.length} items`);
+    console.log(`📱 RECEIVED: newItems has ${newItems.length} items`);
+    console.log(`📊 RECEIVED ITEMS:`, newItems.map((item, idx) => `${idx}: "${item.name}" (id: ${item.id})`));
+    
     setGroceryItems(newItems);
-    autoSave(); // Auto-save when items are reordered
-    console.log('🔄 Items reordered:', newItems.map(item => item.name));
+    console.log(`✅ GROCERY ITEMS UPDATED`);
+    
+    // DISABLED AUTO-SAVE during drag to prevent conflicts
+    // Auto-save will trigger from other operations or manual save
+    console.log(`🚫 SKIPPING AUTO-SAVE during drag operation`);
+    console.log(`🏪 GROCERY SCREEN REORDER DEBUG END\n`);
   };
 
   // Save current mobile list back to backend
   const saveToBackend = async () => {
-    if (isSaving) return;
+    if (isSaving) {
+      console.log('🚫 SAVE SKIPPED: Already saving in progress');
+      return;
+    }
     
     try {
       setIsSaving(true);
-      console.log('💾 Saving grocery list to backend...');
+      console.log(`\n💾 SAVE DEBUG START - ${new Date().toLocaleTimeString()}`);
+      console.log(`📱 SAVING: ${groceryItems.length} items`);
+      console.log(`📋 CURRENT BACKEND LIST:`, currentBackendList ? `ID: ${currentBackendList.id}, Name: "${currentBackendList.list_name}"` : 'None');
+      console.log(`📝 LIST TITLE: "${listTitle}"`);
       
       // Convert mobile data back to backend format
       const backendData = MobileGroceryAdapter.mobileToBackend(
@@ -167,27 +294,58 @@ export default function GroceryListScreen() {
         listTitle
       );
       
+      console.log(`🔄 BACKEND DATA PREPARED:`, backendData);
+      
       let result;
       if (currentBackendList && currentBackendList.id) {
         // Update existing list
+        console.log(`🔄 UPDATING existing list ID: ${currentBackendList.id}`);
         result = await YesChefAPI.updateGroceryList(currentBackendList.id, backendData);
       } else {
-        // Create new list
-        result = await YesChefAPI.saveGroceryList(backendData);
+        // This should rarely happen - prefer updating over creating
+        console.log(`⚠️ WARNING: No current backend list found!`);
+        console.log(`📋 Current backend list:`, currentBackendList);
+        
+        // Try to find an existing list with the same name instead of creating new
+        const existingList = availableLists.find(list => list.list_name === listTitle);
+        if (existingList) {
+          console.log(`🔄 FOUND existing list with same name, updating ID: ${existingList.id}`);
+          setCurrentBackendList(existingList);
+          result = await YesChefAPI.updateGroceryList(existingList.id, backendData);
+        } else {
+          console.log(`➕ CREATING new list as last resort`);
+          result = await YesChefAPI.saveGroceryList(backendData);
+        }
       }
       
       if (result.success) {
-        console.log('✅ Grocery list saved successfully');
+        console.log(`✅ SAVE SUCCESS: List saved successfully`);
+        console.log(`📋 RESULT:`, result);
         setLastSaved(new Date());
         
         // If it was a new list, update our current backend reference
         if (!currentBackendList && result.list) {
+          console.log(`📋 SETTING current backend list to new list:`, result.list);
           setCurrentBackendList(result.list);
         }
         
+        // CRITICAL: Refresh available lists to show updated names
+        console.log(`🔄 REFRESHING available lists to show updated names`);
+        try {
+          const listsResult = await YesChefAPI.getGroceryLists();
+          if (listsResult.success) {
+            setAvailableLists(listsResult.lists);
+            console.log(`✅ Available lists refreshed: ${listsResult.lists.length} lists`);
+          }
+        } catch (refreshError) {
+          console.log(`⚠️ Could not refresh available lists:`, refreshError);
+        }
+        
+        console.log(`💾 SAVE DEBUG END - SUCCESS\n`);
         return { success: true };
       } else {
-        console.error('❌ Failed to save grocery list:', result.error);
+        console.error(`❌ SAVE FAILED:`, result.error);
+        console.log(`💾 SAVE DEBUG END - FAILED\n`);
         return { success: false, error: result.error };
       }
       
@@ -203,17 +361,130 @@ export default function GroceryListScreen() {
   const [saveTimeout, setSaveTimeout] = useState(null);
   
   const autoSave = () => {
+    // Clear any existing timeout
     if (saveTimeout) {
       clearTimeout(saveTimeout);
     }
     
+    // Don't start new save timer if already saving
+    if (isSaving) {
+      return;
+    }
+    
     const timeout = setTimeout(() => {
-      saveToBackend();
-    }, 2000); // Auto-save 2 seconds after last change
+      // Double-check we're not saving when the timeout fires
+      if (!isSaving) {
+        saveToBackend();
+      }
+    }, 3000); // 3 seconds to reduce spam
     
     setSaveTimeout(timeout);
   };
   
+  const [showLoadModal, setShowLoadModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [households, setHouseholds] = useState([]);
+  const [householdMembers, setHouseholdMembers] = useState([]);
+
+  // Load households for invitation
+  const loadHouseholds = async () => {
+    try {
+      const result = await FriendsAPI.getHouseholds();
+      if (result.success) {
+        setHouseholds(result.households);
+      } else {
+        console.error('Failed to load households:', result.error);
+      }
+    } catch (error) {
+      console.error('Error loading households:', error);
+    }
+  };
+
+  // Load household members for invitation
+  const loadHouseholdMembers = async (householdId) => {
+    try {
+      const result = await FriendsAPI.getHouseholdMembers(householdId);
+      if (result.success) {
+        setHouseholdMembers(result.members);
+      } else {
+        console.error('Failed to load household members:', result.error);
+        setHouseholdMembers([]);
+      }
+    } catch (error) {
+      console.error('Error loading household members:', error);
+      setHouseholdMembers([]);
+    }
+  };
+
+  // Handle inviting household members to grocery list
+  const handleInviteToGroceryList = () => {
+    loadHouseholds();
+    setShowInviteModal(true);
+  };
+
+  // Handle inviting specific household
+  const handleInviteHousehold = async (household) => {
+    try {
+      console.log('🎯 GROCERY INVITE DEBUG: Inviting household:', household);
+      console.log('🎯 GROCERY INVITE DEBUG: Current list:', currentBackendList);
+      console.log('🎯 GROCERY INVITE DEBUG: List title:', listTitle);
+      
+      if (!currentBackendList || !currentBackendList.id) {
+        Alert.alert(
+          'Save Required', 
+          'Please save your grocery list first before inviting collaborators.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Save Now', 
+              onPress: async () => {
+                const saveResult = await saveToBackend();
+                if (saveResult.success && currentBackendList) {
+                  // Retry invitation after save
+                  handleInviteHousehold(household);
+                }
+              }
+            }
+          ]
+        );
+        return;
+      }
+      
+      // Call the backend collaboration API
+      const inviteData = {
+        resource_type: 'grocery_list',
+        resource_id: currentBackendList.id,
+        household_id: household.id,
+        permission_level: 'editor'
+      };
+      
+      console.log('🎯 GROCERY INVITE DEBUG: Sending invite data:', inviteData);
+      
+      // Call the real backend collaboration API
+      const result = await YesChefAPI.inviteToCollaborate(inviteData);
+      
+      if (result.success) {
+        Alert.alert(
+          'Invitation Sent!', 
+          `Successfully invited ${household.name} household (${household.members || 0} members) to collaborate on "${listTitle}". They will now be able to see and edit this grocery list!`
+        );
+        console.log('🎯 GROCERY INVITE SUCCESS:', result.data);
+      } else {
+        Alert.alert(
+          'Invitation Failed',
+          result.error || 'Failed to send invitation. Please try again.'
+        );
+        console.error('🎯 GROCERY INVITE FAILED:', result.error);
+      }
+      
+      setShowInviteModal(false);
+      
+    } catch (error) {
+      console.error('🎯 GROCERY INVITE ERROR:', error);
+      Alert.alert('Error', 'Failed to send invitation');
+    }
+  };
+
   // Show dialog to load different grocery lists
   const showLoadListDialog = () => {
     // Simple alert with list of available lists for now
@@ -222,17 +493,58 @@ export default function GroceryListScreen() {
       return;
     }
     
-    const listOptions = availableLists.map(list => ({
-      text: list.list_name || `List ${list.id}`,
-      onPress: () => loadGroceryListById(list.id)
-    }));
-    
-    listOptions.push({ text: 'Cancel', style: 'cancel' });
-    
+    setShowLoadModal(true);
+  };
+
+  // Delete current grocery list with confirmation
+  const deleteCurrentList = async () => {
+    if (!currentBackendList || !currentBackendList.id) {
+      Alert.alert('Cannot Delete', 'No saved list to delete. This appears to be a new unsaved list.');
+      return;
+    }
+
     Alert.alert(
-      'Load Grocery List',
-      'Choose a list to load:',
-      listOptions
+      'Delete Grocery List',
+      `Are you sure you want to permanently delete "${currentBackendList.list_name || 'this list'}"?\n\nThis action cannot be undone.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => console.log('🚫 Delete cancelled by user')
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log(`🗑️ DELETING list: ${currentBackendList.list_name} (ID: ${currentBackendList.id})`);
+              
+              const result = await YesChefAPI.deleteGroceryList(currentBackendList.id);
+              
+              if (result.success) {
+                console.log('✅ List deleted successfully');
+                
+                // Clear current state
+                setGroceryItems([]);
+                setCurrentBackendList(null);
+                setListTitle('New Grocery List');
+                setLastSaved(null);
+                
+                // Refresh available lists
+                await initializeGroceryList();
+                
+                Alert.alert('Success', 'Grocery list deleted successfully.');
+              } else {
+                console.error('❌ Failed to delete list:', result.error);
+                Alert.alert('Error', `Failed to delete list: ${result.error}`);
+              }
+            } catch (error) {
+              console.error('❌ Error deleting list:', error);
+              Alert.alert('Error', 'An error occurred while deleting the list.');
+            }
+          }
+        }
+      ]
     );
   };
   
@@ -258,11 +570,48 @@ export default function GroceryListScreen() {
   
   const completedCount = groceryItems.filter(item => item.checked).length;
   const totalCount = groceryItems.length;
+  
+  // 🔧 Use a ref to maintain stable data reference during editing
+  const stableDataRef = React.useRef([]);
+  
+  // Update stable data only when not editing, or when structural changes happen
+  React.useEffect(() => {
+    if (!editingItemId) {
+      // Not editing - update the stable reference
+      stableDataRef.current = groceryItems.sort((a, b) => a.checked - b.checked);
+    } else {
+      // Currently editing - only update the specific item being edited
+      const currentItem = groceryItems.find(item => item.id === editingItemId);
+      if (currentItem) {
+        const index = stableDataRef.current.findIndex(item => item.id === editingItemId);
+        if (index !== -1) {
+          // Update the item in place without changing the array reference
+          stableDataRef.current[index] = { ...currentItem };
+        }
+      }
+    }
+  }, [groceryItems.length, editingItemId, groceryItems.filter(item => item.checked).length]);
+  
+  // For rendering, use the current groceryItems but with the ref for DragSystem
+  const displayData = editingItemId ? stableDataRef.current : groceryItems.sort((a, b) => a.checked - b.checked);
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header with editable title and options menu */}
-      <View style={styles.header}>
+    <ImageBackground source={SELECTED_BACKGROUND} style={styles.backgroundImage} resizeMode="cover">
+      <View style={styles.overlay} />
+      
+      {/* 📱 Top Status Bar Background (Clean Header for Phone Status) */}
+      <View style={styles.topStatusBarOverlay} />
+      
+      <SafeAreaView style={styles.container}>
+        <StatusBar 
+          barStyle="dark-content" 
+          backgroundColor="transparent" 
+          translucent={true}
+          animated={true}
+        />
+        
+        {/* 🏷️ Card 1: Title Section */}
+        <View style={styles.titleCard}>
         <View style={styles.titleContainer}>
           {isEditingTitle ? (
             <TextInput
@@ -310,9 +659,9 @@ export default function GroceryListScreen() {
               saveToBackend();
             }}
           >
-            <Text style={styles.menuIcon}>💾</Text>
+            <Icon name="save" size={18} color="#22C55E" style={{marginRight: 12}} />
             <Text style={styles.menuText}>Save Now</Text>
-            {isSaving && <ActivityIndicator size="small" color="#3b82f6" />}
+            {isSaving && <ActivityIndicator size="small" color="#22C55E" />}
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -322,7 +671,7 @@ export default function GroceryListScreen() {
               showLoadListDialog();
             }}
           >
-            <Text style={styles.menuIcon}>📋</Text>
+            <Icon name="folder" size={18} color="#1E40AF" style={{marginRight: 12}} />
             <Text style={styles.menuText}>Load List</Text>
           </TouchableOpacity>
           
@@ -333,8 +682,32 @@ export default function GroceryListScreen() {
               createNewList();
             }}
           >
-            <Text style={styles.menuIcon}>➕</Text>
+            <Icon name="add" size={18} color="#E7993F" style={{marginRight: 12}} />
             <Text style={styles.menuText}>New List</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.menuDivider} />
+          
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => {
+              setShowOptionsMenu(false);
+              handleInviteToGroceryList();
+            }}
+          >
+            <Text style={{ fontSize: 18, color: "#7C3AED", marginRight: 12 }}>👥</Text>
+            <Text style={styles.menuText}>Invite</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.menuItem, styles.deleteMenuItem]}
+            onPress={() => {
+              setShowOptionsMenu(false);
+              deleteCurrentList();
+            }}
+          >
+            <Icon name="delete" size={18} color="#DC313F" style={{marginRight: 12}} />
+            <Text style={styles.deleteText}>Delete List</Text>
           </TouchableOpacity>
           
           <View style={styles.menuDivider} />
@@ -346,14 +719,14 @@ export default function GroceryListScreen() {
               initializeGroceryList();
             }}
           >
-            <Text style={styles.menuIcon}>🔄</Text>
+            <Icon name="refresh" size={18} color="#1E40AF" style={{marginRight: 12}} />
             <Text style={styles.menuText}>Refresh</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Sync Status Indicator */}
-      <View style={styles.syncStatus}>
+      {/* 📊 Card 1.5: Sync Status Indicator */}
+      <View style={styles.syncCard}>
         {isSaving ? (
           <View style={styles.syncIndicator}>
             <ActivityIndicator size="small" color="#3b82f6" />
@@ -374,38 +747,41 @@ export default function GroceryListScreen() {
         )}
       </View>
 
-      {/* Add Item Section */}
-      <View style={styles.addSection}>
+      {/* ➕ Card 2: Add Item Section */}
+      <View style={styles.addCard}>
         <TextInput
           style={styles.input}
           value={newItem}
           onChangeText={setNewItem}
-          placeholder="Add new item..."
+          placeholder="Add ingredient..."
+          placeholderTextColor="rgba(156, 163, 175, 0.8)" // Light grey placeholder text
           onSubmitEditing={addItem}
           returnKeyType="done"
         />
         <TouchableOpacity style={styles.addButton} onPress={addItem}>
-          <Ionicons name="add" size={24} color="#ffffff" />
+          <Icon name="add" size={24} color="#ffffff" />
         </TouchableOpacity>
       </View>
 
-      {/* Simple Grocery List */}
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3b82f6" />
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
-      ) : totalCount === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>Your grocery list is empty</Text>
-          <Text style={styles.emptySubtext}>Add items above to get started</Text>
-        </View>
-      ) : (
-        <SimpleDraggableList
-          data={groceryItems.sort((a, b) => a.checked - b.checked)} // Sort unchecked first
-          keyExtractor={(item) => item.id}
-          onReorder={handleReorder}
-          renderItem={({ item }) => (
+      {/* 📝 Card 3: Grocery List Items */}
+      <View style={styles.listCard}>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#3b82f6" />
+            <Text style={styles.loadingText}>Loading...</Text>
+          </View>
+        ) : totalCount === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>Your grocery list is empty</Text>
+            <Text style={styles.emptySubtext}>Add items above to get started</Text>
+          </View>
+        ) : (
+          <SimpleDraggableList
+            data={displayData}
+            keyExtractor={(item) => item.id}
+            onReorder={handleReorder}
+            key={editingItemId ? `editing-${editingItemId}` : `normal-${totalCount}`}
+            renderItem={({ item }) => (
             <View style={styles.itemContainer}>
               <TouchableOpacity 
                 style={[styles.checkbox, item.checked && styles.checkboxChecked]}
@@ -417,17 +793,27 @@ export default function GroceryListScreen() {
               {editingItemId === item.id ? (
                 <TextInput
                   style={styles.itemEditInput}
-                  value={item.name}
-                  onChangeText={(text) => updateItemName(item.id, text)}
-                  onBlur={() => setEditingItemId(null)}
-                  onSubmitEditing={() => setEditingItemId(null)}
+                  value={editingText}
+                  onChangeText={(text) => {
+                    setEditingText(text); // Only update editing text, not main state
+                  }}
+                  onBlur={() => {
+                    setEditingItemIdWithDebug(null); // This will update main state
+                    autoSave(); // Save when user finishes editing
+                  }}
+                  onSubmitEditing={() => {
+                    setEditingItemIdWithDebug(null); // This will update main state
+                    autoSave(); // Save when user presses enter
+                  }}
                   autoFocus
                   selectTextOnFocus
                 />
               ) : (
                 <TouchableOpacity 
                   style={styles.itemTextContainer}
-                  onPress={() => setEditingItemId(item.id)}
+                  onPress={() => {
+                    setEditingItemIdWithDebug(item.id);
+                  }}
                 >
                   <Text style={[styles.itemText, item.checked && styles.itemTextChecked]}>
                     {item.name}
@@ -439,43 +825,257 @@ export default function GroceryListScreen() {
                 style={styles.actionButton}
                 onPress={() => deleteItem(item.id)}
               >
-                <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                <Icon name="delete" size={18} color="#ef4444" />
               </TouchableOpacity>
             </View>
           )}
           style={styles.list}
         />
       )}
+      </View>
+
+      {/* Load List Modal */}
+      <Modal
+        visible={showLoadModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowLoadModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Header with X button */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Load Grocery List</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => {
+                  console.log('🚫 Load cancelled by user');
+                  setShowLoadModal(false);
+                }}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalSubtitle}>
+              Choose a list to load (current changes will be lost):
+            </Text>
+            
+            {/* List of available lists */}
+            <ScrollView style={styles.listContainer}>
+              {availableLists.map((list, index) => (
+                <TouchableOpacity
+                  key={list.id}
+                  style={[
+                    styles.listItem,
+                    index === availableLists.length - 1 && styles.lastListItem
+                  ]}
+                  onPress={() => {
+                    setShowLoadModal(false);
+                    loadGroceryListById(list.id);
+                  }}
+                >
+                  <Text style={styles.listName}>
+                    {list.list_name || `List ${list.id}`}
+                  </Text>
+                  <Text style={styles.listInfo}>
+                    {list.item_count || 0} items
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Invite Household Modal */}
+      <Modal
+        visible={showInviteModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowInviteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Header with X button */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Invite Household</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowInviteModal(false)}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalSubtitle}>
+              Invite a household to collaborate on "{listTitle}":
+            </Text>
+            
+            {/* List of available households */}
+            <ScrollView style={styles.listContainer}>
+              {households.length > 0 ? (
+                households.map((household, index) => (
+                  <TouchableOpacity
+                    key={household.id}
+                    style={[
+                      styles.listItem,
+                      index === households.length - 1 && styles.lastListItem
+                    ]}
+                    onPress={() => handleInviteHousehold(household)}
+                  >
+                    <Text style={styles.listName}>
+                      {household.name}
+                    </Text>
+                    <Text style={styles.listInfo}>
+                      {household.members || 0} members
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyText}>No households found</Text>
+                  <Text style={styles.emptySubtext}>Create a household first to invite members</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  // 🎨 Background and Overlay Styles
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  topStatusBarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 50, // Enough to cover status bar area
+    backgroundColor: 'rgba(255, 255, 255, 0.95)', // More opaque for better status bar visibility
+    zIndex: 3, // Above main overlay to ensure status bar area is clearly visible
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)', // White opaque overlay for readability
+    zIndex: 1,
+  },
+  
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: 'transparent', // Changed from '#ffffff' to transparent
+    zIndex: 2, // Above overlay
+    paddingTop: 50, // Add padding to push content below status bar
   },
-  header: {
+  
+  // 🎨 Card Styles - Beautiful bubble design
+  titleCard: {
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#fafbfc',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)', // Semi-transparent white
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: 'rgba(229, 231, 235, 0.5)',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    marginHorizontal: 16,
+    marginTop: 8, // Back to small margin since container has padding
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  syncCard: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  addCard: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    alignItems: 'center',
+  },
+  listCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    paddingVertical: 8,
+  },
+  
+  header: {
+    paddingHorizontal: 20, // Consistent padding with other screens
+    paddingVertical: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)', // Semi-transparent white
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(229, 231, 235, 0.5)', // Semi-transparent border
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginHorizontal: 16, // Add margin for padding effect
+    marginTop: 16, // Top margin for spacing
+    borderRadius: 12, // Rounded corners to match other screens
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  mainContent: {
+    flex: 1,
+    paddingHorizontal: 16, // Consistent padding with other screens
+    paddingTop: 8, // Small top padding for spacing
   },
   titleContainer: {
     flex: 1,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontFamily: 'Nunito-ExtraBold',
     color: '#111827',
   },
   titleInput: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontFamily: 'Nunito-ExtraBold',
     color: '#111827',
     borderBottomWidth: 1,
     borderBottomColor: '#3b82f6',
@@ -497,8 +1097,8 @@ const styles = StyleSheet.create({
   },
   optionsMenu: {
     position: 'absolute',
-    top: 80,
-    right: 20,
+    top: 130,
+    right: 25,
     backgroundColor: '#ffffff',
     borderRadius: 12,
     paddingVertical: 8,
@@ -522,6 +1122,7 @@ const styles = StyleSheet.create({
   },
   menuText: {
     fontSize: 16,
+    fontFamily: 'Nunito-Regular',
     color: '#374151',
     flex: 1,
   },
@@ -530,8 +1131,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#e5e7eb',
     marginVertical: 4,
   },
+  deleteMenuItem: {
+    backgroundColor: '#fef2f2', // Light red background
+  },
+  deleteIcon: {
+    fontSize: 16,
+    marginRight: 12,
+  },
+  deleteText: {
+    fontSize: 16,
+    color: '#dc2626', // Red text
+    flex: 1,
+    fontWeight: '500',
+  },
   itemCount: {
     fontSize: 14,
+    fontFamily: 'Nunito-Regular',
     color: '#6b7280',
     marginTop: 4,
   },
@@ -557,13 +1172,13 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     height: 48,
-    backgroundColor: '#f9fafb',
+    backgroundColor: 'rgba(249, 250, 251, 0.8)', // Semi-transparent
     borderRadius: 12,
     paddingHorizontal: 16,
     fontSize: 16,
     marginRight: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(229, 231, 235, 0.5)', // Semi-transparent border
   },
   addButton: {
     width: 48,
@@ -635,6 +1250,7 @@ const styles = StyleSheet.create({
   },
   itemText: {
     fontSize: 16,
+    fontFamily: 'Nunito-Regular',
     color: '#111827',
     paddingVertical: 4,
   },
@@ -660,5 +1276,86 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     borderRadius: 6,
     backgroundColor: '#f9fafb',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 0,
+    maxHeight: '80%',
+    width: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    fontSize: 18,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  listContainer: {
+    maxHeight: 300,
+    marginHorizontal: 16, // Add horizontal margins for padding effect
+    marginTop: 8, // Small top margin for spacing
+  },
+  listItem: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(243, 244, 246, 0.5)', // Semi-transparent
+    backgroundColor: 'rgba(255, 255, 255, 0.8)', // Semi-transparent white background
+    marginHorizontal: 4, // Small margin between items
+    marginVertical: 2, // Small vertical margin
+    borderRadius: 8, // Rounded corners for card effect
+  },
+  lastListItem: {
+    borderBottomWidth: 0,
+  },
+  listName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  listInfo: {
+    fontSize: 14,
+    color: '#6b7280',
   },
 });

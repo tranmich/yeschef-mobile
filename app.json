@@ -14,6 +14,11 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "fonts": [
+      "./assets/images/fonts/Nunito-Regular.ttf",
+      "./assets/images/fonts/Nunito-Light.ttf",
+      "./assets/images/fonts/Nunito-ExtraBold.ttf"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.yeschef.mobile"
@@ -34,14 +39,21 @@
         "expo-build-properties",
         {
           "android": {
-            "enableProguardInReleaseBuilds": true
+            "enableProguardInReleaseBuilds": true,
+            "enableMinifyInReleaseBuilds": true
           },
           "ios": {
             "deploymentTarget": "15.1"
           }
         }
       ],
-      "expo-secure-store"
-    ]
+      "expo-secure-store",
+      "expo-sqlite"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1ac57b40-1ae9-4cf5-9adb-8ca4eed47fde"
+      }
+    }
   }
 }

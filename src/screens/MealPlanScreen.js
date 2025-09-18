@@ -1,262 +1,1669 @@
-﻿import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
+  TextInput,
   SafeAreaView,
+  TouchableWithoutFeedback,
+  ScrollView,
+  Modal,
+  Alert,
+  ImageBackground,
+  StatusBar,
 } from 'react-native';
+import { Icon, IconButton } from '../components/IconLibrary';
+import { ThemedText, typography } from '../components/Typography';
+import { SimpleDraggableList } from '../components/DragSystem';
+import { 
+  CrossContainerDragProvider, 
+  CrossContainerDraggableList 
+} from '../components/CrossContainerDragSystem';
+import MobileMealPlanAdapter from '../services/MobileMealPlanAdapter';
+import MealPlanAPI from '../services/MealPlanAPI';
+import YesChefAPI from '../services/YesChefAPI';
+import FriendsAPI from '../services/FriendsAPI';
+import MobileGroceryAdapter from '../services/MobileGroceryAdapter';
 
-export default function MealPlanScreen() {
-  const [selectedWeek, setSelectedWeek] = useState(0);
+function MealPlanScreen({ navigation }) {
+  // 🎨 Background Configuration (matches HomeScreen)
+  const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/home_green.jpg');
+  
+  // Main meal plan state
+  const [mealPlanTitle, setMealPlanTitle] = useState('Weekly Meal Plan');
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [showDayOptionsMenu, setShowDayOptionsMenu] = useState(null); // Track which day's menu is open
+  const [showMealOptionsMenu, setShowMealOptionsMenu] = useState(null); // Track which meal's menu is open
+  const [editingDayId, setEditingDayId] = useState(null); // Track which day name is being edited
+  const [editingMealId, setEditingMealId] = useState(null); // Track which meal name is being edited
+  const [isLoading, setIsLoading] = useState(false); // Track API loading states
+  const [showLoadModal, setShowLoadModal] = useState(false); // Show load plans modal
+  const [availablePlans, setAvailablePlans] = useState([]); // Available plans to load
+  const [currentPlanId, setCurrentPlanId] = useState(null); // Track currently loaded plan for refresh
+  const [lastRefreshTime, setLastRefreshTime] = useState(0); // Throttle refreshes
+  
+  // Invite functionality state
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [households, setHouseholds] = useState([]);
+  const [householdMembers, setHouseholdMembers] = useState([]);
+  
+  // Day management state
+  const [days, setDays] = useState([
+    {
+      id: 1,
+      name: 'Day 1',
+      isExpanded: true,
+      meals: [
+        { id: 'breakfast-1', name: 'Breakfast', recipes: [] },
+        { id: 'lunch-1', name: 'Lunch', recipes: [] },
+        { id: 'dinner-1', name: 'Dinner', recipes: [] },
+      ]
+    }
+  ]);
 
-  // Mock meal plan data (will be replaced with real data from your backend)
-  const mockMealPlan = {
-    weekOf: '2025-09-07',
-    days: [
-      {
-        date: 'Mon, Sep 7',
-        meals: {
-          breakfast: { id: '1', title: 'Fluffy Pancakes', status: 'planned' },
-          lunch: { id: '2', title: 'Caesar Salad', status: 'planned' },
-          dinner: { id: '3', title: 'Spaghetti Carbonara', status: 'cooked' },
-        }
-      },
-      {
-        date: 'Tue, Sep 8',
-        meals: {
-          breakfast: null,
-          lunch: { id: '4', title: 'Chicken Sandwich', status: 'planned' },
-          dinner: { id: '5', title: 'Beef Stir Fry', status: 'planned' },
-        }
-      },
-      {
-        date: 'Wed, Sep 9',
-        meals: {
-          breakfast: { id: '6', title: 'Avocado Toast', status: 'planned' },
-          lunch: null,
-          dinner: { id: '7', title: 'Salmon with Rice', status: 'planned' },
-        }
-      },
-      {
-        date: 'Thu, Sep 10',
-        meals: {
-          breakfast: null,
-          lunch: null,
-          dinner: null,
-        }
-      },
-      {
-        date: 'Fri, Sep 11',
-        meals: {
-          breakfast: null,
-          lunch: null,
-          dinner: { id: '8', title: 'Pizza Night', status: 'planned' },
-        }
-      },
-      {
-        date: 'Sat, Sep 12',
-        meals: {
-          breakfast: { id: '9', title: 'Weekend Brunch', status: 'planned' },
-          lunch: null,
-          dinner: null,
-        }
-      },
-      {
-        date: 'Sun, Sep 13',
-        meals: {
-          breakfast: null,
-          lunch: { id: '10', title: 'Sunday Roast', status: 'planned' },
-          dinner: null,
-        }
-      },
-    ]
-  };
+  // 🔄 Refresh meal plan when screen comes into focus (e.g., returning from My Recipes)
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('👁️ Meal Plan screen focused - checking for updates...');
+      if (currentPlanId) {
+        console.log('🔄 Refreshing current plan due to screen focus');
+        // Add a small delay to ensure any pending saves are completed
+        setTimeout(() => {
+          refreshCurrentPlan();
+        }, 500);
+      } else {
+        console.log('📋 No current plan loaded - staying with current state');
+        // Removed auto-load logic - let the user manually load plans if needed
+      }
+    }, [currentPlanId, days])
+  );
 
-  const generateGroceryList = () => {
-    // This would collect all ingredients from planned meals
-    alert('Grocery list generated from your meal plan!');
-  };
+  // API Functions (Stage 2: Real backend integration)
 
-  const addMeal = (dayIndex, mealType) => {
-    alert(`Add ${mealType} for ${mockMealPlan.days[dayIndex].date}`);
-  };
-
-  const renderMealSlot = (meal, dayIndex, mealType) => {
-    if (meal) {
-      return (
-        <TouchableOpacity style={[styles.mealSlot, styles.mealSlotFilled]}>
-          <Text style={styles.mealTitle}>{meal.title}</Text>
-          <Text style={styles.mealStatus}>
-            {meal.status === 'cooked' ? '✅ Cooked' : '📝 Planned'}
-          </Text>
-        </TouchableOpacity>
-      );
+  const handleSave = async () => {
+    if (!mealPlanTitle.trim()) {
+      console.log('⚠️ No plan title provided, using default');
+      setMealPlanTitle('My Meal Plan');
     }
 
-    return (
-      <TouchableOpacity
-        style={[styles.mealSlot, styles.mealSlotEmpty]}
-        onPress={() => addMeal(dayIndex, mealType)}
-      >
-        <Text style={styles.addMealText}>+ Add {mealType}</Text>
-      </TouchableOpacity>
+    setIsLoading(true);
+    console.log('💾 Saving meal plan:', mealPlanTitle);
+    
+    try {
+      const result = await MealPlanAPI.saveMealPlan(days, mealPlanTitle);
+      
+      if (result.success) {
+        console.log('✅ Meal plan saved successfully! Plan ID:', result.planId);
+        // Update the current plan ID so we can track this plan for future updates
+        setCurrentPlanId(result.planId);
+        console.log('🆔 Set current plan ID to:', result.planId);
+        // Could show success message to user here
+      } else {
+        console.error('❌ Save failed:', result.error);
+        // Could show error message to user here
+      }
+    } catch (error) {
+      console.error('💥 Save error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLoad = async () => {
+    setIsLoading(true);
+    console.log('� Loading meal plans list...');
+    
+    try {
+      const result = await MealPlanAPI.loadMealPlansList();
+      
+      if (result.success) {
+        console.log(`✅ Found ${result.plans.length} meal plans`);
+        console.log('📋 Available plans:', result.plans.map(p => ({ id: p.id, name: p.plan_name })));
+        
+        setAvailablePlans(result.plans);
+        setShowLoadModal(true); // Show selection modal instead of auto-loading
+      } else {
+        console.error('❌ Load failed:', result.error);
+      }
+    } catch (error) {
+      console.error('💥 Load error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadSpecificPlan = async (planId) => {
+    setIsLoading(true);
+    console.log('📂 Loading specific plan:', planId);
+    
+    try {
+      const result = await MealPlanAPI.loadMealPlan(planId);
+      
+      if (result.success) {
+        console.log('✅ Plan loaded successfully!');
+        console.log('🔄 Setting mobile data:', result.mobileDays);
+        
+        // Update the mobile app state with loaded data
+        setDays(result.mobileDays);
+        setMealPlanTitle(result.planTitle);
+        setCurrentPlanId(planId); // Track the loaded plan
+        
+        console.log('🎉 Meal plan loaded into mobile app!');
+      } else {
+        console.error('❌ Load specific plan failed:', result.error);
+      }
+    } catch (error) {
+      console.error('💥 Load specific plan error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 🆕 Refresh current meal plan (for when returning from other screens)
+  const refreshCurrentPlan = async () => {
+    if (!currentPlanId) {
+      console.log('📋 No current plan to refresh');
+      return;
+    }
+    
+    // Throttle refreshes to avoid multiple calls
+    const now = Date.now();
+    if (now - lastRefreshTime < 2000) { // 2 second throttle
+      console.log('🚫 Refresh throttled - too soon since last refresh');
+      return;
+    }
+    setLastRefreshTime(now);
+    
+    console.log('🔄 Refreshing current meal plan:', currentPlanId);
+    console.log('📊 Current state before refresh:', {
+      daysCount: days.length,
+      totalRecipes: days.reduce((total, day) => total + day.meals.reduce((mealTotal, meal) => mealTotal + (meal.recipes?.length || 0), 0), 0)
+    });
+    
+    try {
+      const result = await MealPlanAPI.loadMealPlan(currentPlanId);
+      console.log('📡 Refresh API response: success=' + result.success + ', days=' + (result.mobileDays?.length || 0));
+      
+      if (result.success) {
+        console.log('✅ Plan refreshed successfully!');
+        console.log('📊 New data:', {
+          daysCount: result.mobileDays.length,
+          totalRecipes: result.mobileDays.reduce((total, day) => total + day.meals.reduce((mealTotal, meal) => mealTotal + (meal.recipes?.length || 0), 0), 0)
+        });
+        
+        setDays(result.mobileDays);
+        setMealPlanTitle(result.planTitle);
+        
+        console.log(`🔄 State updated with ${result.mobileDays.length} days`);
+        
+        // Compact meal structure logging for debugging
+        result.mobileDays.forEach((day, dayIndex) => {
+          const mealSummary = day.meals.map(meal => `${meal.name}:${meal.recipes?.length || 0}`).join(', ');
+          console.log(`📅 ${day.name}: ${mealSummary}`);
+        });
+      } else {
+        console.log('❌ Refresh failed:', result);
+      }
+    } catch (error) {
+      console.error('💥 Refresh error:', error);
+    }
+  };
+
+  const handleNew = () => {
+    console.log('➕ Creating new meal plan');
+    setDays([
+      {
+        id: 1,
+        name: 'Day 1',
+        isExpanded: true,
+        meals: [
+          { id: 'breakfast-1', name: 'Breakfast', recipes: [] },
+          { id: 'lunch-1', name: 'Lunch', recipes: [] },
+          { id: 'dinner-1', name: 'Dinner', recipes: [] },
+        ]
+      }
+    ]);
+    setMealPlanTitle('New Meal Plan');
+  };
+
+  const handleDelete = () => {
+    if (!currentPlanId) {
+      Alert.alert('Error', 'No meal plan is currently loaded to delete.');
+      return;
+    }
+
+    Alert.alert(
+      'Delete Meal Plan',
+      `Are you sure you want to delete "${mealPlanTitle}"?\n\nThis action cannot be undone.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setIsLoading(true);
+            try {
+              console.log('🗑️ Deleting meal plan:', currentPlanId);
+              const result = await MealPlanAPI.deleteMealPlan(currentPlanId);
+              
+              if (result.success) {
+                console.log('✅ Meal plan deleted successfully');
+                
+                // Clear the current plan state
+                setCurrentPlanId(null);
+                setMealPlanTitle('Weekly Meal Plan');
+                setDays([
+                  {
+                    id: 1,
+                    name: 'Day 1',
+                    isExpanded: true,
+                    meals: [
+                      { id: 'breakfast-1', name: 'Breakfast', recipes: [] },
+                      { id: 'lunch-1', name: 'Lunch', recipes: [] },
+                      { id: 'dinner-1', name: 'Dinner', recipes: [] },
+                    ]
+                  }
+                ]);
+                
+                Alert.alert('Success', 'Meal plan deleted successfully');
+              } else {
+                console.error('❌ Delete failed:', result.error);
+                Alert.alert('Error', result.error || 'Failed to delete meal plan');
+              }
+            } catch (error) {
+              console.error('💥 Delete error:', error);
+              Alert.alert('Error', 'Failed to delete meal plan');
+            } finally {
+              setIsLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+  
+  const handleAddDay = () => {
+    const newDayId = Date.now();
+    const newDay = {
+      id: newDayId,
+      name: 'New Day',
+      isExpanded: true,
+      meals: [
+        { id: `breakfast-${newDayId}`, name: 'Breakfast', recipes: [] },
+        { id: `lunch-${newDayId}`, name: 'Lunch', recipes: [] },
+        { id: `dinner-${newDayId}`, name: 'Dinner', recipes: [] },
+      ]
+    };
+    setDays([...days, newDay]);
+    // Auto-edit the new day name
+    setEditingDayId(newDayId);
+  };
+    const handleGenerateGroceryList = async () => {
+    if (!currentPlanId) {
+      Alert.alert('No Meal Plan', 'Please save your meal plan first to generate a grocery list.');
+      return;
+    }
+
+    try {
+      console.log('🛒 Generating grocery list for plan:', currentPlanId);
+      
+      // Show loading state
+      Alert.alert('Generating...', 'Creating your grocery list from meal plan recipes.');
+
+      // Call the existing API to generate grocery list from meal plan
+      const response = await YesChefAPI.generateGroceryListFromMealPlan(currentPlanId);
+      
+      if (response.success && response.grocery_list) {
+        console.log('✅ Grocery list generated successfully');
+        
+        // Convert backend format to mobile format using existing adapter
+        const mobileItems = MobileGroceryAdapter.backendToMobile({
+          list_data: response
+        });
+
+        console.log('📱 Converted to mobile format:', mobileItems.length, 'items');
+        
+        // Store the generated list for the grocery screen to access
+        global.tempGeneratedGroceryList = {
+          items: mobileItems,
+          title: `Grocery List - ${mealPlanTitle}`,
+          sourceType: 'meal_plan',
+          sourceName: mealPlanTitle,
+          generatedAt: new Date().toISOString()
+        };
+        
+        console.log('✅ Grocery list ready for grocery screen');
+        
+        // Show success message with option to view list
+        Alert.alert(
+          'Grocery List Generated!', 
+          `Successfully generated ${mobileItems.length} items from your meal plan.`,
+          [
+            { text: 'Stay Here', style: 'cancel' },
+            { 
+              text: 'View List', 
+              onPress: () => navigation.navigate('Grocery')
+            }
+          ]
+        );
+        
+      } else {
+        console.error('❌ Failed to generate grocery list:', response);
+        Alert.alert('Generation Failed', response.message || response.error || 'Could not generate grocery list from meal plan.');
+      }
+      
+    } catch (error) {
+      console.error('💥 Error generating grocery list:', error);
+      Alert.alert('Error', 'Failed to generate grocery list. Please try again.');
+    }
+  };
+
+  // Recipe action handlers
+  const handleToggleRecipeComplete = (dayId, mealId, recipeId) => {
+    console.log(`🍽️ Toggling recipe completion: ${recipeId} in meal ${mealId} on day ${dayId}`);
+    
+    setDays(prevDays => 
+      prevDays.map(day => 
+        day.id === dayId 
+          ? {
+              ...day,
+              meals: day.meals.map(meal =>
+                meal.id === mealId
+                  ? {
+                      ...meal,
+                      recipes: meal.recipes.map(recipe =>
+                        recipe.id === recipeId
+                          ? { ...recipe, isCompleted: !recipe.isCompleted }
+                          : recipe
+                      )
+                    }
+                  : meal
+              )
+            }
+          : day
+      )
     );
   };
 
-  const renderDay = (day, dayIndex) => (
-    <View key={dayIndex} style={styles.dayContainer}>
-      <Text style={styles.dayHeader}>{day.date}</Text>
-      
-      <View style={styles.mealsContainer}>
-        <View style={styles.mealSection}>
-          <Text style={styles.mealTypeLabel}>🌅 Breakfast</Text>
-          {renderMealSlot(day.meals.breakfast, dayIndex, 'breakfast')}
-        </View>
-        
-        <View style={styles.mealSection}>
-          <Text style={styles.mealTypeLabel}>☀️ Lunch</Text>
-          {renderMealSlot(day.meals.lunch, dayIndex, 'lunch')}
-        </View>
-        
-        <View style={styles.mealSection}>
-          <Text style={styles.mealTypeLabel}>🌙 Dinner</Text>
-          {renderMealSlot(day.meals.dinner, dayIndex, 'dinner')}
-        </View>
-      </View>
-    </View>
-  );
+  const handleDeleteRecipe = (dayId, mealId, recipeId) => {
+    console.log(`🗑️ Deleting recipe: ${recipeId} from meal ${mealId} on day ${dayId}`);
+    
+    setDays(prevDays => 
+      prevDays.map(day => 
+        day.id === dayId 
+          ? {
+              ...day,
+              meals: day.meals.map(meal =>
+                meal.id === mealId
+                  ? {
+                      ...meal,
+                      recipes: meal.recipes.filter(recipe => recipe.id !== recipeId)
+                    }
+                  : meal
+              )
+            }
+          : day
+      )
+    );
+  };
 
-  const plannedMealsCount = mockMealPlan.days.reduce((count, day) => {
-    return count + 
-      (day.meals.breakfast ? 1 : 0) +
-      (day.meals.lunch ? 1 : 0) +
-      (day.meals.dinner ? 1 : 0);
+  const handleViewRecipe = (recipeId) => {
+    console.log(`👁️ Viewing recipe: ${recipeId}`);
+    
+    // Handle temporary IDs (user-added recipes that don't exist in database)
+    if (recipeId.toString().startsWith('temp-') || recipeId.toString().startsWith('unknown-')) {
+      alert('This recipe was added manually and cannot be viewed in detail.\n\nOnly recipes from the database can be opened.');
+      return;
+    }
+
+    // Navigate to RecipeViewScreen with recipe ID
+    navigation.navigate('RecipeDetail', { recipeId: recipeId });
+  };
+
+  // Recipe drag reorder handler
+  const handleRecipeReorder = (dayId, mealId, newRecipes, draggedRecipe, fromIndex, toIndex) => {
+    console.log(`🔄 Reordering recipe "${draggedRecipe.title}" from ${fromIndex} to ${toIndex} in ${mealId} on day ${dayId}`);
+    
+    setDays(prevDays => 
+      prevDays.map(day => 
+        day.id === dayId 
+          ? {
+              ...day,
+              meals: day.meals.map(meal =>
+                meal.id === mealId
+                  ? { ...meal, recipes: newRecipes }
+                  : meal
+              )
+            }
+          : day
+      )
+    );
+  };
+
+  // Meal reorder handler (NEW)
+  const handleMealReorder = (dayId, newMealsOrder) => {
+    console.log(`🔄 Reordering meals in day ${dayId}:`, newMealsOrder.map(m => m.name));
+    
+    setDays(prevDays => 
+      prevDays.map(day => 
+        day.id === dayId 
+          ? { ...day, meals: newMealsOrder }
+          : day
+      )
+    );
+  };
+
+  // Cross-container move handler (NEW)
+  const handleCrossContainerMove = (recipe, sourceContainer, targetContainer) => {
+    console.log(`🔄 Cross-container move: "${recipe.title}" from ${sourceContainer.dayId}-${sourceContainer.mealId} to ${targetContainer.dayId}-${targetContainer.mealId}`);
+    
+    setDays(prevDays => {
+      return prevDays.map(day => {
+        // Handle same day moves (both remove and add in one operation)
+        if (day.id === sourceContainer.dayId && day.id === targetContainer.dayId) {
+          console.log(`📋 Same day move within day ${day.id}`);
+          return {
+            ...day,
+            meals: day.meals.map(meal => {
+              // Remove from source meal
+              if (meal.id === sourceContainer.mealId) {
+                return { ...meal, recipes: meal.recipes.filter(r => r.id !== recipe.id) };
+              }
+              // Add to target meal
+              else if (meal.id === targetContainer.mealId) {
+                return { ...meal, recipes: [...meal.recipes, recipe] };
+              }
+              // Other meals unchanged
+              return meal;
+            })
+          };
+        }
+        // Handle cross-day moves - remove from source
+        else if (day.id === sourceContainer.dayId) {
+          console.log(`📤 Removing from source day ${day.id}`);
+          return {
+            ...day,
+            meals: day.meals.map(meal =>
+              meal.id === sourceContainer.mealId
+                ? { ...meal, recipes: meal.recipes.filter(r => r.id !== recipe.id) }
+                : meal
+            )
+          };
+        }
+        // Handle cross-day moves - add to target
+        else if (day.id === targetContainer.dayId) {
+          console.log(`📥 Adding to target day ${day.id}`);
+          return {
+            ...day,
+            meals: day.meals.map(meal =>
+              meal.id === targetContainer.mealId
+                ? { ...meal, recipes: [...meal.recipes, recipe] }
+                : meal
+            )
+          };
+        }
+        // Other days unchanged
+        // Other days unchanged
+        return day;
+      });
+    });
+  };
+
+  // Day handlers (placeholders)
+  const toggleDayExpansion = (dayId) => {
+    setDays(days.map(day => 
+      day.id === dayId ? { ...day, isExpanded: !day.isExpanded } : day
+    ));
+  };
+
+  const handleAddMeal = (dayId) => {
+    const newMealId = `meal-${Date.now()}`;
+    setDays(days.map(day => 
+      day.id === dayId 
+        ? {
+            ...day, 
+            meals: [...day.meals, { 
+              id: newMealId, 
+              name: 'New Meal', 
+              recipes: [] 
+            }]
+          }
+        : day
+    ));
+    // Auto-edit the new meal name
+    setEditingMealId(newMealId);
+  };
+
+  const handleRemoveSection = (dayId) => {
+    // Remove the last meal section from the day
+    setDays(days.map(day => 
+      day.id === dayId && day.meals.length > 1
+        ? { ...day, meals: day.meals.slice(0, -1) }
+        : day
+    ));
+  };
+
+  const handleDeleteMeal = (dayId, mealId) => {
+    console.log(`🗑️ Deleting meal section: ${mealId} from day ${dayId}`);
+    
+    setDays(prevDays => 
+      prevDays.map(day => 
+        day.id === dayId 
+          ? {
+              ...day,
+              meals: day.meals.filter(meal => meal.id !== mealId)
+            }
+          : day
+      )
+    );
+  };
+  
+  const handleDeleteDay = (dayId) => {
+    setDays(days.filter(day => day.id !== dayId));
+  };
+
+  // Editing functions
+  const updateDayName = (dayId, newName) => {
+    setDays(days.map(day => 
+      day.id === dayId ? { ...day, name: newName } : day
+    ));
+  };
+
+  const updateMealName = (dayId, mealId, newName) => {
+    setDays(days.map(day => 
+      day.id === dayId 
+        ? {
+            ...day, 
+            meals: day.meals.map(meal => 
+              meal.id === mealId ? { ...meal, name: newName } : meal
+            )
+          }
+        : day
+    ));
+  };
+  
+  // Wrapper for grocery list generation for menu
+  const handleConvertToGroceryList = () => {
+    handleGenerateGroceryList();
+  };
+
+  // Calculate total number of meals for display
+  const totalMealCount = days.reduce((total, day) => {
+    return total + day.meals.reduce((dayTotal, meal) => {
+      return dayTotal + meal.recipes.length;
+    }, 0);
   }, 0);
 
+  // Load households for invitation
+  const loadHouseholds = async () => {
+    console.log('🏠 HOUSEHOLDS DEBUG: Loading households...');
+    try {
+      const result = await FriendsAPI.getHouseholds();
+      console.log('🏠 HOUSEHOLDS DEBUG: API result:', result);
+      if (result.success) {
+        setHouseholds(result.households);
+        console.log('🏠 HOUSEHOLDS DEBUG: Set households:', result.households);
+      } else {
+        console.error('Failed to load households:', result.error);
+      }
+    } catch (error) {
+      console.error('Error loading households:', error);
+    }
+  };
+
+  // Handle inviting household members to meal plan
+  const handleInviteToMealPlan = () => {
+    console.log('🎯 INVITE DEBUG: handleInviteToMealPlan called');
+    console.log('🎯 INVITE DEBUG: Current meal plan title:', mealPlanTitle);
+    console.log('🎯 INVITE DEBUG: Current plan ID:', currentPlanId);
+    loadHouseholds();
+    setShowInviteModal(true);
+    console.log('🎯 INVITE DEBUG: Modal should be opening...');
+  };
+
+  // Handle inviting specific household
+  const handleInviteHousehold = async (household) => {
+    try {
+      console.log('🎯 INVITE DEBUG: Inviting household:', household);
+      console.log('🎯 INVITE DEBUG: Current plan ID:', currentPlanId);
+      console.log('🎯 INVITE DEBUG: Current plan title:', mealPlanTitle);
+      
+      if (!currentPlanId) {
+        Alert.alert(
+          'Save Required', 
+          'Please save your meal plan first before inviting collaborators.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Save Now', 
+              onPress: async () => {
+                const saveResult = await handleSave();
+                if (saveResult && currentPlanId) {
+                  // Retry invitation after save
+                  handleInviteHousehold(household);
+                }
+              }
+            }
+          ]
+        );
+        return;
+      }
+      
+      // Call the backend collaboration API
+      const inviteData = {
+        resource_type: 'meal_plan',
+        resource_id: currentPlanId,
+        household_id: household.id,
+        permission_level: 'editor'
+      };
+      
+      console.log('🎯 INVITE DEBUG: Sending invite data:', inviteData);
+      
+      // Call the real backend collaboration API
+      const result = await YesChefAPI.inviteToCollaborate(inviteData);
+      
+      if (result.success) {
+        Alert.alert(
+          'Invitation Sent!', 
+          `Successfully invited ${household.name} household (${household.members || 0} members) to collaborate on "${mealPlanTitle}". They will now be able to see and edit this meal plan!`
+        );
+        console.log('🎯 INVITE SUCCESS:', result.data);
+      } else {
+        Alert.alert(
+          'Invitation Failed',
+          result.error || 'Failed to send invitation. Please try again.'
+        );
+        console.error('🎯 INVITE FAILED:', result.error);
+      }
+      
+      setShowInviteModal(false);
+      
+    } catch (error) {
+      console.error('🎯 INVITE ERROR:', error);
+      Alert.alert('Error', 'Failed to send invitation');
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Meal Plan</Text>
-        <Text style={styles.subtitle}>Week of {mockMealPlan.weekOf}</Text>
-        <Text style={styles.counter}>{plannedMealsCount} meals planned</Text>
-      </View>
+    <ImageBackground source={SELECTED_BACKGROUND} style={styles.backgroundImage} resizeMode="cover">
+      <View style={styles.overlay} />
+      
+      {/* 📱 Top Status Bar Background (Clean Header for Phone Status) */}
+      <View style={styles.topStatusBarOverlay} />
+      
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} animated={true} />
+      
+      <TouchableWithoutFeedback onPress={() => setShowMealOptionsMenu(null)}>
+        <View style={{ flex: 1 }}>
+          <CrossContainerDragProvider onCrossContainerMove={handleCrossContainerMove}>
+            
+            {/* 🏷️ Card 1: Title Section */}
+            <View style={styles.titleCard}>
+              <View style={styles.titleContainer}>
+                {isEditingTitle ? (
+                  <TextInput
+                    style={styles.titleInput}
+                    value={mealPlanTitle}
+                    onChangeText={setMealPlanTitle}
+                    onBlur={() => setIsEditingTitle(false)}
+                    onSubmitEditing={() => setIsEditingTitle(false)}
+                    autoFocus
+                    placeholder="Enter meal plan title"
+                  />
+                ) : (
+                  <TouchableOpacity onPress={() => setIsEditingTitle(true)}>
+                    <Text style={styles.title}>{mealPlanTitle}</Text>
+                    {console.log('🔧 MEAL PLAN TITLE DEBUG:', mealPlanTitle)}
+                  </TouchableOpacity>
+                )}
+                
+                {/* Show meal count */}
+                <Text style={styles.itemCount}>{totalMealCount} meals planned</Text>
+              </View>
 
-      {/* Generate Grocery List Button */}
-      <TouchableOpacity style={styles.groceryButton} onPress={generateGroceryList}>
-        <Text style={styles.groceryButtonText}>🛒 Generate Grocery List</Text>
-      </TouchableOpacity>
+              {/* Options Menu Button */}
+              <TouchableOpacity
+                style={styles.optionsButton}
+                onPress={() => setShowOptionsMenu(!showOptionsMenu)}
+              >
+                <Text style={styles.optionsIcon}>⋯</Text>
+              </TouchableOpacity>
+            </View>
 
-      {/* Days */}
-      <ScrollView style={styles.daysContainer} showsVerticalScrollIndicator={false}>
-        {mockMealPlan.days.map((day, index) => renderDay(day, index))}
+      {/* Options Menu Dropdown */}
+      {showOptionsMenu && (
+        <View style={styles.optionsMenu}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => { setShowOptionsMenu(false); handleSave(); }}>
+            <Icon name="save" size={18} color="#22C55E" style={{marginRight: 12}} />
+            <Text style={styles.menuText}>Save</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.menuItem} onPress={() => { setShowOptionsMenu(false); handleLoad(); }}>
+            <Icon name="folder" size={18} color="#1E40AF" style={{marginRight: 12}} />
+            <Text style={styles.menuText}>Load</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.menuDivider} />
+          
+          <TouchableOpacity style={styles.menuItem} onPress={() => { setShowOptionsMenu(false); handleNew(); }}>
+            <Icon name="add" size={18} color="#E7993F" style={{marginRight: 12}} />
+            <Text style={styles.menuText}>New</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.menuItem} onPress={() => { setShowOptionsMenu(false); handleAddDay(); }}>
+            <Icon name="add" size={18} color="#7C3AED" style={{marginRight: 12}} />
+            <Text style={styles.menuText}>Day</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.menuDivider} />
+          
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => { 
+              setShowOptionsMenu(false); 
+              handleInviteToMealPlan();
+            }}
+          >
+            <Text style={{ fontSize: 18, color: "#7C3AED", marginRight: 12 }}>👥</Text>
+            <Text style={styles.menuText}>Invite</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={[styles.menuItem, styles.makeListMenuItem]} onPress={() => { setShowOptionsMenu(false); handleConvertToGroceryList(); }}>
+            <Icon name="list" size={18} color="#059669" style={{marginRight: 12}} />
+            <Text style={[styles.menuText, styles.makeListText]}>Make List</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[
+              styles.menuItem, 
+              styles.deleteMenuItem,
+              !currentPlanId && styles.disabledMenuItem // Disable if no plan loaded
+            ]} 
+            onPress={() => { 
+              setShowOptionsMenu(false); 
+              if (currentPlanId) handleDelete(); 
+            }}
+            disabled={!currentPlanId}
+          >
+            <Icon 
+              name="delete" 
+              size={18} 
+              color={currentPlanId ? "#DC313F" : "#9ca3af"} 
+              style={{marginRight: 12}} 
+            />
+            <Text style={[styles.deleteText, !currentPlanId && styles.disabledText]}>
+              {currentPlanId ? 'Delete' : 'No Plan'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Main content area with days */}
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {days.map((day, dayIndex) => (
+          <View key={`day-${day.id}-${dayIndex}`} style={styles.dayContainer}>
+            {/* Enhanced Day Header with drag handle and options */}
+            <View style={styles.dayHeader}>
+              {/* Drag handle */}
+              <View style={styles.dragHandle}>
+                <View style={styles.dragDots}>
+                  <View style={styles.dotRow}>
+                    <View style={styles.dot} />
+                    <View style={styles.dot} />
+                    <View style={styles.dot} />
+                  </View>
+                  <View style={styles.dotRow}>
+                    <View style={styles.dot} />
+                    <View style={styles.dot} />
+                    <View style={styles.dot} />
+                  </View>
+                </View>
+              </View>
+
+              {/* Day name (editable) */}
+              <View style={styles.dayNameContainer}>
+                {editingDayId === day.id ? (
+                  <TextInput
+                    style={styles.dayNameInput}
+                    value={day.name}
+                    onChangeText={(text) => updateDayName(day.id, text)}
+                    onBlur={() => setEditingDayId(null)}
+                    onSubmitEditing={() => setEditingDayId(null)}
+                    autoFocus
+                    placeholder="Enter day name"
+                  />
+                ) : (
+                  <TouchableOpacity onPress={() => setEditingDayId(day.id)}>
+                    <Text style={styles.dayName}>{day.name}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Expand/Collapse button */}
+              <TouchableOpacity 
+                style={styles.expandButton}
+                onPress={() => toggleDayExpansion(day.id)}
+              >
+                <Text style={styles.expandIcon}>
+                  {day.isExpanded ? '▼' : '▶'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Day options menu */}
+              <TouchableOpacity 
+                style={styles.dayOptionsButton}
+                onPress={() => setShowDayOptionsMenu(showDayOptionsMenu === day.id ? null : day.id)}
+              >
+                <Text style={styles.optionsIcon}>⋯</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Day Options Menu Dropdown */}
+            {showDayOptionsMenu === day.id && (
+              <View style={styles.dayOptionsMenu}>
+                <TouchableOpacity 
+                  style={styles.menuItem} 
+                  onPress={() => { setShowDayOptionsMenu(null); handleAddMeal(day.id); }}
+                >
+                  <Text style={styles.menuIcon}>➕</Text>
+                  <Text style={styles.menuText}>Add Meal</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.menuItem, styles.deleteMenuItem]} 
+                  onPress={() => { setShowDayOptionsMenu(null); handleDeleteDay(day.id); }}
+                >
+                  <Text style={styles.deleteIcon}>❌</Text>
+                  <Text style={styles.deleteText}>Delete Day</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {day.isExpanded && (
+              <View style={styles.dayContent}>
+                <SimpleDraggableList
+                  data={day.meals}
+                  keyExtractor={(meal, mealIndex) => `${day.id}-${meal.id}-${mealIndex}`}
+                  onReorder={(newMeals, draggedMeal, fromIndex, toIndex) => 
+                    handleMealReorder(day.id, newMeals)
+                  }
+                  renderItem={({ item: meal, isDragging }) => (
+                    <View style={[
+                      styles.mealSection,
+                      isDragging && styles.mealSectionDragging
+                    ]}>
+                      {/* Meal header (editable) */}
+                      <View style={styles.mealHeader}>
+                        <View style={styles.mealTitleContainer}>
+                        {editingMealId === meal.id ? (
+                          <TextInput
+                            style={styles.mealNameInput}
+                            value={meal.name}
+                            onChangeText={(text) => updateMealName(day.id, meal.id, text)}
+                            onBlur={() => setEditingMealId(null)}
+                            onSubmitEditing={() => setEditingMealId(null)}
+                            autoFocus
+                            placeholder="Enter meal name"
+                          />
+                        ) : (
+                          <TouchableOpacity onPress={() => setEditingMealId(meal.id)}>
+                            <Text style={styles.mealName}>{meal.name}</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      
+                      {/* Individual meal options menu */}
+                      <TouchableOpacity 
+                        style={styles.mealOptionsButton}
+                        onPress={() => setShowMealOptionsMenu(showMealOptionsMenu === meal.id ? null : meal.id)}
+                      >
+                        <Text style={styles.mealOptionsIcon}>⋮</Text>
+                      </TouchableOpacity>
+                      
+                      {/* Meal options dropdown */}
+                      {showMealOptionsMenu === meal.id && (
+                        <View style={styles.mealOptionsMenu}>
+                          <TouchableOpacity 
+                            style={[styles.mealMenuItem, styles.deleteMealMenuItem]}
+                            onPress={() => { 
+                              setShowMealOptionsMenu(null); 
+                              handleDeleteMeal(day.id, meal.id); 
+                            }}
+                          >
+                            <Icon name="delete" size={14} color="#ef4444" />
+                            <Text style={styles.deleteMealText}>Delete</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.recipesContainer}>
+                      <CrossContainerDraggableList
+                        data={meal.recipes}
+                        containerId={`${day.id}-${meal.id}`}
+                        containerMetadata={{ dayId: day.id, mealId: meal.id }}
+                        renderItem={({ item, index, isDragging }) => (
+                          <RecipeCard
+                            recipe={item}
+                            dayId={day.id}
+                            mealId={meal.id}
+                            recipeIndex={index}
+                            isDragging={isDragging}
+                            onToggleComplete={(recipeId) => handleToggleRecipeComplete(day.id, meal.id, recipeId)}
+                            onDelete={(recipeId) => handleDeleteRecipe(day.id, meal.id, recipeId)}
+                            onView={(recipeId) => handleViewRecipe(recipeId)}
+                          />
+                        )}
+                        onReorder={(newRecipes, draggedRecipe, fromIndex, toIndex) => 
+                          handleRecipeReorder(day.id, meal.id, newRecipes, draggedRecipe, fromIndex, toIndex)
+                        }
+                        keyExtractor={(item, index) => `${day.id}-${meal.id}-recipe-${item?.id || index}`}
+                        style={meal.recipes.length === 0 ? styles.emptyDropZone : undefined}
+                      />
+                    </View>
+                  </View>
+                  )}
+                />
+              </View>
+            )}
+          </View>
+        ))}
       </ScrollView>
+
+      {/* Load Plans Modal */}
+      {showLoadModal && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>📂 Select Meal Plan</Text>
+              <TouchableOpacity 
+                style={styles.modalCloseButton}
+                onPress={() => setShowLoadModal(false)}
+              >
+                <Text style={styles.modalCloseText}>❌</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalContent}>
+              {availablePlans.length > 0 ? (
+                availablePlans.map(plan => (
+                  <TouchableOpacity
+                    key={plan.id}
+                    style={styles.planItem}
+                    onPress={async () => {
+                      setShowLoadModal(false);
+                      await loadSpecificPlan(plan.id);
+                    }}
+                  >
+                    <View style={styles.planInfo}>
+                      <Text style={styles.planName}>{plan.plan_name}</Text>
+                      <Text style={styles.planDate}>{plan.week_start_date}</Text>
+                    </View>
+                    <Text style={styles.planLoadIcon}>📂</Text>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={styles.emptyPlans}>
+                  <Text style={styles.emptyPlansText}>No meal plans found</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      )}
+          </CrossContainerDragProvider>
+        </View>
+      </TouchableWithoutFeedback>
+
+      {/* Invite Household Modal */}
+      {console.log('🎯 MODAL DEBUG: showInviteModal =', showInviteModal)}
+      {console.log('🎯 MODAL DEBUG: households =', households)}
+      <Modal
+        visible={showInviteModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowInviteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>👥 Invite Household</Text>
+              <TouchableOpacity 
+                style={styles.modalCloseButton}
+                onPress={() => setShowInviteModal(false)}
+              >
+                <Text style={styles.modalCloseText}>❌</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalContent}>
+              <Text style={styles.modalSubtitle}>
+                Invite a household to collaborate on "{mealPlanTitle}":
+              </Text>
+              
+              {households.length > 0 ? (
+                households.map(household => (
+                  <TouchableOpacity
+                    key={household.id}
+                    style={styles.planItem}
+                    onPress={() => handleInviteHousehold(household)}
+                  >
+                    <View style={styles.planInfo}>
+                      <Text style={styles.planName}>{household.name}</Text>
+                      <Text style={styles.planDate}>{household.members || 0} members</Text>
+                    </View>
+                    <Text style={styles.planLoadIcon}>👥</Text>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={styles.emptyPlans}>
+                  <Text style={styles.emptyPlansText}>No households found</Text>
+                  <Text style={styles.emptyPlansText}>Create a household first to invite members</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
+    </ImageBackground>
   );
 }
 
+// Recipe Card Component - Clean text-only layout like grocery list with drag support
+const RecipeCard = ({ recipe, onToggleComplete, onDelete, onView, isDragging }) => {
+  return (
+    <View style={[
+      styles.recipeCard,
+      isDragging && styles.recipeCardDragging
+    ]}>
+      {/* Checkbox for completion */}
+      <TouchableOpacity
+        style={styles.recipeCheckbox}
+        onPress={() => onToggleComplete(recipe.id)}
+      >
+        <Text style={styles.recipeCheckboxIcon}>
+          {recipe.isCompleted ? '✅' : '☐'}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Recipe title - tap to view, truncated with ellipsis */}
+      <TouchableOpacity
+        style={styles.recipeTitleContainer}
+        onPress={() => onView(recipe.id)}
+      >
+        <Text
+          style={[
+            styles.recipeTitle,
+            recipe.isCompleted && styles.recipeTitleCompleted
+          ]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {recipe.title}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Delete button - red trash can like grocery list */}
+      <TouchableOpacity
+        style={styles.recipeDeleteButton}
+        onPress={() => onDelete(recipe.id)}
+      >
+        <Icon name="delete" size={18} color="#ef4444" />
+      </TouchableOpacity>
+    </View>
+  );
+};
+
 const styles = StyleSheet.create({
+  // 🎨 Background and Overlay Styles
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)', // White opaque overlay for readability
+    zIndex: 1,
+  },
+  topStatusBarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 50, // Enough to cover status bar area
+    backgroundColor: 'rgba(255, 255, 255, 0.95)', // More opaque for better status bar visibility
+    zIndex: 3, // Above main overlay to ensure status bar area is clearly visible
+  },
+  
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: 'transparent', // Changed from '#f9fafb' to transparent
+    zIndex: 2, // Above overlay
+    paddingTop: 50, // Add padding to push content below status bar
+  },
+
+  // 🎨 Card Styles - Beautiful bubble design
+  titleCard: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)', // Semi-transparent white
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(229, 231, 235, 0.5)',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginHorizontal: 16,
+    marginTop: 8, // Small margin since container has padding
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  titleContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  itemCount: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 4,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 20,
+    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontFamily: 'Nunito-ExtraBold',
     color: '#111827',
-    marginBottom: 4,
   },
-  subtitle: {
+  titleInput: {
+    fontSize: 24,
+    // fontWeight: 'bold', // REMOVED - conflicts with ExtraBold
+    fontFamily: 'Nunito-ExtraBold',
+    color: '#111827',
+    flex: 1,
+    borderBottomWidth: 1,
+    borderBottomColor: '#3b82f6',
+    paddingVertical: 4,
+  },
+  optionsButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 20,
+    marginLeft: 12,
+  },
+  optionsIcon: {
+    fontSize: 18,
+    color: '#374151',
+    fontWeight: 'bold',
+  },
+  optionsMenu: {
+    position: 'absolute',
+    top: 80,
+    right: 25,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 1000,
+    minWidth: 160,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  menuIcon: {
     fontSize: 16,
-    color: '#6b7280',
-    marginBottom: 4,
+    marginRight: 12,
   },
-  counter: {
-    fontSize: 14,
-    color: '#28a745',
+  menuText: {
+    fontSize: 16,
+    fontFamily: 'Nunito-Regular',
+    color: '#374151',
+    flex: 1,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginVertical: 4,
+  },
+  makeListMenuItem: {
+    backgroundColor: '#f0fdf4', // Mint green background
+  },
+  makeListText: {
+    color: '#059669', // Darker green text
+    fontWeight: '600',
+  },
+  deleteMenuItem: {
+    backgroundColor: '#fef2f2', // Light red background
+  },
+  deleteIcon: {
+    fontSize: 16,
+    marginRight: 12,
+  },
+  deleteText: {
+    fontSize: 16,
+    color: '#dc2626',
+    flex: 1,
     fontWeight: '500',
   },
-  groceryButton: {
-    margin: 20,
+  disabledMenuItem: {
+    backgroundColor: '#f3f4f6',
+    opacity: 0.6,
+  },
+  disabledText: {
+    color: '#9ca3af',
+  },
+  infoBar: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 16, // Horizontal padding only
+    paddingTop: 8,         // Reduced top padding
+    paddingBottom: 16,     // Keep bottom padding for scroll space
+  },
+  dayContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  
+  },
+  dayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
-    backgroundColor: '#28a745',
-    borderRadius: 8,
+    backgroundColor: '#f8fafc',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  dragHandle: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  dragDots: {
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  groceryButtonText: {
+  dotRow: {
+    flexDirection: 'row',
+    marginVertical: 1,
+  },
+  dot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#6b7280',
+    marginHorizontal: 1,
+  },
+  dayNameContainer: {
+    flex: 1,
+  },
+  dayName: {
+    fontSize: 18,
+    fontFamily: 'Nunito-ExtraBold', // Added Nunito font
+    color: '#111827',
+  },
+  dayNameInput: {
+    fontSize: 18,
+    fontFamily: 'Nunito-ExtraBold', // Added Nunito font
+    color: '#111827',
+    borderBottomWidth: 1,
+    borderBottomColor: '#3b82f6',
+    paddingVertical: 2,
+  },
+  expandButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  expandIcon: {
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  dayOptionsButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+  },
+  dayOptionsMenu: {
+    position: 'absolute',
+    top: 60,
+    right: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 1000,
+    minWidth: 160,
+  },
+  dayContent: {
+    padding: 16,
+  },
+  mealSection: {
+    marginBottom: 16,
+  },
+  mealSectionDragging: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    borderStyle: 'dashed',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  mealHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingRight: 4,
+  },
+  mealTitleContainer: {
+    flex: 1,
+  },
+  mealOptionsButton: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  mealOptionsIcon: {
+    fontSize: 18,
+    color: '#9ca3af', // Light grey
+    lineHeight: 18,
+  },
+  mealOptionsMenu: {
+    position: 'absolute',
+    top: 24,
+    right: 4,
+    backgroundColor: '#ffffff',
+    borderRadius: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 1000,
+    minWidth: 100,
+  },
+  mealMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  deleteMealMenuItem: {
+    borderRadius: 6,
+  },
+  deleteMealText: {
+    fontSize: 14,
+    color: '#ef4444', // Red text
+    marginLeft: 8,
+  },
+  mealName: {
+    fontSize: 16,
+    fontFamily: 'Nunito-Regular', // Added Nunito font
+    color: '#374151',
+  },
+  mealNameInput: {
+    fontSize: 16,
+    fontFamily: 'Nunito-Regular', // Added Nunito font
+    color: '#374151',
+    borderBottomWidth: 1,
+    borderBottomColor: '#3b82f6',
+    paddingVertical: 2,
+    paddingLeft: 12, // Account for the bullet point spacing
+  },
+  recipesContainer: {
+    paddingLeft: 16,
+  },
+  recipeItem: {
+    paddingVertical: 4,
+  },
+  recipeText: {
+    fontSize: 14,
+    color: '#111827',
+  },
+  recipeTextCompleted: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textDecorationLine: 'line-through',
+  },
+  emptyRecipeItem: {
+    paddingVertical: 4,
+  },
+  emptyRecipeText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    fontStyle: 'italic',
+  },
+  emptyDropZone: {
+    minHeight: 44, // Match the CrossContainerDragSystem
+  },
+  bottomActions: {
+    flexDirection: 'row',
+    padding: 16,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: '#3b82f6',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  groceryButton: {
+    backgroundColor: '#10b981',
+    flexDirection: 'row',
+  },
+  actionButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
   },
-  daysContainer: {
-    flex: 1,
+  actionButtonIcon: {
+    fontSize: 16,
+    marginRight: 8,
   },
-  dayContainer: {
-    margin: 16,
-    marginBottom: 8,
-    padding: 16,
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+  // Load Modal Styles
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
   },
-  dayHeader: {
-    fontSize: 18,
+  modal: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    width: '90%',
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 16,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  modalTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#111827',
-    marginBottom: 12,
-    textAlign: 'center',
   },
-  mealsContainer: {
-    gap: 12,
-  },
-  mealSection: {
-    marginBottom: 8,
-  },
-  mealTypeLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginBottom: 8,
-  },
-  mealSlot: {
-    padding: 12,
-    borderRadius: 8,
-    minHeight: 50,
-    justifyContent: 'center',
-  },
-  mealSlotFilled: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#28a745',
-  },
-  mealSlotEmpty: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderStyle: 'dashed',
-  },
-  mealTitle: {
+  modalSubtitle: {
     fontSize: 16,
-    fontWeight: '500',
+    color: '#6b7280',
+    marginBottom: 16,
+    paddingHorizontal: 20,
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCloseText: {
+    fontSize: 18,
+  },
+  modalContent: {
+    maxHeight: 400,
+  },
+  planItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  planInfo: {
+    flex: 1,
+  },
+  planName: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#111827',
     marginBottom: 4,
   },
-  mealStatus: {
+  planDate: {
     fontSize: 14,
     color: '#6b7280',
   },
-  addMealText: {
-    fontSize: 14,
+  planLoadIcon: {
+    fontSize: 20,
+    marginLeft: 12,
+  },
+  emptyPlans: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyPlansText: {
+    fontSize: 16,
     color: '#9ca3af',
     textAlign: 'center',
-    fontStyle: 'italic',
+  },
+  // Recipe Card Styles - Clean text-only layout like grocery list with drag support
+  recipeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    minHeight: 44, // Touch-friendly height
+    backgroundColor: '#ffffff',
+  },
+  recipeCardDragging: {
+    backgroundColor: '#f3f4f6',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  recipeCheckbox: {
+    width: 28,
+    height: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  recipeCheckboxIcon: {
+    fontSize: 18,
+  },
+  recipeTitleContainer: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  recipeTitle: {
+    fontSize: 16,
+    fontFamily: 'Nunito-Regular', // Added Nunito font
+    color: '#111827',
+    lineHeight: 20,
+  },
+  recipeTitleCompleted: {
+    color: '#9ca3af',
+    textDecorationLine: 'line-through',
+  },
+  recipeDeleteButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
+
+export default MealPlanScreen;

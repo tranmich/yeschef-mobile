@@ -62,11 +62,7 @@ class YesChefAPI {
   async debugFetch(url, options = {}) {
     const fullUrl = url.startsWith('http') ? url : `${this.baseURL}${url}`;
     
-    this.log('Making request:', {
-      url: fullUrl,
-      method: options.method || 'GET',
-      headers: options.headers || {}
-    });
+    this.log(`Making request: ${options.method || 'GET'} ${fullUrl}`);
 
     try {
       const response = await fetch(fullUrl, {
@@ -74,12 +70,7 @@ class YesChefAPI {
         ...options,
       });
 
-      this.log('Response received:', {
-        status: response.status,
-        ok: response.ok,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries())
-      });
+      this.log(`Response: ${response.status} ${response.ok ? '✅' : '❌'}`);
 
       return response;
     } catch (error) {
@@ -128,10 +119,92 @@ class YesChefAPI {
 
   async logout() {
     this.log('Logging out and clearing all auth data...');
+    
+    try {
+      // Call backend logout endpoint first
+      if (this.token) {
+        this.log('Calling backend logout endpoint...');
+        await this.debugFetch('/api/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        this.log('✅ Backend logout successful');
+      }
+    } catch (error) {
+      // Don't fail logout if backend call fails
+      this.log('⚠️ Backend logout failed, continuing with local logout:', error);
+    }
+    
+    // Clear local auth data
     this.token = null;
     this.user = null;
     await this.clearAuthData();
-    this.log('✅ Logout complete');
+    this.log('✅ All auth data cleared - logout complete');
+    
+    return { success: true, message: 'Logged out successfully' };
+  }
+
+  // 🌐 Generic HTTP Methods for API calls
+  async get(endpoint, options = {}) {
+    this.log(`GET request to: ${endpoint}`);
+    
+    try {
+      const response = await this.debugFetch(endpoint, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.token && { 'Authorization': `Bearer ${this.token}` }),
+          ...options.headers,
+        },
+        ...options,
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        this.log(`✅ GET ${endpoint} successful`);
+        return { success: true, ...data };
+      } else {
+        this.error(`GET ${endpoint} failed:`, data);
+        return { success: false, error: data.error || 'Request failed' };
+      }
+    } catch (error) {
+      this.error(`GET ${endpoint} error:`, error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  async post(endpoint, body = {}, options = {}) {
+    this.log(`POST request to: ${endpoint}`, body);
+    
+    try {
+      const response = await this.debugFetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.token && { 'Authorization': `Bearer ${this.token}` }),
+          ...options.headers,
+        },
+        body: JSON.stringify(body),
+        ...options,
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        this.log(`✅ POST ${endpoint} successful`);
+        return { success: true, ...data };
+      } else {
+        this.error(`POST ${endpoint} failed:`, data);
+        return { success: false, error: data.error || 'Request failed' };
+      }
+    } catch (error) {
+      this.error(`POST ${endpoint} error:`, error);
+      return { success: false, error: 'Network error - check connection' };
+    }
   }
 
   // Recipe Methods - Authenticated Only
@@ -209,18 +282,7 @@ class YesChefAPI {
         
         this.log('✅ Recipe fetched successfully:', recipe.title || recipe.name || 'Untitled');
         
-        // 🔧 FIX #3: Add detailed data structure debugging
-        this.log('🔍 Recipe data structure:', {
-          hasTitle: !!(recipe.title || recipe.name),
-          hasIngredients: !!recipe.ingredients,
-          hasInstructions: !!recipe.instructions,
-          ingredientsType: typeof recipe.ingredients,
-          instructionsType: typeof recipe.instructions,
-          ingredientsLength: recipe.ingredients?.length || 'N/A',
-          instructionsLength: recipe.instructions?.length || 'N/A',
-          rawIngredients: recipe.ingredients,
-          rawInstructions: recipe.instructions
-        });
+        // Simplified debugging - removed verbose data structure logging
         
         return { success: true, recipe: recipe };
       } else {
@@ -356,23 +418,42 @@ class YesChefAPI {
   }
 
   async saveGroceryList(listData) {
-    this.log('Saving grocery list:', {
-      name: listData.name,
-      itemCount: listData.items?.length || 0
+    console.log('🔧 DEBUG: YesChefAPI.saveGroceryList called with:', listData);
+    
+    // Convert to backend format (backend expects list_name and list_data)
+    const backendData = {
+      list_name: listData.name || listData.list_name,
+      list_data: listData.items || listData.list_data,
+      recipe_ids: listData.recipe_ids || []
+    };
+
+    console.log('🔧 DEBUG: Backend format data:', backendData);
+
+    this.log('Saving grocery list (FIXED VERSION):', {
+      list_name: backendData.list_name,
+      itemCount: Array.isArray(backendData.list_data) ? backendData.list_data.length : 'complex'
     });
     
     if (!this.isAuthenticated()) {
       return { success: false, error: 'Authentication required' };
     }
 
+    // Validate required fields
+    if (!backendData.list_name) {
+      this.error('Save failed: Missing list name');
+      return { success: false, error: 'List name is required' };
+    }
+
     try {
+      console.log('🔧 DEBUG: About to send backend format data:', JSON.stringify(backendData));
+      
       const response = await this.debugFetch('/api/grocery-lists', {
         method: 'POST',
         headers: {
           ...this.getAuthHeaders(),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(listData),
+        body: JSON.stringify(backendData),
       });
 
       if (response.ok) {
@@ -380,9 +461,9 @@ class YesChefAPI {
         this.log('✅ Grocery list saved successfully!');
         return { success: true, list: data };
       } else {
-        const errorText = await response.text();
-        this.error('Save grocery list failed:', errorText);
-        return { success: false, error: 'Failed to save grocery list' };
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        this.error('Save grocery list failed:', errorData);
+        return { success: false, error: errorData.error || 'Failed to save grocery list' };
       }
     } catch (error) {
       this.error('Save grocery list error:', error);
@@ -391,10 +472,17 @@ class YesChefAPI {
   }
 
   async updateGroceryList(listId, listData) {
+    // Convert to backend format (backend expects list_name and list_data)
+    const backendData = {
+      list_name: listData.name || listData.list_name,
+      list_data: listData.items || listData.list_data,
+      recipe_ids: listData.recipe_ids || []
+    };
+
     this.log('Updating grocery list:', {
       id: listId,
-      name: listData.list_name,
-      itemCount: Array.isArray(listData.list_data) ? listData.list_data.length : 'complex'
+      list_name: backendData.list_name,
+      itemCount: Array.isArray(backendData.list_data) ? backendData.list_data.length : 'complex'
     });
     
     if (!this.isAuthenticated()) {
@@ -408,7 +496,7 @@ class YesChefAPI {
           ...this.getAuthHeaders(),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(listData),
+        body: JSON.stringify(backendData),
       });
 
       if (response.ok) {
@@ -416,12 +504,73 @@ class YesChefAPI {
         this.log('✅ Grocery list updated successfully!');
         return { success: true, list: data };
       } else {
-        const errorText = await response.text();
-        this.error('Update grocery list failed:', errorText);
-        return { success: false, error: 'Failed to update grocery list' };
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        this.error('Update grocery list failed:', errorData);
+        return { success: false, error: errorData.error || 'Failed to update grocery list' };
       }
     } catch (error) {
       this.error('Update grocery list error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  async deleteGroceryList(listId) {
+    this.log('Deleting grocery list:', { id: listId });
+    
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Authentication required' };
+    }
+
+    try {
+      const response = await this.debugFetch(`/api/grocery-lists/${listId}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        this.log('✅ Grocery list deleted successfully!');
+        return { success: true };
+      } else {
+        const errorText = await response.text();
+        this.error('Delete grocery list failed:', errorText);
+        return { success: false, error: 'Failed to delete grocery list' };
+      }
+    } catch (error) {
+      this.error('Delete grocery list error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  // Generate grocery list from meal plan
+  async generateGroceryListFromMealPlan(mealPlanId) {
+    this.log('Generating grocery list from meal plan:', mealPlanId);
+    
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Authentication required' };
+    }
+
+    try {
+      const response = await this.debugFetch(`/api/meal-plans/${mealPlanId}/grocery-list`, {
+        headers: this.getAuthHeaders(),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        this.log('✅ Grocery list generated successfully:', {
+          recipeCount: data.recipe_count,
+          ingredientCount: data.ingredient_count
+        });
+        return data;
+      } else {
+        this.error('Generate grocery list failed:', {
+          status: response.status,
+          error: data.error || data.message
+        });
+        return { success: false, error: data.error || data.message || 'Failed to generate grocery list' };
+      }
+    } catch (error) {
+      this.error('Generate grocery list error:', error);
       return { success: false, error: 'Network error - check connection' };
     }
   }
@@ -518,6 +667,62 @@ class YesChefAPI {
   setDebugMode(enabled) {
     this.debugMode = enabled;
     this.log(`Debug mode ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  // Collaboration Methods
+  async inviteToCollaborate(inviteData) {
+    this.log('Sending collaboration invite:', inviteData);
+    try {
+      const response = await this.debugFetch('/api/collaboration/invite', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(inviteData),
+      });
+
+      const data = await response.json();
+      this.log('Invite response:', data);
+      
+      if (response.ok) {
+        this.log('✅ Invitation sent successfully!');
+        return { success: true, data };
+      } else {
+        this.error('Invite failed:', data);
+        return { success: false, error: data.error || 'Invitation failed' };
+      }
+    } catch (error) {
+      this.error('Invite error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  async getSharedResources() {
+    this.log('Getting shared meal plans and grocery lists...');
+    try {
+      const response = await this.debugFetch('/api/collaboration/my-shared', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      this.log('Shared resources response:', data);
+      
+      if (response.ok) {
+        this.log('✅ Shared resources loaded successfully!');
+        return { success: true, ...data };
+      } else {
+        this.error('Get shared resources failed:', data);
+        return { success: false, error: data.error || 'Failed to load shared resources' };
+      }
+    } catch (error) {
+      this.error('Get shared resources error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
   }
 }
 
