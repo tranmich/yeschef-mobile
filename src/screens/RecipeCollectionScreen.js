@@ -115,9 +115,13 @@ export default function RecipeCollectionScreen({ navigation }) {
     try {
       const result = await YesChefAPI.importRecipe(importUrl.trim());
       if (result.success) {
+        const confidenceText = result.confidence > 0.8 ? 'High quality extraction!' : 
+                              result.confidence > 0.6 ? 'Good extraction' : 
+                              'May need review';
+        
         Alert.alert(
-          'Success!', 
-          `Recipe "${result.recipe.title}" imported successfully!`,
+          'Recipe Imported! 🎉', 
+          `"${result.recipe.title}" imported successfully!\n\nQuality: ${confidenceText}\nMethod: ${result.extraction_method}`,
           [{ text: 'OK', onPress: () => {
             setImportUrl('');
             loadRecipes(); // Refresh the list
@@ -611,55 +615,62 @@ export default function RecipeCollectionScreen({ navigation }) {
   return (
     <ImageBackground source={SELECTED_BACKGROUND} style={styles.backgroundImage} resizeMode="cover">
       <View style={styles.overlay} />
+      
+      {/* 📱 Top Status Bar Background (Clean Header for Phone Status) */}
+      <View style={styles.topStatusBarOverlay} />
+      
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <StatusBar 
+          barStyle="dark-content" 
+          backgroundColor="transparent" 
+          translucent={true}
+          animated={true}
+        />
       <TouchableWithoutFeedback onPress={() => setShowOptionsMenu(null)}>
         <View style={styles.innerContainer}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              {selectedCategory && (
+          {/* Header - Only show when in category view */}
+          {selectedCategory && (
+            <View style={styles.header}>
+              <View style={styles.headerLeft}>
                 <TouchableOpacity style={styles.backButton} onPress={goBackToCategories}>
                   <Text style={styles.backButtonText}>← Categories</Text>
-              </TouchableOpacity>
-            )}
-            <Text style={styles.headerTitle}>
-              {selectedCategory 
-              ? (categoriesWithCounts || []).find(c => c.id === selectedCategory)?.name || 'Recipes'
-              : '📚 Recipe Categories'
-            }
-          </Text>
-        </View>
-      </View>
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>
+                  {(categoriesWithCounts || []).find(c => c.id === selectedCategory)?.name || 'Recipes'}
+                </Text>
+              </View>
+            </View>
+          )}
 
-      {/* Import Section - HIDDEN (will be improved later) */}
-      {false && !selectedCategory && (
-        <View style={styles.importSection}>
-          <Text style={styles.importTitle}>🌐 Import Recipe from URL</Text>
-          <View style={styles.importInputContainer}>
-            <TextInput
-              style={styles.importInput}
-              value={importUrl}
-              onChangeText={setImportUrl}
-              placeholder="Paste recipe URL here (e.g., from AllRecipes, Food Network)"
-              placeholderTextColor="#9ca3af"
-            />
-            <TouchableOpacity
-              style={[styles.importButton, isImporting && styles.importButtonDisabled]}
-              onPress={importRecipeFromUrl}
-              disabled={isImporting}
-            >
-              {isImporting ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <Text style={styles.importButtonText}>Import</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {/* Search - show when viewing recipes in a category */}
+          {/* 🌐 Recipe Import Section - Window Style */}
+          {!selectedCategory && (
+            <View style={styles.importCard}>
+              <Text style={styles.importTitle}>Import Recipe from URL</Text>
+              <View style={styles.importInputContainer}>
+                <TextInput
+                  style={styles.importInput}
+                  value={importUrl}
+                  onChangeText={setImportUrl}
+                  placeholder="Add URL here"
+                  placeholderTextColor="#9ca3af"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                />
+                <TouchableOpacity
+                  style={[styles.importButton, isImporting && styles.importButtonDisabled]}
+                  onPress={importRecipeFromUrl}
+                  disabled={isImporting}
+                >
+                  {isImporting ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={styles.importButtonText}>Import</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}      {/* Search - show when viewing recipes in a category */}
       {selectedCategory && (
         <View style={styles.searchContainer}>
           <TextInput
@@ -789,16 +800,6 @@ export default function RecipeCollectionScreen({ navigation }) {
         )}
       </ScrollView>
 
-      {/* Footer */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          {selectedCategory 
-            ? `${(displayRecipes || []).length} recipe${(displayRecipes || []).length !== 1 ? 's' : ''} in ${(categoriesWithCounts || []).find(c => c.id === selectedCategory)?.name || 'category'}`
-            : `${(recipes || []).length} total recipes across ${(categoriesWithCounts || []).filter(c => (c.count || 0) > 0).length} categories`
-          }
-        </Text>
-      </View>
-
       {/* Meal Plan Selection Modal */}
       <Modal
         visible={showMealPlanModal}
@@ -905,6 +906,15 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
     zIndex: 2, // Above overlay
   },
+  topStatusBarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    zIndex: 10,
+  },
   innerContainer: {
     flex: 1,
   },
@@ -951,11 +961,16 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginTop: 12,
   },
-  importSection: {
+  importCard: {
     backgroundColor: '#ffffff',
+    margin: 16,
+    borderRadius: 12,
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   importTitle: {
     fontSize: 16,
@@ -1197,18 +1212,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito-Regular',
     color: '#9ca3af',
     fontStyle: 'italic',
-  },
-  footer: {
-    padding: 16,
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-  },
-  footerText: {
-    fontSize: 14,
-    fontFamily: 'Nunito-Regular',
-    color: '#6b7280',
-    textAlign: 'center',
   },
   // 🆕 Modal Styles
   modalOverlay: {

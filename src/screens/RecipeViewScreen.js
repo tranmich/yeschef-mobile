@@ -13,55 +13,180 @@ import YesChefAPI from '../services/YesChefAPI';
 import { Icon } from '../components/IconLibrary';
 import RecipeSharingModal from '../components/RecipeSharingModal';
 
-export default function RecipeViewScreen({ navigation, route }) {
+const RecipeViewScreen = ({ route, navigation }) => {
   const [recipe, setRecipe] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentStep, setCurrentStep] = useState(0);
   const [isCookingMode, setIsCookingMode] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showSharingModal, setShowSharingModal] = useState(false);
 
-  // 🔧 FIX #3: Repair OCR-corrupted text from cookbook scanning
+  // 🔧 Enhanced OCR text repair (from webapp)
   const repairOCRText = (text) => {
     if (!text || typeof text !== 'string') return text;
     
     return text
+      // Fix common OCR errors
       .replace(/extr a-virgin/g, 'extra-virgin')
       .replace(/ol ive oil/g, 'olive oil') 
       .replace(/unsal ted but ter/g, 'unsalted butter')
       .replace(/gr ated/g, 'grated')
       .replace(/sea son/g, 'season')
       .replace(/tem perature/g, 'temperature')
-      .replace(/refrig erate/g, 'refrigerate');
+      .replace(/refrig erate/g, 'refrigerate')
+      // Fix fraction characters
+      .replace(/¼/g, '1/4')
+      .replace(/½/g, '1/2')
+      .replace(/¾/g, '3/4')
+      .replace(/⅓/g, '1/3')
+      .replace(/⅔/g, '2/3')
+      .replace(/⅛/g, '1/8')
+      .replace(/⅜/g, '3/8')
+      .replace(/⅝/g, '5/8')
+      .replace(/⅞/g, '7/8')
+      // Fix degree symbol
+      .replace(/°/g, '°')
+      // Remove extra quotes and brackets
+      .replace(/^["'\[\]]+|["'\[\]]+$/g, '')
+      // Fix double spaces
+      .replace(/\s+/g, ' ')
+      .trim();
   };
 
-  // 📋 Enhanced Recipe Field Parsing
+  // 📋 Enhanced Recipe Field Parsing (from webapp)
   const formatRecipeField = (field) => {
+    console.log('📱 formatRecipeField called with:', field);
+    console.log('📱 formatRecipeField type check:', typeof field, Array.isArray(field));
+    
     if (!field) return [];
     
-    let text = field;
-    if (typeof field === 'object') {
-      try {
-        text = typeof field === 'string' ? field : JSON.stringify(field);
-      } catch (e) {
-        console.warn('Failed to parse recipe field:', e);
-        return ['Unable to parse recipe data'];
+    let processedField = field;
+    
+    // Handle JSON string input
+    if (typeof field === 'string') {
+      // Check if it's a JSON array string
+      if (field.trim().startsWith('[') && field.trim().endsWith(']')) {
+        try {
+          processedField = JSON.parse(field);
+          console.log('📱 Parsed JSON field:', processedField);
+        } catch (e) {
+          // If JSON parsing fails, treat as regular string
+          console.warn('📱 Failed to parse field JSON:', field);
+          processedField = field;
+        }
       }
     }
+    
+    // Handle array input (could be strings or objects)
+    if (Array.isArray(processedField)) {
+      console.log('📱 Processing field array with length:', processedField.length);
+      
+      const result = processedField
+        .filter(item => {
+          // Better filtering - check if item exists and has usable content
+          if (!item) {
+            console.log('📱 Filtering out null/undefined item');
+            return false;
+          }
+          
+          // If it's an object, check if it has meaningful properties
+          if (typeof item === 'object') {
+            const hasUsefulData = item.ingredient || item.text || item.name || item.description;
+            console.log('📱 Filtering item object:', item, 'Has useful data:', !!hasUsefulData);
+            return !!hasUsefulData;
+          }
+          
+          // If it's a string, check if it's not empty or just '[object Object]'
+          const stringValue = item.toString().trim();
+          const isValid = stringValue && stringValue !== '[object Object]' && !stringValue.startsWith('[');
+          console.log('📱 Filtering item string:', stringValue, 'Valid:', isValid);
+          return isValid;
+        })
+        .map((item, index) => {
+          console.log(`📱 Processing item ${index}:`, item);
+          let formatted = '';
+          
+          // Handle object items (this is the key fix!)
+          if (typeof item === 'object' && item !== null) {
+            console.log('📱 Processing object item with keys:', Object.keys(item));
+            // Try different common object structures
+            if (item.ingredient) {
+              // This is the exact format we're seeing: {"ingredient": "text"}
+              formatted = item.ingredient;
+              console.log('📱 Used item.ingredient:', formatted);
+            } else if (item.text) {
+              formatted = item.text;
+              console.log('📱 Used item.text:', formatted);
+            } else if (item.name) {
+              // Sometimes stored as name field
+              const parts = [];
+              if (item.quantity) parts.push(item.quantity);
+              if (item.unit) parts.push(item.unit);
+              parts.push(item.name);
+              formatted = parts.join(' ');
+              console.log('📱 Built from name parts:', formatted);
+            } else if (item.description) {
+              formatted = item.description;
+              console.log('📱 Used item.description:', formatted);
+            } else {
+              // Try to extract meaningful text from object
+              const values = Object.values(item).filter(v => 
+                v && typeof v === 'string' && v.trim() && v !== '[object Object]'
+              );
+              formatted = values.join(' ') || '[Unable to parse item]';
+              console.log('📱 Used fallback values:', formatted);
+            }
+          } else {
+            // Handle string items
+            formatted = item.toString().trim();
+            console.log('📱 Used string item:', formatted);
+          }
+          
+          // Remove extra whitespace
+          formatted = formatted.replace(/\s+/g, ' ');
+          
+          // Handle unicode characters
+          formatted = formatted.replace(/\\u([0-9a-fA-F]{4})/g, (match, unicode) => {
+            return String.fromCharCode(parseInt(unicode, 16));
+          });
+          
+          // Clean up OCR artifacts and JSON remnants
+          formatted = repairOCRText(formatted);
+          
+          // Remove any remaining JSON brackets or quotes
+          formatted = formatted.replace(/^["'\[\]]+|["'\[\]]+$/g, '');
+          
+          console.log(`📱 Final formatted item ${index}:`, formatted);
+          return formatted;
+        })
+        .filter(item => item && item.trim()); // Remove any empty items
+        
+      console.log('📱 Final result array:', result);
+      return result;
+    }
 
+    // Handle string input - including long concatenated strings
+    let text = processedField.toString();
+    
     // Clean up the text
-    text = repairOCRText(text.toString());
+    text = repairOCRText(text);
+    
+    // Handle long concatenated strings with multiple items separated by quotes
+    if (text.includes('","') || text.includes('","')) {
+      const items = text.split(/[",]+/).filter(item => item.trim() && item !== '[' && item !== ']');
+      return items.map(item => item.trim().replace(/^["'\[\]]+|["'\[\]]+$/g, ''));
+    }
     
     // Convert various formats to array
     if (text.includes('\n')) {
       return text.split('\n')
         .map(item => item.trim())
-        .filter(item => item && item !== '\\n' && item !== 'null');
+        .filter(item => item && item !== '\\n' && item !== 'null' && !item.startsWith('['));
     } else if (text.includes('•')) {
       return text.split('•')
         .map(item => item.trim())
         .filter(item => item && item !== '\\n' && item !== 'null');
-    } else if (text.includes('. ')) {
+    } else if (text.includes('. ') && !text.match(/^\d+\./)) {
       return text.split('. ')
         .map(item => item.trim())
         .filter(item => item && item !== '\\n' && item !== 'null');
@@ -118,14 +243,39 @@ export default function RecipeViewScreen({ navigation, route }) {
 
   const handleShareConfirm = async (sharingData) => {
     try {
-      // Call the API to share the recipe
-      const response = await YesChefAPI.post('/api/community/recipes', {
+      // Build the sharing payload
+      const sharePayload = {
+        // Original recipe reference
         recipe_id: recipe.id,
+        
+        // Community-specific metadata
         community_title: sharingData.community_title,
         community_description: sharingData.community_description,
         community_background: sharingData.community_background,
         community_icon: sharingData.community_icon,
-      });
+        
+        // 🔧 Include full recipe data for community display
+        title: recipe.title,
+        description: recipe.description,
+        ingredients: recipe.ingredients,
+        instructions: recipe.instructions,
+        servings: recipe.servings,
+        prep_time: recipe.prep_time,
+        cook_time: recipe.cook_time,
+        difficulty: recipe.difficulty,
+        tags: recipe.tags,
+        source: recipe.source,
+        
+        // Attribution data
+        shared_by: 'Current User', // TODO: Replace with actual user name
+        shared_at: new Date().toISOString(),
+        likes: 0, // Start with 0 likes
+      };
+
+      console.log('� Sharing recipe to community:', sharePayload.community_title);
+
+      // Call the API to share the recipe with full recipe data
+      const response = await YesChefAPI.post('/api/community/recipes', sharePayload);
 
       if (response.success) {
         Alert.alert(
@@ -343,7 +493,7 @@ export default function RecipeViewScreen({ navigation, route }) {
       />
     </SafeAreaView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -599,3 +749,5 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
 });
+
+export default RecipeViewScreen;

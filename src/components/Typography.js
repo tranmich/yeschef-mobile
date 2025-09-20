@@ -1,25 +1,5 @@
 /**
- * 🔤 YesChe// Load custom fonts
-export const loadFonts = async () => {
-  try {
-    console.log('🔤 FONT DEBUG: Starting font load...');
-    await Font.loadAsync({
-      // Main font variants from app.json
-      'Nunito-Regular': require('../../assets/images/fonts/Nunito-Regular.ttf'),
-      'Nunito-Light': require('../../assets/images/fonts/Nunito-Light.ttf'),
-      'Nunito-ExtraBold': require('../../assets/images/fonts/Nunito-ExtraBold.ttf'),
-      
-      // Alternative names that might work
-      'Nunito': require('../../assets/images/fonts/Nunito-Regular.ttf'),
-      'NunitoExtraBold': require('../../assets/images/fonts/Nunito-ExtraBold.ttf'),
-      'Nunito-Bold': require('../../assets/images/fonts/Nunito-ExtraBold.ttf'),
-    });
-    console.log('✅ FONT DEBUG: All fonts loaded successfully');
-  } catch (error) {
-    console.error('❌ FONT DEBUG: Error:', error.message);
-    throw error;
-  }
-};hy System
+ * 🔤 YesChef Typography System
  * Centralized font management with beautiful Nunito typeface
  */
 
@@ -37,15 +17,19 @@ export const FONTS = {
 // Load custom fonts
 export const loadFonts = async () => {
   try {
-    console.log('� FONT DEBUG: Starting font load...');
+    console.log('🔤 FONT DEBUG: Starting font load...');
     await Font.loadAsync({
+      // Main font variants from app.json
       'Nunito-Regular': require('../../assets/images/fonts/Nunito-Regular.ttf'),
       'Nunito-Light': require('../../assets/images/fonts/Nunito-Light.ttf'),
       'Nunito-ExtraBold': require('../../assets/images/fonts/Nunito-ExtraBold.ttf'),
+      
+      // Alternative names that might work
       'Nunito': require('../../assets/images/fonts/Nunito-Regular.ttf'),
       'NunitoExtraBold': require('../../assets/images/fonts/Nunito-ExtraBold.ttf'),
+      'Nunito-Bold': require('../../assets/images/fonts/Nunito-ExtraBold.ttf'),
     });
-    console.log('✅ FONT DEBUG: All fonts loaded');
+    console.log('✅ FONT DEBUG: All fonts loaded successfully');
   } catch (error) {
     console.error('❌ FONT DEBUG: Error:', error.message);
     throw error;

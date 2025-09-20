@@ -28,6 +28,8 @@ const ICON_MAPPINGS = {
   
   // Navigation
   forward: { family: Ionicons, name: 'arrow-forward' },
+  'chevron-left': { family: Ionicons, name: 'chevron-back' },
+  'chevron-right': { family: Ionicons, name: 'chevron-forward' },
   menu: { family: Ionicons, name: 'menu' },
   more: { family: Ionicons, name: 'ellipsis-horizontal' },
   'more-horizontal': { family: Feather, name: 'more-horizontal' },
@@ -52,6 +54,14 @@ const ICON_MAPPINGS = {
   'user-friends': { family: Ionicons, name: 'people-outline' },
   'user-friends-filled': { family: Ionicons, name: 'people' },
   'user-plus': { family: Ionicons, name: 'person-add-outline' },
+  
+  // Social & Community  
+  community: { family: Ionicons, name: 'people-outline' },
+  share: { family: Ionicons, name: 'share-outline' },
+  chat: { family: Ionicons, name: 'chatbubble-outline' },
+  camera: { family: Ionicons, name: 'camera-outline' },
+  download: { family: Ionicons, name: 'download-outline' },
+  
   home: { family: Ionicons, name: 'home-outline' },
   password: { family: Ionicons, name: 'lock-closed-outline' },
   email: { family: Ionicons, name: 'mail-outline' },
@@ -61,6 +71,7 @@ const ICON_MAPPINGS = {
   error: { family: Ionicons, name: 'close-circle' },
   warning: { family: Ionicons, name: 'warning' },
   info: { family: Ionicons, name: 'information-circle' },
+  star: { family: Ionicons, name: 'star' },
   
   // System
   settings: { family: Ionicons, name: 'settings-outline' },

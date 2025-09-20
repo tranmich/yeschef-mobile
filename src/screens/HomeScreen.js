@@ -17,13 +17,17 @@ import { Icon } from '../components/IconLibrary';
 import { ThemedText } from '../components/Typography';
 import YesChefAPI from '../services/YesChefAPI';
 
-export default function HomeScreen({ user = null, onLogout = null }) {
+export default function HomeScreen({ navigation, user = null, onLogout = null }) {
   // 📱 UI State
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   
   // 🍳 Community Recipes State
   const [communityRecipes, setCommunityRecipes] = useState([]);
   const [isLoadingCommunity, setIsLoadingCommunity] = useState(true);
+
+  // 📰 Latest Updates State  
+  const [latestUpdates, setLatestUpdates] = useState([]);
+  const [isLoadingUpdates, setIsLoadingUpdates] = useState(true);
 
   // Get safe area insets for proper positioning
   const insets = useSafeAreaInsets();
@@ -46,18 +50,32 @@ export default function HomeScreen({ user = null, onLogout = null }) {
     }
   };
 
-  // 👤 Profile Handler
+  // 🍳 Community Recipe Navigation
+  const handleCommunityRecipePress = (recipe) => {
+    if (navigation) {
+      navigation.navigate('CommunityRecipeDetail', { 
+        communityRecipe: recipe 
+      });
+    } else {
+      console.warn('Navigation not available for community recipe');
+    }
+  };
+
+  // � Community Posts Management
+  const handleMyCommunityPosts = () => {
+    setShowOptionsMenu(false);
+    if (navigation) {
+      navigation.navigate('UserCommunityPosts');
+    } else {
+      console.warn('Navigation not available for community posts');
+    }
+  };
+
+  // �👤 Profile Handler
   const handleProfile = () => {
     setShowOptionsMenu(false);
     console.log('👤 Profile selected');
-    // TODO: Navigate to profile screen
-  };
-
-  // ⚙️ Account Handler
-  const handleAccount = () => {
-    setShowOptionsMenu(false);
-    console.log('⚙️ Account selected');
-    // TODO: Navigate to account settings
+    navigation.navigate('Profile');
   };
 
   // 👋 Logout Handler
@@ -97,26 +115,121 @@ export default function HomeScreen({ user = null, onLogout = null }) {
     } catch (error) {
       console.error('Failed to load community recipes:', error);
       
-      // Fallback to mock data for development
+      // Fallback to mock data for development - start with realistic low counts
       setCommunityRecipes([
-        { id: 1, title: 'Grandma\'s Pasta', user: 'SarahChef', image: '🍝', likes: 42, community_icon: '🍝' },
-        { id: 2, title: 'Perfect Tacos', user: 'MikeChef', image: '🌮', likes: 38, community_icon: '🌮' },
-        { id: 3, title: 'Chocolate Cake', user: 'EmmaChef', image: '🍰', likes: 51, community_icon: '🍰' },
-        { id: 4, title: 'Curry Bowl', user: 'RajChef', image: '🍛', likes: 29, community_icon: '🍛' },
+        { 
+          id: 1, 
+          title: 'Grandma\'s Pasta', 
+          community_title: 'Grandma\'s Secret Pasta Recipe',
+          user: 'SarahChef', 
+          shared_by: 'SarahChef',
+          image: '🍝', 
+          likes: 3, 
+          community_icon: '🍝',
+          ingredients: ['2 cups pasta', '1 can tomato sauce', '1 onion, diced', '2 cloves garlic'],
+          instructions: ['Boil pasta until al dente', 'Sauté onion and garlic', 'Add tomato sauce', 'Combine with pasta']
+        },
+        { 
+          id: 2, 
+          title: 'Perfect Tacos', 
+          community_title: 'Street-Style Tacos',
+          user: 'MikeChef', 
+          shared_by: 'MikeChef',
+          image: '🌮', 
+          likes: 1, 
+          community_icon: '🌮',
+          ingredients: ['8 corn tortillas', '1 lb ground beef', '1 onion', 'Cilantro', 'Lime'],
+          instructions: ['Heat tortillas', 'Cook beef with onions', 'Assemble tacos', 'Garnish with cilantro and lime']
+        },
+        { 
+          id: 3, 
+          title: 'Chocolate Cake', 
+          community_title: 'Decadent Chocolate Cake',
+          user: 'EmmaChef', 
+          shared_by: 'EmmaChef',
+          image: '🍰', 
+          likes: 5, 
+          community_icon: '🍰',
+          ingredients: ['2 cups flour', '1.5 cups sugar', '3/4 cup cocoa powder', '2 eggs'],
+          instructions: ['Preheat oven to 350°F', 'Mix dry ingredients', 'Add wet ingredients', 'Bake for 30 minutes']
+        },
+        { 
+          id: 4, 
+          title: 'Curry Bowl', 
+          community_title: 'Coconut Curry Bowl',
+          user: 'RajChef', 
+          shared_by: 'RajChef',
+          image: '🍛', 
+          likes: 0, 
+          community_icon: '🍛',
+          ingredients: ['1 can coconut milk', '2 tbsp curry paste', '1 lb chicken', 'Jasmine rice'],
+          instructions: ['Cook rice', 'Sauté chicken', 'Add coconut milk and curry paste', 'Simmer until tender']
+        },
       ]);
     } finally {
       setIsLoadingCommunity(false);
     }
   };
 
+  // 📰 Load Latest Updates from API
+  const loadLatestUpdates = async () => {
+    try {
+      setIsLoadingUpdates(true);
+      
+      // Call real API endpoint  
+      const response = await YesChefAPI.get('/api/latest-updates');
+      
+      if (response.success) {
+        setLatestUpdates(response.updates || []);
+      } else {
+        console.error('Failed to load latest updates:', response.error);
+        setLatestUpdates([]);
+      }
+    } catch (error) {
+      console.error('Failed to load latest updates:', error);
+      
+      // Fallback to mock data for development
+      setLatestUpdates([
+        { 
+          id: 'fallback_1', 
+          type: 'content',
+          title: 'Sheet pan formula', 
+          content: 'When you don\'t feel like cooking, throw some protein, a veggie, and your favorite spice on a sheet pan.',
+          category: 'tip',
+          icon: '💡'
+        },
+        { 
+          id: 'fallback_2', 
+          type: 'content',
+          title: 'The fastest sauce in the world', 
+          content: 'A little garlic in olive oil and a splash of pasta water is all it takes.',
+          category: 'technique', 
+          icon: '🔥'
+        },
+        { 
+          id: 'fallback_3', 
+          type: 'activity',
+          title: 'Community Update', 
+          content: 'New recipes have been shared in the community!',
+          category: 'social',
+          icon: '👨‍🍳'
+        },
+      ]);
+    } finally {
+      setIsLoadingUpdates(false);
+    }
+  };
+
   // Load community recipes on component mount
   useEffect(() => {
     loadCommunityRecipes();
+    loadLatestUpdates();
   }, []);
 
   // 🔄 Refresh community recipes
   const handleRefreshCommunity = () => {
     loadCommunityRecipes();
+    loadLatestUpdates();
   };
 
   // 📱 Mock data for community content (will be replaced with real data later)
@@ -125,12 +238,6 @@ export default function HomeScreen({ user = null, onLogout = null }) {
     { id: 2, title: 'Perfect Tacos', user: 'Mike R.', image: '🌮', likes: 38 },
     { id: 3, title: 'Chocolate Cake', user: 'Emma L.', image: '🍰', likes: 51 },
     { id: 4, title: 'Curry Bowl', user: 'Raj P.', image: '🍛', likes: 29 },
-  ];
-
-  const mockNews = [
-    { id: 1, title: 'New Recipe Sharing Feature!', date: 'Sep 15', preview: 'Share your favorite recipes with the community...' },
-    { id: 2, title: 'Fall Cooking Tips', date: 'Sep 12', preview: 'Make the most of seasonal ingredients...' },
-    { id: 3, title: 'App Update 2.1.0', date: 'Sep 10', preview: 'Bug fixes and performance improvements...' },
   ];
 
   return (
@@ -171,10 +278,10 @@ export default function HomeScreen({ user = null, onLogout = null }) {
               
               <TouchableOpacity 
                 style={styles.menuOption}
-                onPress={handleAccount}
+                onPress={handleMyCommunityPosts}
               >
-                <Icon name="settings" size={16} color="#374151" />
-                <Text style={styles.menuOptionText}>Account</Text>
+                <Icon name="community" size={16} color="#10b981" />
+                <Text style={[styles.menuOptionText, { color: '#10b981' }]}>My Community Posts</Text>
               </TouchableOpacity>
               
               <View style={styles.menuDivider} />
@@ -232,13 +339,17 @@ export default function HomeScreen({ user = null, onLogout = null }) {
                   ) : communityRecipes.length > 0 ? (
                     // Real community recipes data
                     communityRecipes.map((recipe) => (
-                      <TouchableOpacity key={recipe.id} style={styles.recipeHomeCard}>
+                      <TouchableOpacity 
+                        key={recipe.id} 
+                        style={styles.recipeHomeCard}
+                        onPress={() => handleCommunityRecipePress(recipe)}
+                      >
                         <Text style={styles.recipeHomeImage}>{recipe.community_icon || recipe.image}</Text>
-                        <Text style={styles.recipeHomeTitle}>{recipe.title}</Text>
-                        <Text style={styles.recipeHomeUser}>by {recipe.user}</Text>
+                        <Text style={styles.recipeHomeTitle}>{recipe.community_title || recipe.title}</Text>
+                        <Text style={styles.recipeHomeUser}>by {recipe.shared_by || recipe.user}</Text>
                         <View style={styles.recipeHomeLikes}>
                           <Icon name="heart" size={12} color="#EF4444" />
-                          <Text style={styles.likesHomeText}>{recipe.likes}</Text>
+                          <Text style={styles.likesHomeText}>{recipe.likes || 0}</Text>
                         </View>
                       </TouchableOpacity>
                     ))
@@ -264,15 +375,23 @@ export default function HomeScreen({ user = null, onLogout = null }) {
             <View style={styles.sectionContainer}>
               <View style={styles.homeSection}>
                 <Text style={styles.homeSectionTitle}>📰 Latest Updates</Text>
-                {mockNews.map((article) => (
-                  <TouchableOpacity key={article.id} style={styles.newsHomeCard}>
-                    <View style={styles.newsHomeHeader}>
-                      <Text style={styles.newsHomeTitle}>{article.title}</Text>
-                      <Text style={styles.newsHomeDate}>{article.date}</Text>
-                    </View>
-                    <Text style={styles.newsHomePreview}>{article.preview}</Text>
-                  </TouchableOpacity>
-                ))}
+                {isLoadingUpdates ? (
+                  <View style={styles.loadingContainer}>
+                    <Text style={styles.loadingText}>Loading updates...</Text>
+                  </View>
+                ) : (
+                  latestUpdates.map((update) => (
+                    <TouchableOpacity key={update.id} style={styles.newsHomeCard}>
+                      <View style={styles.newsHomeHeader}>
+                        <View style={styles.newsHomeContent}>
+                          <Text style={styles.newsHomeTitle}>{update.title}</Text>
+                          <Text style={styles.newsHomeCategory}>{update.category}</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.newsHomePreview}>{update.content}</Text>
+                    </TouchableOpacity>
+                  ))
+                )}
               </View>
             </View>
 
@@ -547,13 +666,26 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 8,
   },
+  newsHomeIcon: {
+    fontSize: 20,
+    marginRight: 12,
+    alignSelf: 'center',
+  },
+  newsHomeContent: {
+    flex: 1,
+  },
   newsHomeTitle: {
     fontSize: 16,
     // fontWeight removed - conflicts with Nunito-Bold (documented in PROJECT_MASTER_GUIDE)
+    fontFamily: 'Nunito-ExtraBold',
     color: '#1F2937',
-    flex: 1,
-    marginRight: 10,
-    fontFamily: 'Nunito-Bold', // Added consistent font family
+    marginBottom: 2,
+  },
+  newsHomeCategory: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+    textTransform: 'capitalize',
   },
   newsHomeDate: {
     fontSize: 12,
@@ -562,10 +694,19 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito-Regular', // Added consistent font family
   },
   newsHomePreview: {
+    fontSize: 15,
+    color: '#374151',
+    lineHeight: 22,
+    marginTop: 4,
+    fontFamily: 'Nunito-Regular',
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  loadingText: {
     fontSize: 14,
-    color: '#4B5563',
-    lineHeight: 20,
-    fontFamily: 'Nunito-Regular', // Added consistent font family
+    color: '#6B7280',
   },
   bottomSpacing: {
     height: 20,

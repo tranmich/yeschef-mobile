@@ -17,6 +17,9 @@ import RecipeCollectionScreen from './src/screens/RecipeCollectionScreen';
 import MealPlanScreen from './src/screens/MealPlanScreen';
 import FriendsScreen from './src/screens/FriendsScreen';
 import HomeScreen from './src/screens/HomeScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
+import CommunityRecipeDetailScreen from './src/screens/CommunityRecipeDetailScreen';
+import UserCommunityPostsScreen from './src/screens/UserCommunityPostsScreen';
 import DebugScreen from './src/screens/DebugScreen';
 import DragTestScreen from './src/screens/DragTestScreen';
 import LoginScreen from './src/screens/LoginScreen';
@@ -135,6 +138,56 @@ function MealPlanStack() {
         component={RecipeViewScreen}
         options={{ 
           title: 'Recipe',
+          headerBackTitleVisible: false,
+          headerTintColor: '#111827',
+          headerStyle: {
+            backgroundColor: '#fafbfc',
+            borderBottomWidth: 1,
+            borderBottomColor: '#e5e7eb',
+          }
+        }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+// 🏠 Home Stack Navigator (Community + Exploration)
+function HomeStack({ user, onLogout }) {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen 
+        name="HomeMain" 
+        options={{ headerShown: false }}
+      >
+        {(props) => <HomeScreen {...props} user={user} onLogout={onLogout} />}
+      </Stack.Screen>
+      <Stack.Screen 
+        name="Profile" 
+        options={{ headerShown: false }}
+      >
+        {(props) => <ProfileScreen {...props} user={user} />}
+      </Stack.Screen>
+      <Stack.Screen 
+        name="CommunityRecipeDetail" 
+        component={CommunityRecipeDetailScreen}
+        options={{ 
+          title: 'Community Recipe',
+          headerShown: false, // CommunityRecipeDetailScreen handles its own header
+          headerBackTitleVisible: false,
+          headerTintColor: '#111827',
+          headerStyle: {
+            backgroundColor: '#fafbfc',
+            borderBottomWidth: 1,
+            borderBottomColor: '#e5e7eb',
+          }
+        }}
+      />
+      <Stack.Screen 
+        name="UserCommunityPosts" 
+        component={UserCommunityPostsScreen}
+        options={{ 
+          title: 'My Community Posts',
+          headerShown: false, // UserCommunityPostsScreen handles its own header
           headerBackTitleVisible: false,
           headerTintColor: '#111827',
           headerStyle: {
@@ -278,7 +331,7 @@ export default function App() {
           name="Home" 
           options={{
             title: 'Home',
-            headerShown: false, // HomeScreen handles its own header
+            headerShown: false, // HomeStack handles headers
             tabBarIcon: ({ color, size, focused }) => (
               <Icon 
                 name={focused ? 'homeFilled' : 'home'} 
@@ -288,7 +341,7 @@ export default function App() {
             ),
           }}
         >
-          {() => <HomeScreen user={user} onLogout={handleLogout} />}
+          {(props) => <HomeStack {...props} user={user} onLogout={handleLogout} />}
         </Tab.Screen>
         
         {/* #1 PRIORITY - Grocery List (Store Companion) */}

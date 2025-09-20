@@ -207,6 +207,36 @@ class YesChefAPI {
     }
   }
 
+  async put(endpoint, body = {}, options = {}) {
+    this.log(`PUT request to: ${endpoint}`, body);
+    
+    try {
+      const response = await this.debugFetch(endpoint, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.token && { 'Authorization': `Bearer ${this.token}` }),
+          ...options.headers,
+        },
+        body: JSON.stringify(body),
+        ...options,
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        this.log(`✅ PUT ${endpoint} successful`);
+        return { success: true, ...data };
+      } else {
+        this.error(`PUT ${endpoint} failed:`, data);
+        return { success: false, error: data.error || 'Request failed' };
+      }
+    } catch (error) {
+      this.error(`PUT ${endpoint} error:`, error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
   // Recipe Methods - Authenticated Only
   async getRecipes(filters = {}) {
     this.log('Getting recipes with filters:', filters);
@@ -316,14 +346,19 @@ class YesChefAPI {
       const data = await response.json();
       this.log('Import response:', data);
       
-      if (response.ok) {
+      if (response.ok && data.success) {
         this.log('✅ Recipe imported successfully!', {
-          title: data.recipe?.title,
-          confidence: data.recipe?.confidence_score
+          title: data.recipe_data?.title,
+          confidence: data.confidence,
+          processing_time: data.processing_time
         });
         return { 
           success: true, 
-          recipe: data.recipe
+          recipe: data.recipe_data,
+          recipe_id: data.recipe_id,
+          confidence: data.confidence,
+          needs_review: data.needs_review,
+          extraction_method: data.extraction_method
         };
       } else {
         this.error('Import failed:', data);
@@ -721,6 +756,124 @@ class YesChefAPI {
       }
     } catch (error) {
       this.error('Get shared resources error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  // =====================================================
+  // 👤 PROFILE API METHODS
+  // =====================================================
+
+  async getProfile() {
+    this.log('Getting user profile...');
+    try {
+      const response = await this.get('/api/profile');
+      
+      if (response.success) {
+        this.log('✅ Profile loaded successfully!', response.profile);
+        return response;
+      } else {
+        this.error('Get profile failed:', response.error);
+        return response;
+      }
+    } catch (error) {
+      this.error('Get profile error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  async updateProfile(profileData) {
+    this.log('Updating user profile...', profileData);
+    try {
+      const response = await this.put('/api/profile', profileData);
+      
+      if (response.success) {
+        this.log('✅ Profile updated successfully!');
+        return response;
+      } else {
+        this.error('Update profile failed:', response.error);
+        return response;
+      }
+    } catch (error) {
+      this.error('Update profile error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  async getUserStats() {
+    this.log('Getting user statistics...');
+    try {
+      const response = await this.get('/api/profile/stats');
+      
+      if (response.success) {
+        this.log('✅ User stats loaded successfully!', response.stats);
+        return response;
+      } else {
+        this.error('Get user stats failed:', response.error);
+        return response;
+      }
+    } catch (error) {
+      this.error('Get user stats error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  async uploadProfilePhoto(imageUri) {
+    this.log('Uploading profile photo...', imageUri);
+    try {
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('photo', {
+        uri: imageUri,
+        type: 'image/jpeg',
+        name: 'profile.jpg',
+      });
+
+      const token = await this.getToken();
+      if (!token) {
+        this.error('No authentication token available');
+        return { success: false, error: 'Authentication required' };
+      }
+
+      const response = await fetch(`${this.baseURL}/api/profile/photo`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+      this.log('Profile photo upload response:', data);
+
+      if (response.ok) {
+        this.log('✅ Profile photo uploaded successfully!');
+        return { success: true, ...data };
+      } else {
+        this.error('Profile photo upload failed:', data);
+        return { success: false, error: data.error || 'Failed to upload photo' };
+      }
+    } catch (error) {
+      this.error('Profile photo upload error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  async checkUsernameAvailability(username) {
+    this.log('Checking username availability...', username);
+    try {
+      const response = await this.post('/api/profile/username/check', { username });
+      
+      if (response.success) {
+        this.log('✅ Username availability checked!', response);
+        return response;
+      } else {
+        this.error('Username check failed:', response.error);
+        return response;
+      }
+    } catch (error) {
+      this.error('Username check error:', error);
       return { success: false, error: 'Network error - check connection' };
     }
   }
