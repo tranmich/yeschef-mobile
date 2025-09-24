@@ -14,6 +14,7 @@ import {
   ImageBackground,
   StatusBar,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Icon, IconButton } from '../components/IconLibrary';
 import { ThemedText, typography } from '../components/Typography';
 import { SimpleDraggableList } from '../components/DragSystem';
@@ -26,6 +27,9 @@ import MealPlanAPI from '../services/MealPlanAPI';
 import YesChefAPI from '../services/YesChefAPI';
 import FriendsAPI from '../services/FriendsAPI';
 import MobileGroceryAdapter from '../services/MobileGroceryAdapter';
+// 🔄 LOCAL-FIRST ARCHITECTURE
+import { useMealPlanData } from '../hooks/useLocalData';
+import { LocalDataStatus, DraftPicker } from '../components/LocalDataStatus';
 
 function MealPlanScreen({ navigation }) {
   // 🎨 Background Configuration (matches HomeScreen)
@@ -45,40 +49,193 @@ function MealPlanScreen({ navigation }) {
   const [currentPlanId, setCurrentPlanId] = useState(null); // Track currently loaded plan for refresh
   const [lastRefreshTime, setLastRefreshTime] = useState(0); // Throttle refreshes
   
+  // 📋 Default empty meal plan structure
+  const getDefaultMealPlan = () => {
+    return [
+      {
+        id: 1,  // Use number ID to match RecipeCollectionScreen expectations
+        name: 'Day 1',
+        isExpanded: true,
+        recipes: [],
+        meals: [
+          { id: 'breakfast-1', name: 'Breakfast', recipes: [] },
+          { id: 'lunch-1', name: 'Lunch', recipes: [] },
+          { id: 'dinner-1', name: 'Dinner', recipes: [] }
+        ]
+      }
+    ];
+  };
+  
   // Invite functionality state
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [households, setHouseholds] = useState([]);
   const [householdMembers, setHouseholdMembers] = useState([]);
   
-  // Day management state
-  const [days, setDays] = useState([
-    {
-      id: 1,
-      name: 'Day 1',
-      isExpanded: true,
-      meals: [
-        { id: 'breakfast-1', name: 'Breakfast', recipes: [] },
-        { id: 'lunch-1', name: 'Lunch', recipes: [] },
-        { id: 'dinner-1', name: 'Dinner', recipes: [] },
-      ]
+  // 🔄 LOCAL-FIRST ARCHITECTURE: Replace days state with local data management
+  const {
+    data: days,
+    updateData: setDays,
+    hasUnsavedChanges,
+    isAutoSaving,
+    lastSaved,
+    error: localDataError,
+    saveAsDraft,
+    loadFromDraft,
+    getDrafts,
+    forceAutoSave,
+    markAsSaved
+  } = useMealPlanData(getDefaultMealPlan()); // Use our consistent default structure
+
+  // 🔄 LOCAL DATA STATUS: UI state for draft management
+  const [showDraftsModal, setShowDraftsModal] = useState(false);
+  const [draftsList, setDraftsList] = useState([]);
+
+  // � INITIALIZATION: Clean start
+  useEffect(() => {
+    console.log('🎬 MealPlanScreen initializing...');
+    
+    // If no plan is loaded, ensure we start clean
+    if (!currentPlanId) {
+      console.log('🧹 No saved plan - ensuring clean start with default data');
+      // Small delay to avoid conflicts with focus effects
+      setTimeout(async () => {
+        await createNewMealPlan();
+      }, 100);
     }
-  ]);
+  }, []);
+  const createNewMealPlan = async () => {
+    console.log('🆕 Creating new meal plan - clean slate');
+    
+    // Clear all local state first
+    await clearAllLocalState();
+    
+    // Reset to default empty state
+    const defaultDays = getDefaultMealPlan();
+    setDays(defaultDays);
+    setMealPlanTitle('Weekly Meal Plan');
+    setCurrentPlanId(null);
+    
+    console.log('✅ New meal plan ready with', defaultDays.length, 'days');
+  };
+  const clearAllLocalState = async () => {
+    try {
+      console.log('🧹 CLEARING ALL LOCAL STATE for clean slate');
+      
+      // Clear the legacy AsyncStorage that causes conflicts
+      await AsyncStorage.removeItem('localMealPlan');
+      console.log('🧹 Cleared localMealPlan AsyncStorage');
+      
+      // Clear any meal plan backups (we'll rely on backend only)
+      const keys = await AsyncStorage.getAllKeys();
+      const mealPlanKeys = keys.filter(key => key.startsWith('meal_plan_'));
+      if (mealPlanKeys.length > 0) {
+        await AsyncStorage.multiRemove(mealPlanKeys);
+        console.log('🧹 Cleared', mealPlanKeys.length, 'meal plan backups');
+      }
+      
+      console.log('✅ Local state cleared - clean slate ready');
+    } catch (error) {
+      console.error('❌ Error clearing local state:', error);
+    }
+  };
+  // 🔄 SIMPLIFIED: Only sync AsyncStorage for new/local plans (not saved plans)
+  const checkForLocalMealPlan = async () => {
+    try {
+      const localData = await AsyncStorage.getItem('localMealPlan');
+      if (localData) {
+        const { mealPlan, lastUpdated, isLocal } = JSON.parse(localData);
+        console.log('🔄 Found local meal plan from AsyncStorage, updated:', new Date(lastUpdated).toLocaleTimeString());
+        
+        // Process AsyncStorage data and force sync with local-first system
+        if (isLocal && mealPlan && Array.isArray(mealPlan)) {
+          console.log('📦 SYNC: Force updating local-first system with AsyncStorage data');
+          
+          // Ensure proper expansion state for better UX
+          const mealPlanWithExpansion = mealPlan.map(day => ({
+            ...day,
+            isExpanded: day.isExpanded !== undefined ? day.isExpanded : true
+          }));
+          
+          // 🔄 SYNC WITH LOCAL-FIRST SYSTEM: Update the hook's state directly
+          setDays(mealPlanWithExpansion);
+          
+          // Force mark as unsaved to trigger the correct state
+          setTimeout(() => {
+            console.log('🔄 FORCE SYNC: Marking as unsaved to refresh UI state');
+            // This will trigger the change detection in the hook
+            setDays([...mealPlanWithExpansion]);
+          }, 100);
+          
+          if (!currentPlanId) {
+            // Keep the clean "Weekly Meal Plan" title for new plans
+            console.log('🏷️ Keeping clean title "Weekly Meal Plan" for unsaved plan');
+          } else {
+            // For saved plans, keep the existing title but sync the recipe data
+            console.log('🏷️ Syncing recipes for saved plan but preserving title');
+          }
+          
+          // � DEBUG: Check what was actually loaded
+          mealPlan.forEach((day, index) => {
+            console.log(`🔍 LOAD DEBUG Day ${day.name}:`, {
+              recipesCount: (day.recipes || []).length,
+              breakfastRecipes: day.meals?.find(m => m.name === 'Breakfast')?.recipes?.length || 0,
+              recipeTitles: (day.recipes || []).map(r => r.title)
+            });
+          });
+          
+          // �🔄 PERSISTENCE: Keep local storage for unsaved changes (don't auto-clear)
+          console.log('✅ Local meal plan loaded (keeping in storage for persistence)');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to check local meal plan:', error);
+    }
+  };
+
+  // 🧹 RESET: Clear corrupted local storage (temporary debug function)
+  const clearLocalStorage = async () => {
+    try {
+      await AsyncStorage.removeItem('localMealPlan');
+      console.log('🧹 RESET: Cleared corrupted local storage');
+      Alert.alert('Storage Cleared', 'Local meal plan storage has been reset. Please restart the app.');
+    } catch (error) {
+      console.error('❌ Failed to clear local storage:', error);
+    }
+  };
+
+  // 🔄 Throttling for screen focus to prevent infinite loops
+  const [lastFocusCheck, setLastFocusCheck] = useState(0);
 
   // 🔄 Refresh meal plan when screen comes into focus (e.g., returning from My Recipes)
   useFocusEffect(
     React.useCallback(() => {
+      const now = Date.now();
+      if (now - lastFocusCheck < 2000) { // Throttle to max once every 2 seconds
+        console.log('🚫 Focus check throttled - too soon since last check');
+        return;
+      }
+      setLastFocusCheck(now);
+      
       console.log('👁️ Meal Plan screen focused - checking for updates...');
+      
+      // 🔄 IMPROVED SYNC: Always sync AsyncStorage but preserve saved plan state
+      if (!currentPlanId) {
+        console.log('📋 New plan mode - syncing recipes and keeping clean title');
+        checkForLocalMealPlan();
+      } else {
+        console.log('💾 Saved plan mode - syncing recipes but preserving plan identity');
+        checkForLocalMealPlan(); // Allow sync to pick up new recipe additions
+      }
+      
       if (currentPlanId) {
-        console.log('🔄 Refreshing current plan due to screen focus');
-        // Add a small delay to ensure any pending saves are completed
-        setTimeout(() => {
-          refreshCurrentPlan();
-        }, 500);
+        // 🔒 LOCAL-FIRST PROTECTION: Skip ALL backend refreshes - use local data only
+        console.log('🛡️ SKIPPING ALL BACKEND REFRESHES: Using local-first data exclusively');
+        return;
       } else {
         console.log('📋 No current plan loaded - staying with current state');
         // Removed auto-load logic - let the user manually load plans if needed
       }
-    }, [currentPlanId, days])
+    }, [currentPlanId, days, lastFocusCheck, hasUnsavedChanges])
   );
 
   // API Functions (Stage 2: Real backend integration)
@@ -97,6 +254,11 @@ function MealPlanScreen({ navigation }) {
       
       if (result.success) {
         console.log('✅ Meal plan saved successfully! Plan ID:', result.planId);
+        
+        // 🧹 CLEAN SLATE: Clear all conflicting local state after save
+        await clearAllLocalState();
+        console.log('🧹 Local state cleared after successful save');
+        
         // Update the current plan ID so we can track this plan for future updates
         setCurrentPlanId(result.planId);
         console.log('🆔 Set current plan ID to:', result.planId);
@@ -146,9 +308,36 @@ function MealPlanScreen({ navigation }) {
         console.log('✅ Plan loaded successfully!');
         console.log('🔄 Setting mobile data:', result.mobileDays);
         
+        // 🧹 CLEAN SLATE: Clear all local state before loading
+        await clearAllLocalState();
+        console.log('🧹 Local state cleared before loading plan data');
+        
+        // 🔄 COMPATIBILITY: Move breakfast recipes to day.recipes for simplified UI
+        const compatibleDays = result.mobileDays.map(day => {
+          const breakfastMeal = day.meals?.find(meal => meal.name === 'Breakfast' || meal.id === 'breakfast-1');
+          const breakfastRecipes = breakfastMeal?.recipes || [];
+          
+          console.log('🔄 LOAD COMPATIBILITY DEBUG:', {
+            dayName: day.name,
+            breakfastMeal: breakfastMeal?.name,
+            breakfastRecipeCount: breakfastRecipes.length,
+            existingDayRecipes: (day.recipes || []).length
+          });
+          
+          return {
+            ...day,
+            recipes: breakfastRecipes, // Replace with breakfast recipes (backend is source of truth)
+            meals: day.meals?.map(meal => 
+              (meal.name === 'Breakfast' || meal.id === 'breakfast-1')
+                ? { ...meal, recipes: [] } // Clear breakfast recipes since they're now in day.recipes
+                : meal
+            ) || []
+          };
+        });
+        
         // Update the mobile app state with loaded data
-        setDays(result.mobileDays);
-        setMealPlanTitle(result.planTitle);
+        setDays(compatibleDays);
+        setMealPlanTitle(result.planName || result.planTitle || `Plan ${planId}`);
         setCurrentPlanId(planId); // Track the loaded plan
         
         console.log('🎉 Meal plan loaded into mobile app!');
@@ -178,10 +367,10 @@ function MealPlanScreen({ navigation }) {
     setLastRefreshTime(now);
     
     console.log('🔄 Refreshing current meal plan:', currentPlanId);
-    console.log('📊 Current state before refresh:', {
-      daysCount: days.length,
-      totalRecipes: days.reduce((total, day) => total + day.meals.reduce((mealTotal, meal) => mealTotal + (meal.recipes?.length || 0), 0), 0)
-    });
+    
+    // 🔒 LOCAL-FIRST PROTECTION: Disable ALL backend refreshes - use local data exclusively
+    console.log('🛡️ SKIPPING BACKEND REFRESH: Local-first mode - using local data only');
+    return;
     
     try {
       const result = await MealPlanAPI.loadMealPlan(currentPlanId);
@@ -189,12 +378,36 @@ function MealPlanScreen({ navigation }) {
       
       if (result.success) {
         console.log('✅ Plan refreshed successfully!');
-        console.log('📊 New data:', {
-          daysCount: result.mobileDays.length,
-          totalRecipes: result.mobileDays.reduce((total, day) => total + day.meals.reduce((mealTotal, meal) => mealTotal + (meal.recipes?.length || 0), 0), 0)
+        
+        // 🔄 COMPATIBILITY: Move breakfast recipes to day.recipes for simplified UI
+        const compatibleDays = result.mobileDays.map(day => {
+          const breakfastMeal = day.meals?.find(meal => meal.name === 'Breakfast' || meal.id === 'breakfast-1');
+          const breakfastRecipes = breakfastMeal?.recipes || [];
+          
+          console.log('🔄 REFRESH COMPATIBILITY DEBUG:', {
+            dayName: day.name,
+            breakfastMeal: breakfastMeal?.name,
+            breakfastRecipeCount: breakfastRecipes.length,
+            existingDayRecipes: (day.recipes || []).length
+          });
+          
+          return {
+            ...day,
+            recipes: [...(day.recipes || []), ...breakfastRecipes], // Merge existing + breakfast
+            meals: day.meals?.map(meal => 
+              (meal.name === 'Breakfast' || meal.id === 'breakfast-1')
+                ? { ...meal, recipes: [] } // Clear breakfast recipes since they're now in day.recipes
+                : meal
+            ) || []
+          };
         });
         
-        setDays(result.mobileDays);
+        console.log('📊 Loaded data:', {
+          daysCount: compatibleDays.length,
+          totalRecipes: compatibleDays.reduce((total, day) => total + (day.recipes?.length || 0), 0)
+        });
+        
+        setDays(compatibleDays);
         setMealPlanTitle(result.planTitle);
         
         console.log(`🔄 State updated with ${result.mobileDays.length} days`);
@@ -287,20 +500,41 @@ function MealPlanScreen({ navigation }) {
       ]
     );
   };
-  
-  const handleAddDay = () => {
+
+  // Helper function to save days to local storage
+  const saveDaysToStorage = async (updatedDays) => {
+    try {
+      await AsyncStorage.setItem('localMealPlan', JSON.stringify({
+        mealPlan: updatedDays,
+        lastUpdated: Date.now(),
+        isLocal: true
+      }));
+      console.log('💾 Days saved to local storage');
+    } catch (error) {
+      console.error('❌ Failed to save days to storage:', error);
+    }
+  };
+
+  const handleAddDay = async () => {
     const newDayId = Date.now();
     const newDay = {
       id: newDayId,
       name: 'New Day',
       isExpanded: true,
+      recipes: [], // Add recipes array for compatibility
       meals: [
         { id: `breakfast-${newDayId}`, name: 'Breakfast', recipes: [] },
         { id: `lunch-${newDayId}`, name: 'Lunch', recipes: [] },
         { id: `dinner-${newDayId}`, name: 'Dinner', recipes: [] },
       ]
     };
-    setDays([...days, newDay]);
+    
+    const updatedDays = [...days, newDay];
+    setDays(updatedDays);
+    
+    // Save to AsyncStorage to persist the change
+    await saveDaysToStorage(updatedDays);
+    
     // Auto-edit the new day name
     setEditingDayId(newDayId);
   };
@@ -564,15 +798,25 @@ function MealPlanScreen({ navigation }) {
     );
   };
   
-  const handleDeleteDay = (dayId) => {
-    setDays(days.filter(day => day.id !== dayId));
+  const handleDeleteDay = async (dayId) => {
+    const updatedDays = days.filter(day => day.id !== dayId);
+    setDays(updatedDays);
+    
+    // Save to AsyncStorage to persist the change
+    await saveDaysToStorage(updatedDays);
+    
+    console.log(`🗑️ Deleted day ${dayId} and saved to storage`);
   };
 
   // Editing functions
-  const updateDayName = (dayId, newName) => {
-    setDays(days.map(day => 
+  const updateDayName = async (dayId, newName) => {
+    const updatedDays = days.map(day => 
       day.id === dayId ? { ...day, name: newName } : day
-    ));
+    );
+    setDays(updatedDays);
+    
+    // Save to AsyncStorage to persist the change
+    await saveDaysToStorage(updatedDays);
   };
 
   const updateMealName = (dayId, mealId, newName) => {
@@ -587,17 +831,162 @@ function MealPlanScreen({ navigation }) {
         : day
     ));
   };
+
+  // 🌟 NEW SIMPLIFIED HANDLERS: Work directly with day.recipes
+  
+  const handleRecipeReorderInDay = (dayId, newRecipes) => {
+    console.log(`🔄 Reordering recipes in day ${dayId}:`, newRecipes.map(r => r.title));
+    
+    setDays(prevDays => 
+      prevDays.map(day => 
+        day.id === dayId 
+          ? { ...day, recipes: newRecipes }
+          : day
+      )
+    );
+  };
+
+  const handleDeleteRecipeFromDay = async (dayId, recipeId) => {
+    console.log(`🗑️ Deleting recipe ${recipeId} from day ${dayId}`);
+    
+    const updatedDays = days.map(day => 
+      day.id === dayId 
+        ? { 
+            ...day, 
+            recipes: (day.recipes || []).filter(recipe => recipe.id !== recipeId),
+            // 🔄 COMPATIBILITY: Also remove from breakfast meal to prevent resurrection
+            meals: day.meals?.map(meal => 
+              (meal.name === 'Breakfast' || meal.id === 'breakfast-1')
+                ? { ...meal, recipes: (meal.recipes || []).filter(recipe => recipe.id !== recipeId) }
+                : meal
+            ) || []
+          }
+        : day
+    );
+    
+    // Update state
+    setDays(updatedDays);
+    
+    // 🔄 PERSISTENCE: Save to local storage to prevent resurrection on refresh
+    try {
+      await AsyncStorage.setItem('localMealPlan', JSON.stringify({
+        mealPlan: updatedDays,
+        lastUpdated: Date.now(),
+        isLocal: true
+      }));
+      console.log('💾 Recipe deletion saved to local storage');
+    } catch (error) {
+      console.error('❌ Failed to save recipe deletion:', error);
+    }
+  };
+
+  const handleToggleRecipeCompleteInDay = (dayId, recipeId) => {
+    console.log(`✅ Toggling recipe completion: ${recipeId} in day ${dayId}`);
+    
+    setDays(prevDays => 
+      prevDays.map(day => 
+        day.id === dayId 
+          ? {
+              ...day,
+              recipes: (day.recipes || []).map(recipe => 
+                recipe.id === recipeId 
+                  ? { ...recipe, completed: !recipe.completed }
+                  : recipe
+              )
+            }
+          : day
+      )
+    );
+  };
   
   // Wrapper for grocery list generation for menu
   const handleConvertToGroceryList = () => {
     handleGenerateGroceryList();
   };
 
-  // Calculate total number of meals for display
+  // ==============================================
+  // 🔄 LOCAL-FIRST DRAFT MANAGEMENT
+  // ==============================================
+
+  /**
+   * Handle manual save as draft
+   */
+  const handleSaveAsDraft = async () => {
+    const draftName = `${mealPlanTitle} - ${new Date().toLocaleTimeString()}`;
+    const result = await saveAsDraft(draftName);
+    
+    if (result.success) {
+      Alert.alert(
+        'Draft Saved! 📝',
+        `Your meal plan has been saved as "${result.draftName}"`,
+        [{ text: 'OK', style: 'default' }]
+      );
+    } else {
+      Alert.alert(
+        'Save Failed',
+        result.error || 'Could not save draft',
+        [{ text: 'OK', style: 'default' }]
+      );
+    }
+  };
+
+  /**
+   * Show drafts list modal
+   */
+  const handleShowDrafts = async () => {
+    const drafts = await getDrafts();
+    setDraftsList(drafts);
+    setShowDraftsModal(true);
+  };
+
+  /**
+   * Load selected draft
+   */
+  const handleLoadDraft = async (draft) => {
+    setShowDraftsModal(false);
+    
+    if (hasUnsavedChanges) {
+      Alert.alert(
+        'Unsaved Changes',
+        'You have unsaved changes. Loading this draft will replace your current work.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Load Draft', 
+            style: 'destructive',
+            onPress: async () => {
+              const result = await loadFromDraft(draft.id);
+              if (result.success) {
+                setMealPlanTitle(draft.name.replace(/ - \d+:\d+:\d+ [AP]M$/, '') || 'Loaded Meal Plan');
+                console.log('✅ Draft loaded successfully');
+              } else {
+                Alert.alert('Load Failed', result.error || 'Could not load draft');
+              }
+            }
+          }
+        ]
+      );
+    } else {
+      const result = await loadFromDraft(draft.id);
+      if (result.success) {
+        setMealPlanTitle(draft.name.replace(/ - \d+:\d+:\d+ [AP]M$/, '') || 'Loaded Meal Plan');
+        console.log('✅ Draft loaded successfully');
+      } else {
+        Alert.alert('Load Failed', result.error || 'Could not load draft');
+      }
+    }
+  };
+
+  /**
+   * Force auto-save current changes
+   */
+  const handleForceAutoSave = async () => {
+    await forceAutoSave();
+  };
+
+  // Calculate total number of recipes for display - SIMPLIFIED: Only count day.recipes
   const totalMealCount = days.reduce((total, day) => {
-    return total + day.meals.reduce((dayTotal, meal) => {
-      return dayTotal + meal.recipes.length;
-    }, 0);
+    return total + (day.recipes?.length || 0);
   }, 0);
 
   // Load households for invitation
@@ -716,6 +1105,8 @@ function MealPlanScreen({ navigation }) {
                     onSubmitEditing={() => setIsEditingTitle(false)}
                     autoFocus
                     placeholder="Enter meal plan title"
+                    placeholderTextColor="#9ca3af"
+                    selectionColor="#3b82f6"
                   />
                 ) : (
                   <TouchableOpacity onPress={() => setIsEditingTitle(true)}>
@@ -736,6 +1127,17 @@ function MealPlanScreen({ navigation }) {
                 <Text style={styles.optionsIcon}>⋯</Text>
               </TouchableOpacity>
             </View>
+
+            {/* 📝 LOCAL DATA STATUS - Show draft/save status */}
+            <LocalDataStatus
+              hasUnsavedChanges={hasUnsavedChanges}
+              isAutoSaving={isAutoSaving}
+              lastSaved={lastSaved}
+              error={localDataError}
+              onSaveAsDraft={handleSaveAsDraft}
+              onShowDrafts={handleShowDrafts}
+              style={styles.localDataStatus}
+            />
 
       {/* Options Menu Dropdown */}
       {showOptionsMenu && (
@@ -888,88 +1290,36 @@ function MealPlanScreen({ navigation }) {
 
             {day.isExpanded && (
               <View style={styles.dayContent}>
-                <SimpleDraggableList
-                  data={day.meals}
-                  keyExtractor={(meal, mealIndex) => `${day.id}-${meal.id}-${mealIndex}`}
-                  onReorder={(newMeals, draggedMeal, fromIndex, toIndex) => 
-                    handleMealReorder(day.id, newMeals)
-                  }
-                  renderItem={({ item: meal, isDragging }) => (
-                    <View style={[
-                      styles.mealSection,
-                      isDragging && styles.mealSectionDragging
-                    ]}>
-                      {/* Meal header (editable) */}
-                      <View style={styles.mealHeader}>
-                        <View style={styles.mealTitleContainer}>
-                        {editingMealId === meal.id ? (
-                          <TextInput
-                            style={styles.mealNameInput}
-                            value={meal.name}
-                            onChangeText={(text) => updateMealName(day.id, meal.id, text)}
-                            onBlur={() => setEditingMealId(null)}
-                            onSubmitEditing={() => setEditingMealId(null)}
-                            autoFocus
-                            placeholder="Enter meal name"
-                          />
-                        ) : (
-                          <TouchableOpacity onPress={() => setEditingMealId(meal.id)}>
-                            <Text style={styles.mealName}>{meal.name}</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                      
-                      {/* Individual meal options menu */}
-                      <TouchableOpacity 
-                        style={styles.mealOptionsButton}
-                        onPress={() => setShowMealOptionsMenu(showMealOptionsMenu === meal.id ? null : meal.id)}
-                      >
-                        <Text style={styles.mealOptionsIcon}>⋮</Text>
-                      </TouchableOpacity>
-                      
-                      {/* Meal options dropdown */}
-                      {showMealOptionsMenu === meal.id && (
-                        <View style={styles.mealOptionsMenu}>
-                          <TouchableOpacity 
-                            style={[styles.mealMenuItem, styles.deleteMealMenuItem]}
-                            onPress={() => { 
-                              setShowMealOptionsMenu(null); 
-                              handleDeleteMeal(day.id, meal.id); 
-                            }}
-                          >
-                            <Icon name="delete" size={14} color="#ef4444" />
-                            <Text style={styles.deleteMealText}>Delete</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                    </View>
-                    <View style={styles.recipesContainer}>
-                      <CrossContainerDraggableList
-                        data={meal.recipes}
-                        containerId={`${day.id}-${meal.id}`}
-                        containerMetadata={{ dayId: day.id, mealId: meal.id }}
-                        renderItem={({ item, index, isDragging }) => (
-                          <RecipeCard
-                            recipe={item}
-                            dayId={day.id}
-                            mealId={meal.id}
-                            recipeIndex={index}
-                            isDragging={isDragging}
-                            onToggleComplete={(recipeId) => handleToggleRecipeComplete(day.id, meal.id, recipeId)}
-                            onDelete={(recipeId) => handleDeleteRecipe(day.id, meal.id, recipeId)}
-                            onView={(recipeId) => handleViewRecipe(recipeId)}
-                          />
-                        )}
-                        onReorder={(newRecipes, draggedRecipe, fromIndex, toIndex) => 
-                          handleRecipeReorder(day.id, meal.id, newRecipes, draggedRecipe, fromIndex, toIndex)
-                        }
-                        keyExtractor={(item, index) => `${day.id}-${meal.id}-recipe-${item?.id || index}`}
-                        style={meal.recipes.length === 0 ? styles.emptyDropZone : undefined}
-                      />
-                    </View>
-                  </View>
+                {/* SIMPLIFIED UI: Direct recipe list (no meal containers) */}
+                <CrossContainerDraggableList
+                  data={day.recipes || []}
+                  containerId={`day-${day.id}`}
+                  containerMetadata={{ dayId: day.id }}
+                  renderItem={({ item, index, isDragging }) => (
+                    <RecipeCard
+                      recipe={item}
+                      dayId={day.id}
+                      recipeIndex={index}
+                      isDragging={isDragging}
+                      onToggleComplete={(recipeId) => handleToggleRecipeCompleteInDay(day.id, recipeId)}
+                      onDelete={(recipeId) => handleDeleteRecipeFromDay(day.id, recipeId)}
+                      onView={(recipeId) => handleViewRecipe(recipeId)}
+                    />
                   )}
+                  onReorder={(newRecipes, draggedRecipe, fromIndex, toIndex) => 
+                    handleRecipeReorderInDay(day.id, newRecipes)
+                  }
+                  keyExtractor={(item, index) => `day-${day.id}-recipe-${item?.id || index}`}
+                  style={(day.recipes?.length || 0) === 0 ? styles.emptyDropZone : undefined}
                 />
+                
+                {/* Empty state */}
+                {(!day.recipes || day.recipes.length === 0) && (
+                  <View style={styles.emptyDayState}>
+                    <Text style={styles.emptyDayText}>No recipes yet</Text>
+                    <Text style={styles.emptyDaySubtext}>Add recipes from the Recipe Collection!</Text>
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -1071,6 +1421,58 @@ function MealPlanScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* 📝 DRAFTS MODAL - Local-first draft management */}
+      {showDraftsModal && (
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={showDraftsModal}
+          onRequestClose={() => setShowDraftsModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.draftModalContent}>
+              <View style={styles.draftModalHeader}>
+                <Text style={styles.draftModalTitle}>Load Draft</Text>
+                <TouchableOpacity onPress={() => setShowDraftsModal(false)}>
+                  <Icon name="x" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView style={styles.draftsList}>
+                {draftsList.map((draft) => (
+                  <TouchableOpacity
+                    key={draft.id}
+                    style={styles.draftItem}
+                    onPress={() => handleLoadDraft(draft)}
+                  >
+                    <View style={styles.draftInfo}>
+                      <Text style={styles.draftName}>{draft.name}</Text>
+                      <Text style={styles.draftMeta}>
+                        {new Date(draft.timestamp).toLocaleString()} • 
+                        {draft.recipeCount} recipes • 
+                        {draft.autoGenerated ? ' Auto-saved' : ' Manual save'}
+                      </Text>
+                    </View>
+                    <Icon name="chevron-right" size={20} color="#ccc" />
+                  </TouchableOpacity>
+                ))}
+                
+                {draftsList.length === 0 && (
+                  <View style={styles.emptyDraftsState}>
+                    <Icon name="file" size={48} color="#ccc" />
+                    <Text style={styles.emptyDraftsText}>No drafts available</Text>
+                    <Text style={styles.emptyDraftsSubtext}>
+                      Your auto-saves and manual drafts will appear here
+                    </Text>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      )}
+
     </SafeAreaView>
     </ImageBackground>
   );
@@ -1158,14 +1560,14 @@ const styles = StyleSheet.create({
   titleCard: {
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)', // Semi-transparent white
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(229, 231, 235, 0.5)',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginHorizontal: 16,
-    marginTop: 8, // Small margin since container has padding
+    marginTop: 8,
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1176,6 +1578,8 @@ const styles = StyleSheet.create({
   titleContainer: {
     flex: 1,
     marginRight: 12,
+    paddingTop: 4,
+    justifyContent: 'flex-start',
   },
   itemCount: {
     fontSize: 14,
@@ -1198,10 +1602,8 @@ const styles = StyleSheet.create({
   },
   titleInput: {
     fontSize: 24,
-    // fontWeight: 'bold', // REMOVED - conflicts with ExtraBold
     fontFamily: 'Nunito-ExtraBold',
     color: '#111827',
-    flex: 1,
     borderBottomWidth: 1,
     borderBottomColor: '#3b82f6',
     paddingVertical: 4,
@@ -1663,6 +2065,127 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  
+  // 🌟 NEW SIMPLIFIED UI STYLES
+  emptyDayState: {
+    padding: 20,
+    alignItems: 'center',
+    backgroundColor: 'rgba(243, 244, 246, 0.5)',
+    borderRadius: 8,
+    margin: 8,
+  },
+  emptyDayText: {
+    fontSize: 16,
+    color: '#6b7280',
+    fontFamily: 'Nunito-SemiBold',
+  },
+  emptyDaySubtext: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginTop: 4,
+    fontFamily: 'Nunito-Regular',
+  },
+
+  // ==============================================
+  // 📝 LOCAL-FIRST UI STYLES
+  // ==============================================
+
+  localDataStatus: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+
+  // Draft Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  draftModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    width: '90%',
+    maxHeight: '70%',
+    overflow: 'hidden',
+  },
+
+  draftModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+
+  draftModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    fontFamily: 'Nunito-Bold',
+  },
+
+  draftsList: {
+    maxHeight: 400,
+  },
+
+  draftItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+
+  draftInfo: {
+    flex: 1,
+  },
+
+  draftName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 4,
+    fontFamily: 'Nunito-SemiBold',
+  },
+
+  draftMeta: {
+    fontSize: 12,
+    color: '#666',
+    fontFamily: 'Nunito-Regular',
+  },
+
+  emptyDraftsState: {
+    alignItems: 'center',
+    padding: 32,
+  },
+
+  emptyDraftsText: {
+    fontSize: 16,
+    color: '#999',
+    marginTop: 12,
+    fontFamily: 'Nunito-SemiBold',
+  },
+
+  emptyDraftsSubtext: {
+    fontSize: 14,
+    color: '#ccc',
+    marginTop: 8,
+    textAlign: 'center',
+    fontFamily: 'Nunito-Regular',
   },
 });
 

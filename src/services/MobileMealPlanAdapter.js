@@ -61,12 +61,22 @@ class MobileMealPlanAdapter {
         }
       });
       
+      // 🍞 SIMPLIFIED MOBILE UX: Extract day.recipes from breakfast column
+      // Our simplified system stores recipes at day level, but backend stores in breakfast column
+      const breakfastData = dayData['breakfast'] || [];
+      console.log(`🔍 BACKEND BREAKFAST DEBUG for ${notionDay.name}:`, JSON.stringify(breakfastData, null, 2));
+      
+      const dayRecipes = MobileMealPlanAdapter.convertRecipesToMobileFormat(breakfastData);
+      
+      console.log(`🔄 LOAD DEBUG: Extracted ${dayRecipes.length} recipes from breakfast column for day ${notionDay.name}`);
+      
       // Create mobile day structure
       mobileDays.push({
         id: notionDay.id.replace('day-', ''), // Convert 'day-1' to '1'
         name: notionDay.name,
         isExpanded: true, // Default to expanded for mobile
-        meals: mobileMeals
+        meals: mobileMeals,
+        recipes: dayRecipes // Add day-level recipes for simplified system
       });
     });
 
@@ -252,7 +262,28 @@ class MobileMealPlanAdapter {
         notionData[dayId][column.id] = [];
       });
 
-      // Populate with mobile meal data
+      // 🍞 SIMPLIFIED MOBILE UX: Handle day.recipes (simplified format)
+      // Put day-level recipes into breakfast meal for backend compatibility
+      if (mobileDay.recipes && Array.isArray(mobileDay.recipes) && mobileDay.recipes.length > 0) {
+        console.log('🔄 DEBUG: Converting day.recipes for backend:', mobileDay.recipes.map(r => r.title));
+        
+        const dayRecipeObjects = mobileDay.recipes
+          .filter(recipe => recipe && typeof recipe === 'object' && recipe.id)
+          .map(recipe => ({
+            id: recipe.id,
+            title: recipe.title || recipe.name,
+            name: recipe.name || recipe.title,
+            isCompleted: recipe.isCompleted || false,
+            source: recipe.source || 'day_recipe'
+          }));
+          
+        // Add to breakfast column for backend storage
+        notionData[dayId]['breakfast'] = dayRecipeObjects;
+        console.log('🔄 DEBUG: Added', dayRecipeObjects.length, 'day recipes to breakfast column');
+        console.log('🔍 DETAILED DEBUG: Breakfast column data:', JSON.stringify(dayRecipeObjects, null, 2));
+      }
+
+      // Populate with mobile meal data (original meal-based logic)
       mobileDay.meals.forEach(meal => {
         const columnId = meal.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
         

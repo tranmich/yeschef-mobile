@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import {
   View,
   Text,
@@ -9,55 +9,64 @@ import {
   TextInput,
   ActivityIndicator,
   Modal,
+  Animated,
   TouchableWithoutFeedback,
   StatusBar,
   Platform,
   ImageBackground,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import YesChefAPI from '../services/YesChefAPI';
 import MealPlanAPI from '../services/MealPlanAPI';
 
-export default function RecipeCollectionScreen({ navigation }) {
-  // 🎨 Background Configuration (matches HomeScreen)
+// Safety function to ensure proper text rendering
+const safeTextRender = (value, fallback = '') => {
+  const result = value || fallback;
+  return typeof result === 'string' ? result : String(result || fallback || '');
+};
+
+const RecipeCollectionScreen = ({ navigation }) => {
+  try {
+  // Background configuration (matches HomeScreen)
   const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/home_green.jpg');
   
-  // 🔧 Match exact categories from web app CookbookSidebar.js - MOVED TO TOP
+  // 📚 Match exact categories from web app CookbookSidebar.js
   const defaultCategories = [
     { id: 'all', name: 'All Recipes', icon: '📚', color: '#6B7280' },
-    { id: 'recent-imports', name: 'Recent Imports', icon: '📥', color: '#059669' },
-    { id: 'breakfast', name: 'Breakfast', icon: '🍳', color: '#F59E0B' },
+    { id: 'recent-imports', name: 'Recent Imports', icon: '🔥', color: '#059669' },
+    { id: 'breakfast', name: 'Breakfast', icon: '🥞', color: '#F59E0B' },
     { id: 'lunch', name: 'Lunch', icon: '🥗', color: '#10B981' },
     { id: 'dinner', name: 'Dinner', icon: '🍽️', color: '#3B82F6' },
-    { id: 'desserts', name: 'Desserts', icon: '🍰', color: '#8B5CF6' },
-    { id: 'one-pot', name: 'One-Pot', icon: '🥘', color: '#EF4444' },
+    { id: 'desserts', name: 'Desserts', icon: '🧁', color: '#8B5CF6' },
+    { id: 'one-pot', name: 'One-Pot', icon: '🍲', color: '#EF4444' },
     { id: 'quick', name: 'Quick', icon: '⚡', color: '#F97316' },
-    { id: 'favorites', name: 'Favorites', icon: '⭐', color: '#EC4899' }
+    { id: 'favorites', name: 'Favorites', icon: '❤️', color: '#EC4899' }
   ];
-
-  console.log('🔧 defaultCategories defined:', defaultCategories.length, 'categories');
 
   const [recipes, setRecipes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importUrl, setImportUrl] = useState('');
-  // 🔧 Enhanced category system - sync with web app
   const [selectedCategory, setSelectedCategory] = useState(null); // null = show category list
-  const [categoryOrder, setCategoryOrder] = useState([]);
-  // 🔧 Add state for category counts to force updates
   const [categoriesWithCounts, setCategoriesWithCounts] = useState(() => {
-    console.log('🔧 Initializing categoriesWithCounts state');
-    return defaultCategories.map(cat => ({ ...cat, count: 0 }));
+    const initialCategories = defaultCategories.map(cat => ({ ...cat, count: 0 }));
+    return initialCategories;
   });
-  
-  // 🆕 Meal Plan Integration
+  // Meal Plan Integration
   const [currentMealPlan, setCurrentMealPlan] = useState(null);
-  const [currentPlanId, setCurrentPlanId] = useState(null); // Track the plan ID we're working with
+  const [currentPlanId, setCurrentPlanId] = useState(null);
   const [showMealPlanModal, setShowMealPlanModal] = useState(false);
   const [selectedRecipeForPlan, setSelectedRecipeForPlan] = useState(null);
-  const [showOptionsMenu, setShowOptionsMenu] = useState(null); // Track which recipe's menu is open
-  const [isUpdatingMealPlan, setIsUpdatingMealPlan] = useState(false); // Prevent reload during update
+  const [showOptionsMenu, setShowOptionsMenu] = useState(null);
+  const [showBottomSheet, setShowBottomSheet] = useState(null);
+  const [isUpdatingMealPlan, setIsUpdatingMealPlan] = useState(false);
+
+  // 🍞 Toast notification state
+  const [showToast, setShowToast] = useState(false);
+  const [toastAnimation] = useState(new Animated.Value(0));
 
   useEffect(() => {
     loadRecipes();
@@ -69,39 +78,17 @@ export default function RecipeCollectionScreen({ navigation }) {
       const result = await YesChefAPI.getRecipes();
       if (result.success) {
         setRecipes(result.recipes || []);
-        console.log(`📚 Loaded ${result.recipes?.length || 0} recipes`);
-        
-        // 🔧 DEBUG: Log first few recipes to see their structure
-        if (result.recipes && result.recipes.length > 0) {
-          console.log('🔍 Sample recipe fields:', {
-            firstRecipe: Object.keys(result.recipes[0]),
-            sampleData: {
-              title: result.recipes[0].title,
-              name: result.recipes[0].name,
-              category: result.recipes[0].category,
-              meal_role: result.recipes[0].meal_role,
-              imported_at: result.recipes[0].imported_at,
-              prep_time: result.recipes[0].prep_time,
-              cook_time: result.recipes[0].cook_time,
-              total_time: result.recipes[0].total_time
-            }
-          });
-          
-          // 🔧 DEBUG: Test a few recipes to see if they have valid titles
-          console.log('🔍 Recipe titles sample:', result.recipes.slice(0, 5).map(r => ({
-            id: r.id,
-            title: r.title,
-            titleLength: (r.title || '').length,
-            hasTitle: !!r.title
-          })));
-        }
+        console.log(`✅ Loaded ${result.recipes?.length || 0} recipes`);
       } else {
         Alert.alert('Error', result.error || 'Failed to load recipes');
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to connect to backend');
     } finally {
-      setIsLoading(false);
+      // Add small delay to prevent React Native state transition issues
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 100);
     }
   };
 
@@ -120,7 +107,7 @@ export default function RecipeCollectionScreen({ navigation }) {
                               'May need review';
         
         Alert.alert(
-          'Recipe Imported! 🎉', 
+          'Recipe Imported! ??', 
           `"${result.recipe.title}" imported successfully!\n\nQuality: ${confidenceText}\nMethod: ${result.extraction_method}`,
           [{ text: 'OK', onPress: () => {
             setImportUrl('');
@@ -138,93 +125,21 @@ export default function RecipeCollectionScreen({ navigation }) {
   };
 
   const openRecipe = (recipe) => {
-    // Pass the full recipe object for faster loading, with fallback to ID
     navigation.navigate('RecipeDetail', { 
       recipe: recipe,
       recipeId: recipe.id 
     });
   };
 
-  // 🆕 Meal Plan Integration Functions
-  const loadCurrentMealPlan = async () => {
-    if (isUpdatingMealPlan) {
-      console.log('🚫 Skipping meal plan reload - update in progress');
-      return;
-    }
-    
-    try {
-      console.log('🔄 Starting to load meal plan...');
-      
-      // First get the list of meal plans to find the default/current one
-      const plansList = await MealPlanAPI.loadMealPlansList();
-      console.log('📅 Available meal plans: count=' + (plansList?.plans?.length || 0));
-      
-      // Only auto-load if we don't already have a meal plan in progress
-      if (plansList && plansList.plans && plansList.plans.length > 0 && 
-          (!currentMealPlan || currentMealPlan.length === 0)) {
-        // Use the first plan as the default, or find one marked as current
-        const defaultPlan = plansList.plans[0];
-        console.log('📅 Selected default plan:', defaultPlan.plan_name, '(ID:', defaultPlan.id + ')');
-        
-        // Load the actual meal plan data
-        console.log('📅 Loading meal plan with ID:', defaultPlan.id);
-        const result = await MealPlanAPI.loadMealPlan(defaultPlan.id);
-        console.log('📅 Raw meal plan data response: success=' + (result?.success || false) + ', days=' + (result?.mobileDays?.length || 0));
-        
-        if (result && result.days) {
-          console.log('✅ Found days in result:', result.days.length);
-          setCurrentMealPlan(result.days);
-          setCurrentPlanId(defaultPlan.id); // Track the plan ID
-        } else if (result && result.mobileDays) {
-          console.log('✅ Found mobileDays in result:', result.mobileDays.length);
-          setCurrentMealPlan(result.mobileDays);
-          setCurrentPlanId(defaultPlan.id); // Track the plan ID
-        } else if (result) {
-          console.log('⚠️ Result exists but checking for other possible structures...');
-          console.log('📅 Result keys:', Object.keys(result));
-          
-          // Maybe the structure is different - let's check common alternatives
-          if (result.mealPlan && result.mealPlan.days) {
-            console.log('🔍 Found days in result.mealPlan.days');
-            setCurrentMealPlan(result.mealPlan.days);
-          } else if (result.data && result.data.days) {
-            console.log('🔍 Found days in result.data.days');
-            setCurrentMealPlan(result.data.days);
-          } else {
-            console.log('❌ No recognizable day structure found, using default');
-            setCurrentMealPlan([{
-              id: 1,
-              name: 'Day 1',
-              isExpanded: true,
-              meals: [
-                { id: 'breakfast-1', name: 'Breakfast', recipes: [] },
-                { id: 'lunch-1', name: 'Lunch', recipes: [] },
-                { id: 'dinner-1', name: 'Dinner', recipes: [] },
-              ]
-            }]);
-          }
-        }
-      } else if (currentMealPlan && currentMealPlan.length > 0) {
-        console.log('📅 Keeping existing meal plan with', currentMealPlan.length, 'days');
-      } else {
-        console.log('📅 No meal plans available - using default empty plan');
-        setCurrentMealPlan(getDefaultMealPlan());
-      }
-    } catch (error) {
-      console.error('❌ Error loading meal plan:', error);
-      console.error('❌ Error details:', error.message, error.stack);
-      // Set a default structure if loading fails
-      console.log('🔄 Using fallback default meal plan');
-      setCurrentMealPlan(getDefaultMealPlan());
-    }
-  };
-
-  // Fallback default meal plan structure (matches MealPlanScreen)
+  // Fallback default meal plan structure - TRANSITIONAL: Both old and new structure
   const getDefaultMealPlan = () => {
     return [
       {
         id: 1,
         name: 'Day 1',
+        isExpanded: true,
+        recipes: [], // NEW: Direct recipe list for simplified UI
+        // OLD: Keep meals for compatibility with current modal
         meals: [
           { id: 'breakfast-1', name: 'Breakfast', recipes: [] },
           { id: 'lunch-1', name: 'Lunch', recipes: [] },
@@ -234,18 +149,60 @@ export default function RecipeCollectionScreen({ navigation }) {
     ];
   };
 
+  // 🍞 Show gentle mint toast notification
+  const showAddedToast = () => {
+    setShowToast(true);
+    
+    // Gentle fade in
+    Animated.timing(toastAnimation, {
+      toValue: 1,
+      duration: 400, // Slower, calmer animation
+      useNativeDriver: true,
+    }).start();
+
+    // Auto dismiss after 2.5 seconds - calm timing
+    setTimeout(() => {
+      Animated.timing(toastAnimation, {
+        toValue: 0,
+        duration: 400, // Slower fade out
+        useNativeDriver: true,
+      }).start(() => {
+        setShowToast(false);
+      });
+    }, 2500);
+  };
+
+  // 🔄 Save local meal plan to AsyncStorage for cross-screen sharing
+  const saveLocalMealPlan = async (mealPlan) => {
+    try {
+      await AsyncStorage.setItem('localMealPlan', JSON.stringify({
+        mealPlan: mealPlan,
+        lastUpdated: Date.now(),
+        isLocal: true
+      }));
+      console.log('💾 Local meal plan saved to AsyncStorage');
+    } catch (error) {
+      console.error('❌ Failed to save local meal plan:', error);
+    }
+  };
+
   const handleAddToMealPlan = useCallback((recipe) => {
     setSelectedRecipeForPlan(recipe);
     setShowOptionsMenu(null); // Close options menu
     setShowMealPlanModal(true);
     
-    // Only load meal plan if we don't have it already or if it's empty
+    // 🎯 NEW LOGIC: Check local state first, then saved plans
     if (!currentMealPlan || currentMealPlan.length === 0) {
-      setTimeout(() => {
-        loadCurrentMealPlan();
-      }, 100);
+      console.log('🎯 No local meal plan - creating default local state first');
+      // Create a default local meal plan that user can work with immediately
+      const defaultPlan = getDefaultMealPlan();
+      setCurrentMealPlan(defaultPlan);
+      // Note: No currentPlanId means this is a "new" unsaved plan
+      console.log('✅ Created local meal plan for immediate use');
+    } else {
+      console.log('✅ Using existing local meal plan with', currentMealPlan.length, 'days');
     }
-  }, [currentMealPlan, loadCurrentMealPlan]);
+  }, [currentMealPlan]);
 
   const handleDeleteRecipe = async (recipe) => {
     try {
@@ -266,134 +223,290 @@ export default function RecipeCollectionScreen({ navigation }) {
         ]
       );
     } catch (error) {
-      console.error('❌ Error deleting recipe:', error);
+      console.error('? Error deleting recipe:', error);
       Alert.alert('Error', 'Failed to delete recipe');
     }
   };
 
-  const addRecipeToMeal = async (dayId, mealId) => {
+  // 🌟 SIMPLIFIED: Add recipe directly to day.recipes (no meal containers)
+  const addRecipeToDay = async (dayId, recipeToAdd = null) => {
     try {
-      if (!selectedRecipeForPlan) return;
+      // Use passed recipe or fall back to selectedRecipeForPlan
+      const recipe = recipeToAdd || selectedRecipeForPlan;
       
-      console.log(`📅 Starting to add "${selectedRecipeForPlan.title}" to Day ${dayId}, Meal ${mealId}`);
-      setIsUpdatingMealPlan(true); // Prevent reloads during update
+      if (!recipe) {
+        console.log('❌ No recipe available for adding to day');
+        Alert.alert('Error', 'No recipe selected');
+        return;
+      }
+
+      console.log('🌟 SIMPLIFIED: Adding recipe directly to day:', dayId, recipe.title);
+
+      // Ensure we have a meal plan - Load fresh from storage to avoid stale state
+      let mealPlanToUse;
+      try {
+        const localData = await AsyncStorage.getItem('localMealPlan');
+        if (localData) {
+          const { mealPlan } = JSON.parse(localData);
+          mealPlanToUse = mealPlan;
+        } else if (currentMealPlan && currentMealPlan.length > 0) {
+          mealPlanToUse = currentMealPlan;
+        } else {
+          mealPlanToUse = getDefaultMealPlan();
+        }
+      } catch (error) {
+        console.error('❌ Error loading meal plan, using fallback:', error);
+        mealPlanToUse = currentMealPlan || getDefaultMealPlan();
+      }
+
+      // 🔍 DEBUG: Check meal plan structure before update
+      console.log('🔍 MEAL PLAN STRUCTURE DEBUG:', {
+        mealPlanLength: mealPlanToUse.length,
+        firstDayId: mealPlanToUse[0]?.id,
+        firstDayName: mealPlanToUse[0]?.name,
+        firstDayRecipesCount: mealPlanToUse[0]?.recipes?.length || 0,
+        dayIdWeAreLookingFor: dayId,
+        dayIdWithPrefix: `day-${dayId}`
+      });
+
+      // Add recipe directly to day.recipes array
+      const updatedMealPlan = mealPlanToUse.map(day => {
+        console.log(`🔍 DAY MATCH DEBUG: Checking day ${day.id} vs ${dayId} or day-${dayId}`);
+        console.log(`🔍 DAY MATCH TYPES: day.id type=${typeof day.id}, dayId type=${typeof dayId}`);
+        console.log(`🔍 DAY MATCH COMPARISON: day.id === dayId = ${day.id === dayId}`);
+        
+        // Fix comparison - both should be numbers for reliable matching
+        if (day.id === dayId || day.id === String(dayId)) {
+          console.log(`✅ MATCHED DAY: ${day.id}, adding recipe to this day`);
+          const existingRecipes = day.recipes || [];
+          const recipeExists = existingRecipes.some(r => r.id === recipe.id);
+          
+          if (recipeExists) {
+            console.log('⚠️ Recipe already exists in this day, skipping duplicate');
+            return day;
+          }
+          
+          const newRecipe = {
+            id: recipe.id,
+            title: recipe.title,
+            name: recipe.title,
+            isCompleted: false,
+            source: 'simplified_add',
+            addedAt: Date.now()
+          };
+          
+          console.log('✅ Adding recipe to day.recipes array:', newRecipe.title);
+          console.log('🔍 BEFORE ADD: day.recipes.length =', existingRecipes.length);
+          
+          const updatedDay = {
+            ...day,
+            recipes: [...existingRecipes, newRecipe]
+          };
+          
+          console.log('🔍 AFTER ADD: updatedDay.recipes.length =', updatedDay.recipes.length);
+          return updatedDay;
+        } else {
+          console.log(`❌ NO MATCH: day ${day.id} !== ${dayId}`);
+        }
+        return day;
+      });
+
+      // Update the meal plan
+      console.log('🔍 FINAL MEAL PLAN AFTER MAP:', updatedMealPlan.map(day => ({
+        id: day.id,
+        name: day.name,
+        recipesCount: day.recipes?.length || 0,
+        recipeTitles: day.recipes?.map(r => r.title) || []
+      })));
       
-      // Create a new recipe object in the format expected by the meal plan
-      const newRecipe = {
-        id: selectedRecipeForPlan.id,
-        title: selectedRecipeForPlan.title,
-        isCompleted: false
-      };
+      setCurrentMealPlan(updatedMealPlan);
       
-      console.log('🔄 Current meal plan before update: days=' + (currentMealPlan?.length || 0));
+      // � DEBUG: Check what's being saved
+      console.log('🔍 SAVE DEBUG - Updated meal plan recipe count:', updatedMealPlan[0]?.recipes?.length);
+      console.log('🔍 SAVE DEBUG - Recipe titles:', updatedMealPlan[0]?.recipes?.map(r => r.title));
       
-      // Update the local meal plan state
+      // �🔄 COMPATIBILITY: For saving, put day.recipes into breakfast meal (replace, don't append)
+      const saveCompatibleMealPlan = updatedMealPlan.map(day => ({
+        ...day,
+        meals: day.meals.map(meal => 
+          meal.id === 'breakfast-1' 
+            ? { ...meal, recipes: day.recipes || [] } // REPLACE breakfast recipes with current day.recipes
+            : meal
+        )
+      }));
+      
+      await saveLocalMealPlan(saveCompatibleMealPlan);
+
+      // Show gentle success notification
+      showAddedToast();
+      setSelectedRecipeForPlan(null);
+      
+    } catch (error) {
+      console.error('❌ Error adding recipe to day:', error);
+      Alert.alert('Error', 'Failed to add recipe to day');
+    }
+  };
+
+  // 🎯 UNIFIED: Single function to add recipes to meal plans
+  const addRecipeToMealPlan = async (dayId, mealIdentifier) => {
+    try {
+      if (!selectedRecipeForPlan) {
+        Alert.alert('Error', 'No recipe selected');
+        return;
+      }
+
+      // 🔧 Ensure we have a local meal plan (local-first approach)
+      if (!currentMealPlan || currentMealPlan.length === 0) {
+        console.log('🎯 No meal plan - creating default local meal plan');
+        setCurrentMealPlan(getDefaultMealPlan());
+        // Give React a moment to update state
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      // Prevent multiple simultaneous updates
+      if (isUpdatingMealPlan) {
+        console.log('⚠️ Meal plan update already in progress, skipping');
+        return;
+      }
+
+      console.log('🎯 Adding recipe to meal plan:', {
+        recipe: selectedRecipeForPlan.title,
+        dayId: dayId,
+        mealIdentifier: mealIdentifier,
+        currentPlanId: currentPlanId
+      });
+
+      setIsUpdatingMealPlan(true); // Prevent concurrent updates
+
+      // Find the day and meal in the current meal plan
       const updatedMealPlan = currentMealPlan.map(day => {
-        if (day.id === dayId) {
-          console.log(`✅ Found target day ${dayId}, updating meals...`);
+        if (day.id === dayId || day.id === `day-${dayId}`) {
+          // Found the matching day, update the meal
+          const updatedMeals = day.meals.map(meal => {
+            // Check if this is the target meal using meal.id
+            if (meal.id === mealIdentifier) {
+              // Found the matching meal, check if recipe already exists
+              const existingRecipes = meal.recipes || [];
+              const recipeExists = existingRecipes.some(r => r.id === selectedRecipeForPlan.id);
+              
+              if (recipeExists) {
+                console.log('⚠️ Recipe already exists in this meal slot, skipping duplicate');
+                return meal; // Return unchanged if recipe already exists
+              }
+              
+              // Create comprehensive recipe object
+              const newRecipe = {
+                id: selectedRecipeForPlan.id,
+                title: selectedRecipeForPlan.title,
+                name: selectedRecipeForPlan.title,
+                isCompleted: false,
+                source: 'mobile_add',
+                addedAt: Date.now()
+              };
+              
+              console.log(`✅ Adding recipe to meal ${meal.name || meal.id}. Current recipes:`, existingRecipes.length);
+              
+              return {
+                ...meal,
+                recipes: [...existingRecipes, newRecipe]
+              };
+            }
+            return meal;
+          });
+          
           return {
             ...day,
-            meals: day.meals.map(meal => {
-              if (meal.id === mealId) {
-                console.log(`✅ Found target meal ${mealId}, adding recipe. Current recipes:`, meal.recipes.length);
-                const updatedMeal = {
-                  ...meal,
-                  recipes: [...(meal.recipes || []), newRecipe]
-                };
-                console.log(`✅ Updated meal now has ${updatedMeal.recipes.length} recipes`);
-                return updatedMeal;
-              }
-              return meal;
-            })
+            meals: updatedMeals
           };
         }
         return day;
       });
-      
-      console.log('🔄 Updated meal plan: days=' + updatedMealPlan.length + ', total recipes=' + updatedMealPlan.reduce((total, day) => total + day.meals.reduce((mealTotal, meal) => mealTotal + (meal.recipes?.length || 0), 0), 0));
-      
-      // Update the local state first for immediate feedback
+
+      // Check if the recipe was actually added (not a duplicate)
+      const wasAdded = updatedMealPlan.some(day => 
+        day.meals.some(meal => 
+          meal.recipes && meal.recipes.some(r => 
+            r.id === selectedRecipeForPlan.id && r.addedAt
+          )
+        )
+      );
+
+      if (!wasAdded) {
+        // Recipe was already in the meal plan
+        setIsUpdatingMealPlan(false);
+        setShowMealPlanModal(false);
+        Alert.alert(
+          'Recipe Already Added',
+          `"${selectedRecipeForPlan.title}" is already in this meal slot.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                setSelectedRecipeForPlan(null);
+              }
+            }
+          ]
+        );
+        return;
+      }
+
+      // Update local state first for immediate UI feedback
       setCurrentMealPlan(updatedMealPlan);
       console.log('✅ Local state updated');
-      
-      // Wait a bit for state to settle
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Try to save the updated meal plan to backend
-      try {
-        console.log('💾 Updating meal plan in backend...');
-        console.log('💾 Plan to update: ID=' + currentPlanId + ', with', updatedMealPlan.length, 'days');
-        
-        if (currentPlanId) {
-          // Try to update the existing plan
+
+      // 🔄 Save to AsyncStorage for cross-screen sharing
+      await saveLocalMealPlan(updatedMealPlan);
+
+      // 🎯 Handle saving based on whether this is a new or existing plan
+      if (currentPlanId) {
+        console.log('� Existing saved plan detected - updating backend...');
+        try {
           const updateResult = await MealPlanAPI.updateMealPlan(currentPlanId, updatedMealPlan);
-          console.log('💾 Update result: success=' + (updateResult?.success || false));
-          
           if (updateResult && updateResult.success) {
             console.log('✅ Meal plan updated successfully in backend');
           } else {
-            console.error('❌ Update failed:', updateResult);
-            // Check if it's a "not found" error - plan might have been deleted
-            if (updateResult?.error?.includes('not found') || updateResult?.error?.includes('Meal plan not found')) {
-              console.log('🔄 Meal plan not found - creating new plan instead');
-              // Clear the invalid plan ID and create a new plan
-              const fallbackResult = await MealPlanAPI.saveMealPlan(updatedMealPlan, 'My Meal Plan (Recovered)');
-              if (fallbackResult && fallbackResult.success) {
-                console.log('✅ Created new meal plan as fallback:', fallbackResult.planId);
-                // Update the currentPlanId to the new plan
-                // Note: You might want to pass this back to MealPlanScreen somehow
-              } else {
-                throw new Error('Failed to create fallback meal plan');
-              }
-            } else {
-              throw new Error('Backend update returned failure');
-            }
+            console.error('⚠️ Backend update failed, but local changes saved');
+            Alert.alert(
+              'Saved Locally',
+              `Recipe added to meal plan! Backend sync failed, but changes are saved locally.`
+            );
           }
-        } else {
-          // Fallback: save as new plan if no current plan ID
-          const plansList = await MealPlanAPI.loadMealPlansList();
-          if (plansList && plansList.plans && plansList.plans.length > 0) {
-            const currentPlan = plansList.plans[0];
-            const saveResult = await MealPlanAPI.saveMealPlan(updatedMealPlan, currentPlan.plan_name + ' (Updated)');
-            console.log('💾 Fallback save result: success=' + (saveResult?.success || false) + ', newPlanId=' + saveResult?.plan_id);
-            
-            if (saveResult && saveResult.success) {
-              console.log('✅ Meal plan saved successfully to backend');
-              setCurrentPlanId(saveResult.plan_id); // Update our tracking
-            } else {
-              throw new Error('Backend save returned failure');
-            }
-          }
+        } catch (saveError) {
+          console.error('⚠️ Failed to update backend:', saveError);
+          Alert.alert(
+            'Saved Locally', 
+            `Recipe added to meal plan! You can sync to backend later from the Meal Plan screen.`
+          );
         }
-      } catch (saveError) {
-        console.error('⚠️ Failed to save to backend:', saveError);
-        // Show a different message if save failed
-        Alert.alert(
-          'Warning',
-          `Recipe was added locally but may not be saved. Error: ${saveError.message}`
-        );
-        setIsUpdatingMealPlan(false);
-        setShowMealPlanModal(false);
-        setSelectedRecipeForPlan(null);
-        return; // Exit early if save failed
+      } else {
+        console.log('📝 New local meal plan - recipe added successfully');
       }
-      
-      setIsUpdatingMealPlan(false); // Allow reloads again
+
+      // Close modal and show success
       setShowMealPlanModal(false);
-      setSelectedRecipeForPlan(null);
+      setIsUpdatingMealPlan(false);
       
       Alert.alert(
         'Added to Meal Plan!',
-        `"${selectedRecipeForPlan.title}" has been added to ${dayId === '1' ? 'Day 1' : `Day ${dayId}`}.\n\nSwitch to the Meal Plan tab to see it.`
+        `"${selectedRecipeForPlan.title}" has been added to your meal plan.\n\n${currentPlanId ? 'Changes synced to saved plan.' : 'Visit the Meal Plan tab to save when ready.'}`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setSelectedRecipeForPlan(null);
+            }
+          }
+        ]
       );
+      
     } catch (error) {
-      console.error('❌ Error adding recipe to meal plan:', error);
-      setIsUpdatingMealPlan(false); // Reset flag on error
-      Alert.alert('Error', 'Failed to add recipe to meal plan');
+      console.error('🚨 Error adding recipe to meal plan:', error);
+      setIsUpdatingMealPlan(false);
+      Alert.alert('Error', 'Failed to add recipe to meal plan: ' + error.message);
     }
   };
 
-  // 🔧 Category management functions - OPTIMIZED for performance
+  // 📚 Category management functions - OPTIMIZED for performance
   const getCategoryRecipes = (categoryId, recipesToFilter = null) => {
     try {
       const safeRecipes = recipesToFilter || filteredRecipes || [];
@@ -405,13 +518,25 @@ export default function RecipeCollectionScreen({ navigation }) {
       }
     
     if (categoryId === 'recent-imports') {
-      // Use created_at since imported_at doesn't exist
+      // Show most recently created recipes (last 30 days or top 20 most recent)
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      return safeRecipes.filter(recipe => {
+      
+      const recentRecipes = safeRecipes.filter(recipe => {
         const createdDate = recipe.created_at ? new Date(recipe.created_at) : null;
         return createdDate && createdDate > thirtyDaysAgo;
       });
+      
+      // If less than 10 recent recipes, show the 20 most recently created overall
+      if (recentRecipes.length < 10) {
+        return safeRecipes
+          .filter(recipe => recipe.created_at)
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+          .slice(0, 20);
+      }
+      
+      // Sort by creation date (newest first)
+      return recentRecipes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     }
     
     if (categoryId === 'favorites') {
@@ -472,7 +597,7 @@ export default function RecipeCollectionScreen({ navigation }) {
                  description.includes('lunch');
                  
         case 'dinner':
-          // 🔧 MATCH WEB APP LOGIC: Default main dishes to dinner
+          // ?? MATCH WEB APP LOGIC: Default main dishes to dinner
           const isBreakfast = title.includes('breakfast') || title.includes('morning') || title.includes('pancake') || title.includes('waffle') || description.includes('breakfast');
           const isLunch = title.includes('lunch') || title.includes('sandwich') || title.includes('salad') || title.includes('wrap') || description.includes('lunch');
           const isDessert = title.includes('dessert') || title.includes('cake') || title.includes('cookie') || title.includes('pie') || title.includes('chocolate') || title.includes('sweet') || description.includes('dessert');
@@ -480,7 +605,7 @@ export default function RecipeCollectionScreen({ navigation }) {
           // If it's not breakfast, lunch, or dessert, it's probably dinner (like web app)
           const isDinner = !isBreakfast && !isLunch && !isDessert;
           
-          // console.log(`🍽️ DINNER LOGIC for "${title}": isDinner=${isDinner}`); // Removed verbose logging
+          // console.log(`?+ DINNER LOGIC for "${title}": isDinner=${isDinner}`); // Removed verbose logging
           
           return isDinner;
                  
@@ -524,7 +649,7 @@ export default function RecipeCollectionScreen({ navigation }) {
     }
   };
 
-  // 🔧 useEffect to update categories when recipes or search changes - DEBOUNCED for performance
+  // useEffect to update categories when recipes or search changes - debounced for performance
   useEffect(() => {
     // Debounce expensive category calculations
     const timeoutId = setTimeout(() => {
@@ -536,10 +661,17 @@ export default function RecipeCollectionScreen({ navigation }) {
                (recipe.source || '').toLowerCase().includes(searchQuery.toLowerCase());
       });
       
-      // 🔧 SAFETY: Don't calculate until we have valid recipes
+      // ?? SAFETY: Don't calculate until we have valid recipes
       if (!currentFilteredRecipes || !Array.isArray(currentFilteredRecipes) || currentFilteredRecipes.length === 0) {
         const zeroCategories = defaultCategories.map(cat => ({ ...cat, count: 0 }));
-        // setCategoriesWithCounts(zeroCategories); // Temporarily disabled to fix React error
+        // console.log('?? SETTING ZERO CATEGORIES - about to update state');
+        
+        // Use setTimeout to defer state update and prevent batching issues
+        setTimeout(() => {
+          setCategoriesWithCounts(zeroCategories);
+          // console.log('?? ZERO CATEGORIES state updated');
+        }, 0);
+        
         return;
       }
       
@@ -561,7 +693,33 @@ export default function RecipeCollectionScreen({ navigation }) {
         };
         
         const result = defaultCategories.map(getCategoryWithCountLocal);
-        setCategoriesWithCounts(result); // Re-enabled now that React error is fixed
+        // DISABLED: Extensive debugging
+        // console.log('?? CALCULATED CATEGORIES - structure:', JSON.stringify(result.map(c => ({
+        //   id: c.id,
+        //   name: c.name,
+        //   icon: c.icon,
+        //   color: c.color,
+        //   count: c.count,
+        //   nameType: typeof c.name,
+        //   iconType: typeof c.icon,
+        //   colorType: typeof c.color,
+        //   countType: typeof c.count,
+        //   allProps: Object.keys(c)
+        // })), null, 2));
+        
+        // console.log('?? ABOUT TO CALL setCategoriesWithCounts - current state type:', typeof categoriesWithCounts);
+        // console.log('?? ABOUT TO CALL setCategoriesWithCounts - new data valid:', result.every(c => 
+        //   typeof c.name === 'string' && 
+        //   typeof c.icon === 'string' && 
+        //   typeof c.color === 'string' && 
+        //   typeof c.count === 'number'
+        // ));
+        
+        // Use setTimeout to defer state update and prevent batching issues
+        setTimeout(() => {
+          setCategoriesWithCounts(result);
+          // console.log('?? CALCULATED CATEGORIES state updated');
+        }, 0);
       } catch (error) {
         setCategoriesWithCounts(defaultCategories.map(cat => ({ ...cat, count: 0 }))); // Re-enabled
       }
@@ -592,12 +750,30 @@ export default function RecipeCollectionScreen({ navigation }) {
 
   // Get recipes for currently selected category with safety check - MEMOIZED for performance
   const displayRecipes = useMemo(() => {
-    const categoryRecipes = selectedCategory ? (getCategoryRecipes(selectedCategory) || []) : [];
-    // Limit initial render to first 50 recipes for better performance
-    return categoryRecipes.slice(0, 50);
-  }, [selectedCategory, filteredRecipes]); // Re-calculate only when category or filtered recipes change
+    if (!selectedCategory) return [];
+    
+    let categoryRecipes = getCategoryRecipes(selectedCategory) || [];
+    
+    // Apply search filter if there's a search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      categoryRecipes = categoryRecipes.filter(recipe =>
+        (recipe.title && recipe.title.toLowerCase().includes(query)) ||
+        (recipe.description && recipe.description.toLowerCase().includes(query)) ||
+        (recipe.ingredients && recipe.ingredients.toLowerCase().includes(query)) ||
+        (recipe.source && recipe.source.toLowerCase().includes(query))
+      );
+    }
+    
+    // Limit initial render to first 100 recipes for better performance
+    return categoryRecipes.slice(0, 100);
+  }, [selectedCategory, searchQuery, recipes]); // Re-calculate when category, search, or recipes change
+
+  // Check loading and recipes state occasionally
+  // console.log('?? Component state - isLoading:', isLoading, 'recipes count:', recipes.length);
 
   if (isLoading) {
+    // console.log('?? STUCK IN LOADING STATE - isLoading is true');
     return (
       <ImageBackground source={SELECTED_BACKGROUND} style={styles.backgroundImage} resizeMode="cover">
         <View style={styles.overlay} />
@@ -612,11 +788,458 @@ export default function RecipeCollectionScreen({ navigation }) {
     );
   }
 
+  // Main content render
+
+  // Main component render
   return (
-    <ImageBackground source={SELECTED_BACKGROUND} style={styles.backgroundImage} resizeMode="cover">
+    <ImageBackground 
+      source={SELECTED_BACKGROUND} 
+      style={styles.backgroundImage} 
+      resizeMode="cover"
+    >
       <View style={styles.overlay} />
       
-      {/* 📱 Top Status Bar Background (Clean Header for Phone Status) */}
+      {/* White overlay for better readability */}
+      <View style={styles.whiteOverlay} />
+      
+      {/* Top status bar background */}
+      <View style={styles.topStatusBarOverlay} />
+      
+      {/* 🍞 Gentle Mint Toast - Bottom positioned for calm UX */}
+      {showToast && (
+        <Animated.View 
+          style={[
+            styles.simpleToast,
+            {
+              opacity: toastAnimation,
+              transform: [{
+                translateY: toastAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [20, 0], // Gentle slide up from bottom
+                }),
+              }],
+            }
+          ]}
+        >
+          <Text style={styles.simpleToastText}>Added ✓</Text>
+        </Animated.View>
+      )}
+      
+      {/* Header positioned outside problematic container */}
+      {selectedCategory && (
+        <View style={{
+          position: 'absolute', 
+          top: 60, // Below status bar
+          left: 16, 
+          right: 16, 
+          zIndex: 9999, 
+          backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+          padding: 16,
+          borderRadius: 12,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3,
+        }}>
+          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            <TouchableOpacity 
+              style={{marginRight: 12}} 
+              onPress={goBackToCategories}
+            >
+              <Text style={{
+                color: '#3B82F6', 
+                fontSize: 16,
+                fontFamily: 'Nunito-Regular',
+                fontWeight: '600'
+              }}>← Categories</Text>
+            </TouchableOpacity>
+            <Text style={{
+              fontSize: 18, 
+              color: '#111827', 
+              flex: 1,
+              fontFamily: 'Nunito-ExtraBold'
+            }}>
+              {(() => {
+                const category = (categoriesWithCounts || []).find(c => c.id === selectedCategory);
+                const categoryName = category?.name;
+                return typeof categoryName === 'string' ? categoryName : 'Recent Imports';
+              })()}
+            </Text>
+          </View>
+        </View>
+      )}
+      
+      <SafeAreaView style={styles.container}>
+        <StatusBar 
+          barStyle="dark-content" 
+          backgroundColor="transparent" 
+          translucent={true}
+          animated={true}
+        />
+        
+        {/* Search positioned outside problematic innerContainer */}
+        {selectedCategory && (
+          <View style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.9)', 
+            marginHorizontal: 16,
+            marginTop: 32, // REDUCED from 72 to create smaller gap
+            marginBottom: 8,
+            padding: 12,
+            borderRadius: 12,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 3,
+            zIndex: 100,
+          }}>
+            <TextInput
+              style={{
+                borderWidth: 1,
+                borderColor: '#e5e7eb',
+                borderRadius: 8,
+                padding: 12,
+                fontSize: 16,
+                backgroundColor: '#ffffff',
+                color: '#374151',
+                fontFamily: 'Nunito-Regular', // Added proper font
+              }}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search recipes..."
+              placeholderTextColor="#9ca3af"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+        )}
+        
+        <TouchableWithoutFeedback onPress={() => setShowBottomSheet(null)}>
+          <View style={styles.innerContainer}>
+            {/* Header moved outside for testing */}
+            {/* Original header removed for testing */}
+
+            {/* Original search removed - moved outside problematic container */}
+
+            <ScrollView style={styles.mainContent}>
+              {/* Recipe import section */}
+              {!selectedCategory && (
+                <View style={styles.importCard}>
+                  <Text style={styles.importTitle}>Import Recipe from URL</Text>
+                  <View style={styles.importInputContainer}>
+                    <TextInput
+                      style={styles.importInput}
+                      value={importUrl}
+                      onChangeText={setImportUrl}
+                      placeholder="Add URL here"
+                      placeholderTextColor="#9ca3af"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="url"
+                    />
+                    <TouchableOpacity
+                      style={[styles.importButton, isImporting && styles.importButtonDisabled]}
+                      onPress={importRecipeFromUrl}
+                      disabled={isImporting}
+                    >
+                      {isImporting ? (
+                        <ActivityIndicator size="small" color="#ffffff" />
+                      ) : (
+                        <Text style={styles.importButtonText}>Import</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {(() => {
+                return !selectedCategory ? (
+                  // Category Grid View
+                  <View style={styles.categoryGrid}>
+                    {(() => {
+                      const categoriesToRender = (categoriesWithCounts && Array.isArray(categoriesWithCounts) ? categoriesWithCounts : []);
+                      
+                      if (categoriesToRender.length === 0) {
+                        return <Text style={{ color: 'white' }}>No categories available</Text>;
+                      }
+                      
+                      return categoriesToRender.map((category, index) => {
+                        return (
+                          <TouchableOpacity
+                            key={category?.id || `category-${index}`}
+                            style={[styles.categoryCard, { borderLeftColor: category?.color || '#6B7280' }]}
+                            onPress={() => selectCategory(category?.id)}
+                          >
+                            <View style={styles.categoryCardContent}>
+                              <Text style={styles.categoryIcon}>
+                                {safeTextRender(category?.icon, '📚')}
+                              </Text>
+                              <View style={styles.categoryInfo}>
+                                <Text style={styles.categoryName}>
+                                  {safeTextRender(category?.name, 'Unknown')}
+                                </Text>
+                                <Text style={styles.categoryCount}>
+                                  {(() => {
+                                    const count = category?.count || 0;
+                                    const countText = `${count} recipe${count !== 1 ? 's' : ''}`;
+                                    return safeTextRender(countText, '0 recipes');
+                                  })()}
+                                </Text>
+                              </View>
+                              <Text style={styles.categoryArrow}>{'>'}</Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      });
+                    })()}
+                  </View>
+                ) : (
+                  // Recipe List View - RESTORED (PERFORMANCE OPTIMIZED)
+                  <View style={styles.recipeGrid}>
+                    {displayRecipes.map((recipe, index) => (
+                      <TouchableOpacity
+                        key={recipe.id || index}
+                        style={styles.recipeCard}
+                        onPress={() => openRecipe(recipe)}
+                      >
+                        <View style={styles.recipeContent}>
+                          <View style={styles.recipeHeader}>
+                            <TouchableOpacity 
+                              style={styles.recipeTitleContainer}
+                              onPress={() => openRecipe(recipe)}
+                            >
+                              <Text style={styles.recipeTitle}>{recipe.title || 'Untitled Recipe'}</Text>
+                            </TouchableOpacity>
+                            
+                            {/* Options Menu Button */}
+                            <TouchableOpacity
+                              style={styles.optionsButton}
+                              activeOpacity={0.7}
+                              onPress={(e) => {
+                                console.log('? Button pressed for recipe:', recipe.id);
+                                e.stopPropagation();
+                                setShowBottomSheet(showBottomSheet === recipe.id ? null : recipe.id);
+                              }}
+                            >
+                              <Text style={styles.optionsIcon}>⋮</Text>
+                            </TouchableOpacity>
+                          </View>
+
+                          <TouchableOpacity
+                            style={styles.recipeMainContent}
+                            onPress={() => openRecipe(recipe)}
+                          >
+                            {recipe.description && (
+                              <Text style={styles.recipeDescription} numberOfLines={2}>
+                                {recipe.description}
+                              </Text>
+                            )}
+                            
+                            <View style={styles.recipeMetadata}>
+                              {recipe.prep_time && typeof recipe.prep_time === 'string' && (
+                                <Text style={styles.metadataItem}>⏱️ {recipe.prep_time}</Text>
+                              )}
+                              {recipe.servings && typeof recipe.servings !== 'number' && (
+                                <Text style={styles.metadataItem}>👥 {recipe.servings}</Text>
+                              )}
+                              {recipe.servings && typeof recipe.servings === 'number' && (
+                                <Text style={styles.metadataItem}>👥 {recipe.servings} servings</Text>
+                              )}
+                            </View>
+                            
+                            {recipe.source && (
+                              <Text style={styles.recipeSource}>?? {recipe.source}</Text>
+                            )}
+                          </TouchableOpacity>
+
+                          {/* Options menu replaced with bottom sheet */}
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                );
+              })()}
+            </ScrollView>
+
+            {/* 📅 Meal Plan Selection Modal - USING REAL DATA */}
+            <Modal
+              animationType="slide"
+              transparent={true}
+              visible={showMealPlanModal}
+              onRequestClose={() => setShowMealPlanModal(false)}
+            >
+              <TouchableWithoutFeedback onPress={() => setShowMealPlanModal(false)}>
+                <View style={styles.bottomSheetOverlay}>
+                  <TouchableWithoutFeedback onPress={() => {}}>
+                    <View style={styles.mealPlanModalContent}>
+                      <View style={styles.bottomSheetHandle} />
+                      
+                      <Text style={styles.mealPlanModalTitle}>
+                        Add "{selectedRecipeForPlan?.title}" to Meal Plan
+                      </Text>
+                      
+                      <ScrollView style={styles.mealPlanDaysList} showsVerticalScrollIndicator={false}>
+                        {currentMealPlan && currentMealPlan.length > 0 ? (
+                          currentMealPlan.map((day, dayIndex) => (
+                            <View key={day.id || dayIndex} style={styles.mealPlanDaySection}>
+                              <Text style={styles.mealPlanDayTitle}>{day.name || `Day ${day.id || (dayIndex + 1)}`}</Text>
+                              
+                              {/* Show actual meals from current meal plan */}
+                              {day.meals && day.meals.map((meal, mealIndex) => (
+                                <TouchableOpacity
+                                  key={`${day.id}-${meal.id}-${mealIndex}`}
+                                  style={styles.mealPlanMealOption}
+                                  onPress={() => {
+                                    addRecipeToMealPlan(day.id || (dayIndex + 1).toString(), meal.id);
+                                    setShowMealPlanModal(false);
+                                  }}
+                                >
+                                  <View style={styles.mealPlanMealInfo}>
+                                    <Text style={styles.mealPlanMealType}>
+                                      {meal.name || 'Meal'} ({day.name || `Day ${day.id}`})
+                                    </Text>
+                                    {meal.recipes && meal.recipes.length > 0 ? (
+                                      <Text style={styles.mealPlanCurrentRecipes}>
+                                        Current: {meal.recipes.map(r => r.title || r.name).join(', ')}
+                                      </Text>
+                                    ) : (
+                                      <Text style={styles.mealPlanEmptySlot}>Empty slot</Text>
+                                    )}
+                                  </View>
+                                  <Ionicons name="add-circle-outline" size={20} color="#059669" />
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          ))
+                        ) : (
+                          // Empty state fallback
+                          <View style={styles.mealPlanEmptyState}>
+                            <Text style={styles.mealPlanEmptyTitle}>No Meal Plan Found</Text>
+                            <Text style={styles.mealPlanEmptyText}>
+                              Create a meal plan first to add recipes to it.
+                            </Text>
+                          </View>
+                        )}
+                      </ScrollView>
+                      
+                      <TouchableOpacity
+                        style={[styles.bottomSheetButton, styles.cancelButton]}
+                        onPress={() => setShowMealPlanModal(false)}
+                      >
+                        <Text style={styles.bottomSheetButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableWithoutFeedback>
+                </View>
+              </TouchableWithoutFeedback>
+            </Modal>
+            
+            {/* Bottom sheet modal for recipe options */}
+            <Modal
+              visible={showBottomSheet !== null}
+              transparent={true}
+              animationType="slide"
+              onRequestClose={() => setShowBottomSheet(null)}
+            >
+              <TouchableWithoutFeedback onPress={() => setShowBottomSheet(null)}>
+                <View style={styles.bottomSheetOverlay}>
+                  <TouchableWithoutFeedback onPress={() => {}}>
+                    <View style={styles.bottomSheet}>
+                      <View style={styles.bottomSheetHandle} />
+                      
+                      <Text style={styles.bottomSheetTitle}>Recipe Options</Text>
+                      
+                      <TouchableOpacity
+                        style={styles.bottomSheetButton}
+                        onPress={() => {
+                          const recipe = displayRecipes.find(r => r.id === showBottomSheet);
+                          if (recipe) {
+                            setShowBottomSheet(null);
+                            addRecipeToDay(1, recipe); // Add directly to Day 1 (simplified)
+                          }
+                        }}
+                      >
+                        <Ionicons name="add" size={20} color="#374151" style={styles.bottomSheetButtonIcon} />
+                        <Text style={styles.bottomSheetButtonText}>Add to Meal Plan</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.bottomSheetButton, styles.deleteButton]}
+                        onPress={() => {
+                          const recipe = displayRecipes.find(r => r.id === showBottomSheet);
+                          if (recipe) {
+                            setShowBottomSheet(null);
+                            handleDeleteRecipe(recipe);
+                          }
+                        }}
+                      >
+                        <Ionicons name="trash-outline" size={20} color="#ef4444" style={styles.bottomSheetButtonIcon} />
+                        <Text style={styles.bottomSheetButtonText}>Delete</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity
+                        style={[styles.bottomSheetButton, styles.cancelButton]}
+                        onPress={() => setShowBottomSheet(null)}
+                      >
+                        <Text style={styles.bottomSheetButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableWithoutFeedback>
+                </View>
+              </TouchableWithoutFeedback>
+            </Modal>
+          </View>
+        </TouchableWithoutFeedback>
+      </SafeAreaView>
+    </ImageBackground>
+  );
+
+  // DISABLED: Component render state debugging
+  // console.log('?? COMPONENT RENDER - categoriesWithCounts state:', {
+  //   type: typeof categoriesWithCounts,
+  //   isArray: Array.isArray(categoriesWithCounts),
+  //   length: categoriesWithCounts?.length,
+  //   isEmpty: !categoriesWithCounts || categoriesWithCounts.length === 0,
+  //   firstCategory: categoriesWithCounts?.[0] ? {
+  //     id: categoriesWithCounts[0].id,
+  //     name: categoriesWithCounts[0].name,
+  //     nameType: typeof categoriesWithCounts[0].name,
+  //     icon: categoriesWithCounts[0].icon,
+  //     iconType: typeof categoriesWithCounts[0].icon,
+  //     allProps: Object.keys(categoriesWithCounts[0])
+  //   } : 'NO_FIRST_CATEGORY'
+  // });
+
+  // ?? SAFETY: Don't render if categoriesWithCounts is in invalid state
+  // TEMPORARILY DISABLED TO TEST IF THIS CAUSES THE ERROR
+  /*
+  if (!categoriesWithCounts || !Array.isArray(categoriesWithCounts) || categoriesWithCounts.length === 0) {
+    console.log('?? SAFETY: Rendering fallback due to invalid categoriesWithCounts');
+    return (
+      <ImageBackground source={SELECTED_BACKGROUND} style={styles.backgroundImage} resizeMode="cover">
+        <View style={styles.overlay} />
+        <SafeAreaView style={styles.container}>
+          <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#ffffff" />
+            <Text style={[styles.loadingText, styles.whiteText]}>Loading categories...</Text>
+          </View>
+        </SafeAreaView>
+      </ImageBackground>
+    );
+  }
+  */
+
+  return (
+    <ImageBackground 
+      source={SELECTED_BACKGROUND} 
+      style={styles.backgroundImage} 
+      resizeMode="cover"
+    >
+      <View style={styles.overlay} />
+      
+      {/* ?? Top Status Bar Background (Clean Header for Phone Status) */}
       <View style={styles.topStatusBarOverlay} />
       
       <SafeAreaView style={styles.container}>
@@ -636,13 +1259,18 @@ export default function RecipeCollectionScreen({ navigation }) {
                   <Text style={styles.backButtonText}>← Categories</Text>
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>
-                  {(categoriesWithCounts || []).find(c => c.id === selectedCategory)?.name || 'Recipes'}
+                  {(() => {
+                    const category = (categoriesWithCounts || []).find(c => c.id === selectedCategory);
+                    const categoryName = category?.name;
+                    return typeof categoryName === 'string' ? categoryName : 'Recipes';
+                  })()}
                 </Text>
               </View>
             </View>
           )}
 
-          {/* 🌐 Recipe Import Section - Window Style */}
+          {/* TEMPORARILY DISABLED TO TEST IF THIS CAUSES THE ERROR */}
+          {/*
           {!selectedCategory && (
             <View style={styles.importCard}>
               <Text style={styles.importTitle}>Import Recipe from URL</Text>
@@ -670,7 +1298,8 @@ export default function RecipeCollectionScreen({ navigation }) {
                 </TouchableOpacity>
               </View>
             </View>
-          )}      {/* Search - show when viewing recipes in a category */}
+          )}
+          */}      {/* Search - show when viewing recipes in a category */}
       {selectedCategory && (
         <View style={styles.searchContainer}>
           <TextInput
@@ -685,29 +1314,13 @@ export default function RecipeCollectionScreen({ navigation }) {
 
       {/* Main Content */}
       <ScrollView style={styles.mainContent}>
-        {!selectedCategory ? (
+        {(() => {
+          return !selectedCategory ? (
           // Category Grid View
           <View style={styles.categoryGrid}>
-            {(categoriesWithCounts && Array.isArray(categoriesWithCounts) ? categoriesWithCounts : []).map((category) => (
-              <TouchableOpacity
-                key={category.id}
-                style={[styles.categoryCard, { borderLeftColor: category.color }]}
-                onPress={() => selectCategory(category.id)}
-              >
-                <View style={styles.categoryCardContent}>
-                  <Text style={styles.categoryIcon}>{category.icon}</Text>
-                  <View style={styles.categoryInfo}>
-                    <Text style={styles.categoryName}>{category.name}</Text>
-                    <Text style={styles.categoryCount}>
-                      {category.count || 0} recipe{(category.count || 0) !== 1 ? 's' : ''}
-                    </Text>
-                  </View>
-                  <Text style={styles.categoryArrow}>→</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+            <Text style={styles.loadingText}>Categories will appear here</Text>
           </View>
-        ) : (
+          ) : (
           // Recipe List View
           <View style={styles.recipeListContainer}>
             {(displayRecipes || []).length === 0 ? (
@@ -738,35 +1351,17 @@ export default function RecipeCollectionScreen({ navigation }) {
                         style={styles.optionsButton}
                         activeOpacity={0.7}
                         onPress={(e) => {
+                          console.log('?? BUTTON TOUCHED!!! Recipe ID:', recipe.id);
                           e.stopPropagation(); // Prevent parent touch
-                          setShowOptionsMenu(showOptionsMenu === recipe.id ? null : recipe.id);
+                          console.log('?? 3-dot pressed, setting bottom sheet for recipe:', recipe.id);
+                          setShowBottomSheet(showBottomSheet === recipe.id ? null : recipe.id);
                         }}
                       >
                         <Text style={styles.optionsIcon}>⋮</Text>
                       </TouchableOpacity>
                     </View>
                     
-                    {/* Options Menu Dropdown */}
-                    {showOptionsMenu === recipe.id && (
-                      <View style={styles.optionsMenu}>
-                        <TouchableOpacity
-                          style={styles.optionsMenuItem}
-                          activeOpacity={0.7}
-                          onPress={() => handleAddToMealPlan(recipe)}
-                        >
-                          <Text style={styles.optionsMenuIcon}>📅</Text>
-                          <Text style={styles.optionsMenuText}>+ Meal Plan</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.optionsMenuItem, styles.deleteMenuItem]}
-                          activeOpacity={0.7}
-                          onPress={() => handleDeleteRecipe(recipe)}
-                        >
-                          <Text style={styles.optionsMenuIcon}>🗑️</Text>
-                          <Text style={styles.deleteMenuText}>Delete</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
+                    {/* Options menu replaced with bottom sheet */}
                     
                     {/* Recipe Content - Also tappable */}
                     <TouchableOpacity 
@@ -780,16 +1375,19 @@ export default function RecipeCollectionScreen({ navigation }) {
                       )}
                       
                       <View style={styles.recipeMetadata}>
-                        {recipe.prep_time && (
+                        {recipe.prep_time && typeof recipe.prep_time === 'string' && (
                           <Text style={styles.metadataItem}>⏱️ {recipe.prep_time}</Text>
                         )}
-                        {recipe.servings && (
+                        {recipe.servings && typeof recipe.servings !== 'number' && (
                           <Text style={styles.metadataItem}>👥 {recipe.servings}</Text>
+                        )}
+                        {recipe.servings && typeof recipe.servings === 'number' && (
+                          <Text style={styles.metadataItem}>👥 {recipe.servings} servings</Text>
                         )}
                       </View>
                       
                       {recipe.source && (
-                        <Text style={styles.recipeSource}>📖 {recipe.source}</Text>
+                        <Text style={styles.recipeSource}>?? {recipe.source}</Text>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -797,7 +1395,8 @@ export default function RecipeCollectionScreen({ navigation }) {
               ))
             )}
           </View>
-        )}
+        );
+        })()}
       </ScrollView>
 
       {/* Meal Plan Selection Modal */}
@@ -817,7 +1416,7 @@ export default function RecipeCollectionScreen({ navigation }) {
                     style={styles.modalCloseButton}
                     onPress={() => setShowMealPlanModal(false)}
                   >
-                    <Text style={styles.modalCloseText}>✕</Text>
+                    <Text style={styles.modalCloseText}>?</Text>
                   </TouchableOpacity>
                 </View>
             
@@ -834,7 +1433,7 @@ export default function RecipeCollectionScreen({ navigation }) {
                 style={styles.reloadButton}
                 onPress={loadCurrentMealPlan}
               >
-                <Text style={styles.reloadButtonText}>🔄 Reload</Text>
+                <Text style={styles.reloadButtonText}>?? Reload</Text>
               </TouchableOpacity>
             </View>
             
@@ -855,9 +1454,9 @@ export default function RecipeCollectionScreen({ navigation }) {
                       <TouchableOpacity
                         key={meal.id}
                         style={styles.mealOption}
-                        onPress={() => addRecipeToMeal(day.id, meal.id)}
+                        onPress={() => addRecipeToMealPlan(day.id, meal.id)}
                       >
-                        <Text style={styles.mealIcon}>🍽️</Text>
+                        <Text style={styles.mealIcon}>?+</Text>
                         <Text style={styles.mealName}>{meal.name}</Text>
                         <Text style={styles.mealRecipeCount}>
                           ({(meal.recipes || []).length} recipe{(meal.recipes || []).length !== 1 ? 's' : ''})
@@ -876,12 +1475,33 @@ export default function RecipeCollectionScreen({ navigation }) {
         </View>
       </TouchableWithoutFeedback>
     </SafeAreaView>
+    
     </ImageBackground>
   );
-}
+  
+  } catch (error) {
+    console.error('Component render error:', error);
+    return (
+      <ImageBackground 
+        source={require('../../assets/images/backgrounds/home_green.jpg')} 
+        style={{ flex: 1 }} 
+        resizeMode="cover"
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' }} />
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={{ color: 'white', fontSize: 18 }}>Error loading recipes...</Text>
+          </View>
+        </SafeAreaView>
+      </ImageBackground>
+    );
+  }
+};
+
+export default React.memo(RecipeCollectionScreen);
 
 const styles = StyleSheet.create({
-  // 🎨 Background and Overlay Styles
+  // Background and Overlay Styles
   backgroundImage: {
     flex: 1,
     width: '100%',
@@ -893,8 +1513,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)', // White opaque overlay for readability
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', // Dark overlay for contrast
     zIndex: 1,
+  },
+  whiteOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)', // White opaque overlay for readability
+    zIndex: 2,
   },
   whiteText: {
     color: '#ffffff',
@@ -903,7 +1532,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent', // Changed from '#f9fafb' to transparent
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    paddingTop: 50, // Match GroceryListScreen padding
     zIndex: 2, // Above overlay
   },
   topStatusBarOverlay: {
@@ -915,6 +1544,47 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     zIndex: 10,
   },
+  
+  // Header Card Styles
+  headerCard: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    overflow: 'visible', // Ensure content isn't clipped
+    zIndex: 1000, // MUCH higher than topStatusBarOverlay (10)
+    position: 'relative',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  basicText: {
+    fontSize: 16,
+    color: '#000000',
+    // NO fontFamily, NO fontWeight - use system default
+  },
+  searchCard: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   innerContainer: {
     flex: 1,
   },
@@ -922,7 +1592,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,  // ✅ FIXED: Changed from 16 to 20 to match other screens
+    padding: 20,  // ? FIXED: Changed from 16 to 20 to match other screens
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
@@ -938,17 +1608,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   backButtonText: {
-    fontSize: 16,
+    fontSize: 18, // Increased size for visibility
     fontFamily: 'Nunito-Regular',
-    color: '#3B82F6',
-    fontWeight: '600',
+    color: '#FF0000', // RED for debugging
+    backgroundColor: '#FFFF00', // YELLOW background for debugging
+    // Removed all font properties to test system font
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20, // Increased size for visibility
+    color: '#FF0000', // RED for debugging
     fontFamily: 'Nunito-ExtraBold',
-    fontWeight: '600',
-    color: '#111827',
+    backgroundColor: '#00FF00', // GREEN background for debugging
     flex: 1,
+    // Removed all font properties to test system font
   },
   loadingContainer: {
     flex: 1,
@@ -1017,16 +1689,18 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 6,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#ffffff',
+    color: '#374151',
   },
   mainContent: {
     flex: 1,
+    // Removed extra padding - content should flow naturally
   },
-  // 🔧 Category Grid Styles
+  // ?? Category Grid Styles
   categoryGrid: {
     padding: 16,
   },
@@ -1073,7 +1747,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito-Regular',
     color: '#9ca3af',
   },
-  // 🔧 Recipe List Container
+  // ?? Recipe List Container
   recipeListContainer: {
     padding: 16,
   },
@@ -1100,12 +1774,20 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   recipeCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)', // Semi-transparent white like GroceryList
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
     overflow: 'visible', // Allow options menu to overflow
+  },
+  recipeGrid: {
+    paddingVertical: 16,
+    paddingBottom: 100, // Extra padding for bottom navigation
   },
   recipeContent: {
     padding: 16,
@@ -1146,19 +1828,22 @@ const styles = StyleSheet.create({
   },
   optionsMenu: {
     position: 'absolute',
-    top: 80,
-    right: 20,
+    top: 25, // Higher up to show both menu items
+    right: 10, // More space from edge
     backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e5e7eb',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    zIndex: 1000,
-    minWidth: 160,
+    shadowRadius: 8,
+    elevation: 20,
+    zIndex: 9999,
+    minWidth: 130, // Wider to fit "Delete" text
+    maxWidth: 150,
+    // Ensure menu content is not clipped
+    overflow: 'visible',
   },
   optionsMenuItem: {
     flexDirection: 'row',
@@ -1213,7 +1898,7 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     fontStyle: 'italic',
   },
-  // 🆕 Modal Styles
+  // ?? Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1343,5 +2028,176 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9ca3af',
     textAlign: 'center',
+  },
+  
+  // ?? Bottom Sheet Styles
+  bottomSheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  bottomSheet: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  bottomSheetHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#d1d5db',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  bottomSheetTitle: {
+    fontSize: 18,
+    fontFamily: 'Nunito-ExtraBold',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  bottomSheetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    marginBottom: 8,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  bottomSheetButtonIcon: {
+    marginRight: 12,
+  },
+  bottomSheetButtonText: {
+    fontSize: 16,
+    fontFamily: 'Nunito-Regular',
+    color: '#374151',
+    fontWeight: '600',
+  },
+  deleteButton: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+  },
+  cancelButton: {
+    backgroundColor: '#f9fafb',
+    borderColor: '#d1d5db',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  
+  // 📅 Meal Plan Modal Styles
+  mealPlanModalContent: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  mealPlanModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 20,
+    paddingTop: 16,
+  },
+  mealPlanDaysList: {
+    maxHeight: 400,
+  },
+  mealPlanDaySection: {
+    marginBottom: 20,
+  },
+  mealPlanDayTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+    paddingLeft: 4,
+  },
+  mealPlanMealOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  mealPlanMealInfo: {
+    flex: 1,
+  },
+  mealPlanMealType: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  mealPlanCurrentRecipes: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontStyle: 'italic',
+  },
+  mealPlanEmptySlot: {
+    fontSize: 14,
+    color: '#9ca3af',
+    fontStyle: 'italic',
+  },
+  mealPlanEmptyState: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  mealPlanEmptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  mealPlanEmptyText: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+
+  // 🍞 Gentle mint toast notification styles
+  simpleToast: {
+    position: 'absolute',
+    bottom: 120, // Bottom positioning for calm feel
+    left: 20,
+    right: 20,
+    alignItems: 'center',
+    zIndex: 9998,
+  },
+  simpleToastText: {
+    backgroundColor: '#e6fffa', // Soft mint color (Tailwind teal-50)
+    color: '#1f2937', // Gentle dark gray text
+    fontSize: 15,
+    fontWeight: '500', // Lighter weight for calm feel
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: '#a7f3d0', // Subtle mint border (Tailwind emerald-200)
+    textAlign: 'center',
+    overflow: 'hidden',
+    // Soft shadow for subtle depth
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
 });

@@ -237,6 +237,35 @@ class YesChefAPI {
     }
   }
 
+  async delete(endpoint, options = {}) {
+    this.log(`DELETE request to: ${endpoint}`);
+    
+    try {
+      const response = await this.debugFetch(endpoint, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.token && { 'Authorization': `Bearer ${this.token}` }),
+          ...options.headers,
+        },
+        ...options,
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        this.log(`✅ DELETE ${endpoint} successful`);
+        return { success: true, ...data };
+      } else {
+        this.error(`DELETE ${endpoint} failed:`, data);
+        return { success: false, error: data.error || 'Request failed' };
+      }
+    } catch (error) {
+      this.error(`DELETE ${endpoint} error:`, error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
   // Recipe Methods - Authenticated Only
   async getRecipes(filters = {}) {
     this.log('Getting recipes with filters:', filters);
@@ -789,6 +818,13 @@ class YesChefAPI {
       
       if (response.success) {
         this.log('✅ Profile updated successfully!');
+        
+        // If username/name was updated, also update user's recipes
+        if (profileData.name || profileData.username) {
+          this.log('📝 Username changed - updating user recipes...');
+          await this.updateUserRecipes(profileData.name || profileData.username);
+        }
+        
         return response;
       } else {
         this.error('Update profile failed:', response.error);
@@ -797,6 +833,26 @@ class YesChefAPI {
     } catch (error) {
       this.error('Update profile error:', error);
       return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  async updateUserRecipes(newUsername) {
+    this.log('Updating user recipes with new username:', newUsername);
+    try {
+      const response = await this.put('/api/profile/update-recipes', { 
+        username: newUsername 
+      });
+      
+      if (response.success) {
+        this.log('✅ User recipes updated successfully!');
+      } else {
+        this.log('⚠️ Recipe update failed (may not be implemented):', response.error);
+      }
+      
+      return response;
+    } catch (error) {
+      this.log('⚠️ Recipe update error (backend may not support this):', error);
+      return { success: false, error: 'Recipe update not supported' };
     }
   }
 

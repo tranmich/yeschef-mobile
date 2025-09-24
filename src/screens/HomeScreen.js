@@ -346,7 +346,7 @@ export default function HomeScreen({ navigation, user = null, onLogout = null })
                       >
                         <Text style={styles.recipeHomeImage}>{recipe.community_icon || recipe.image}</Text>
                         <Text style={styles.recipeHomeTitle}>{recipe.community_title || recipe.title}</Text>
-                        <Text style={styles.recipeHomeUser}>by {recipe.shared_by || recipe.user}</Text>
+                        <Text style={styles.recipeHomeUser}>by {recipe.display_name || recipe.author_name || recipe.shared_by || recipe.user || 'Unknown Chef'}</Text>
                         <View style={styles.recipeHomeLikes}>
                           <Icon name="heart" size={12} color="#EF4444" />
                           <Text style={styles.likesHomeText}>{recipe.likes || 0}</Text>

@@ -127,22 +127,29 @@ const UserCommunityPostsScreen = ({ navigation }) => {
     try {
       setDeletingPostId(post.id);
       
-      // TODO: Implement delete API call
-      // await YesChefAPI.delete(`/api/community/recipes/${post.id}`);
+      // Call the backend API to unshare the community post
+      console.log('🔄 Calling API to unshare community post:', post.id);
+      const response = await YesChefAPI.delete(`/api/community/recipes/${post.id}`);
       
-      // Remove from local state
-      setUserPosts(prev => prev.filter(p => p.id !== post.id));
-      
-      Alert.alert(
-        '✅ Post Deleted',
-        `"${post.community_title}" has been removed from the community.`,
-        [{ text: 'OK' }]
-      );
-      
-      console.log('🗑️ Deleted community post:', post.community_title);
+      if (response.success) {
+        // Remove from local state only if API call succeeded
+        setUserPosts(prev => prev.filter(p => p.id !== post.id));
+        
+        Alert.alert(
+          '✅ Post Deleted',
+          `"${post.community_title}" has been removed from the community.`,
+          [{ text: 'OK' }]
+        );
+        
+        console.log('✅ Successfully unshared community post:', post.community_title);
+      } else {
+        // API call failed, show error
+        Alert.alert('Error', response.error || 'Failed to delete post. Please try again.');
+        console.error('❌ API delete failed:', response.error);
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to delete post. Please try again.');
-      console.error('Delete error:', error);
+      Alert.alert('Error', 'Network error - check your connection and try again.');
+      console.error('❌ Delete error:', error);
     } finally {
       setDeletingPostId(null);
     }

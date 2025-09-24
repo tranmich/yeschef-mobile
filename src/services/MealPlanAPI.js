@@ -7,6 +7,7 @@
 
 import YesChefAPI from './YesChefAPI';
 import MobileMealPlanAdapter from './MobileMealPlanAdapter';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 class MealPlanAPI {
   
@@ -48,6 +49,7 @@ class MealPlanAPI {
       
       if (result.success) {
         console.log('✅ Meal plan saved successfully:', result.plan_id);
+        
         return {
           success: true,
           planId: result.plan_id,

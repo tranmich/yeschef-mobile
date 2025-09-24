@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ImageBackground,
+  Image,
   TouchableOpacity,
   ScrollView,
   StatusBar,
@@ -39,8 +40,13 @@ export default function ProfileScreen({ navigation, user = null }) {
       
       if (result.success) {
         console.log('✅ Profile data loaded:', result.profile);
-        setProfileData(result.profile);
-        setEditingUsername(result.profile.username);
+        // Use name field as username since backend username field isn't updating properly
+        const profileWithFixedUsername = {
+          ...result.profile,
+          username: result.profile.name || result.profile.username || 'YesChef User'
+        };
+        setProfileData(profileWithFixedUsername);
+        setEditingUsername(profileWithFixedUsername.username);
       } else {
         console.error('❌ Profile load failed:', result.error);
         Alert.alert('Error', result.error || 'Failed to load profile data');
@@ -85,18 +91,46 @@ export default function ProfileScreen({ navigation, user = null }) {
     }
     
     try {
-      console.log('🔄 Updating username to:', editingUsername.trim());
+      console.log('🔄 Starting username update process...');
+      console.log('📝 Current profileData:', profileData);
+      console.log('� New username:', editingUsername.trim());
       
-      // For now, we'll update the name field since username doesn't exist in DB yet
-      const result = await YesChefAPI.updateProfile({
-        name: editingUsername.trim()
-      });
+      // Test: First let's see what the current profile data looks like
+      console.log('🔍 Testing current API getProfile response...');
+      const currentProfile = await YesChefAPI.getProfile();
+      console.log('📥 Current profile from API:', currentProfile);
+      
+      console.log('📤 Sending update to API...');
+      const updateData = {
+        name: editingUsername.trim() // Only update name field since username isn't working in backend
+      };
+      console.log('📤 Update payload:', updateData);
+      
+      const result = await YesChefAPI.updateProfile(updateData);
+      console.log('📥 Update API Response:', result);
       
       if (result.success) {
-        console.log('✅ Username updated successfully');
-        setProfileData(prev => ({ ...prev, username: editingUsername.trim() }));
+        console.log('✅ Username updated successfully in API');
+        
+        // Test: Check what the API returns immediately after update
+        console.log('🔍 Fetching profile again to verify update...');
+        const verifyProfile = await YesChefAPI.getProfile();
+        console.log('📥 Profile after update:', verifyProfile);
+        
+        // Update local state - use the name field as the display username
+        setProfileData(prev => ({ 
+          ...prev, 
+          username: verifyProfile.profile?.name || editingUsername.trim(),
+          name: verifyProfile.profile?.name || editingUsername.trim()
+        }));
         setIsEditingUsername(false);
-        Alert.alert('Success', 'Username updated successfully!');
+        Alert.alert(
+          'Success', 
+          'Username updated successfully!\n\nYour recipes and posts are being updated with the new username.',
+          [{ text: 'OK' }]
+        );
+        
+        console.log('💾 Updated local profileData with verified username');
       } else {
         console.error('❌ Username update failed:', result.error);
         Alert.alert('Error', result.error || 'Failed to update username');
@@ -112,20 +146,7 @@ export default function ProfileScreen({ navigation, user = null }) {
     setIsEditingUsername(false);
   };
 
-  // 📸 Handle Profile Photo
-  const handleProfilePhotoPress = () => {
-    Alert.alert(
-      'Profile Photo',
-      'Choose an option:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Take Photo', onPress: () => console.log('Take Photo') },
-        { text: 'Choose from Gallery', onPress: () => console.log('Choose from Gallery') }
-      ]
-    );
-  };
-
-  // 🔙 Handle Back Navigation
+  //  Handle Back Navigation
   const handleBack = () => {
     navigation.goBack();
   };
@@ -150,6 +171,9 @@ export default function ProfileScreen({ navigation, user = null }) {
     <ImageBackground source={SELECTED_BACKGROUND} style={styles.backgroundImage} resizeMode="cover">
       <View style={styles.overlay} />
       
+      {/* 🤍 White Opaque Layer for Better Readability */}
+      <View style={styles.whiteOverlay} />
+      
       {/* 📱 Top Status Bar Background (Clean Header for Phone Status) */}
       <View style={styles.topStatusBarOverlay} />
       
@@ -162,18 +186,17 @@ export default function ProfileScreen({ navigation, user = null }) {
         />
         
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* 🔙 Header with Back Button */}
+          {/* 🔙 Header with Back Button Only */}
           <View style={styles.headerCard}>
             <TouchableOpacity style={styles.backButton} onPress={handleBack}>
               <Icon name="chevron-left" size={24} color="#374151" />
               <Text style={styles.backButtonText}>Back</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>My Profile</Text>
           </View>
 
           {/* 👤 Profile Header Card */}
           <View style={styles.profileHeaderCard}>
-            <TouchableOpacity style={styles.profilePhotoContainer} onPress={handleProfilePhotoPress}>
+            <View style={styles.profilePhotoContainer}>
               {profileData?.profilePhotoUrl ? (
                 <Image source={{ uri: profileData.profilePhotoUrl }} style={styles.profilePhoto} />
               ) : (
@@ -183,10 +206,7 @@ export default function ProfileScreen({ navigation, user = null }) {
                   </Text>
                 </View>
               )}
-              <View style={styles.photoEditIcon}>
-                <Icon name="camera" size={16} color="#ffffff" />
-              </View>
-            </TouchableOpacity>
+            </View>
             
             <View style={styles.usernameContainer}>
               {isEditingUsername ? (
@@ -312,6 +332,11 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     zIndex: 1,
+  },
+  whiteOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    zIndex: 2,
   },
   topStatusBarOverlay: {
     position: 'absolute',

@@ -55,9 +55,6 @@ const RecipeViewScreen = ({ route, navigation }) => {
 
   // 📋 Enhanced Recipe Field Parsing (from webapp)
   const formatRecipeField = (field) => {
-    console.log('📱 formatRecipeField called with:', field);
-    console.log('📱 formatRecipeField type check:', typeof field, Array.isArray(field));
-    
     if (!field) return [];
     
     let processedField = field;
@@ -68,10 +65,8 @@ const RecipeViewScreen = ({ route, navigation }) => {
       if (field.trim().startsWith('[') && field.trim().endsWith(']')) {
         try {
           processedField = JSON.parse(field);
-          console.log('📱 Parsed JSON field:', processedField);
         } catch (e) {
           // If JSON parsing fails, treat as regular string
-          console.warn('📱 Failed to parse field JSON:', field);
           processedField = field;
         }
       }
@@ -79,7 +74,7 @@ const RecipeViewScreen = ({ route, navigation }) => {
     
     // Handle array input (could be strings or objects)
     if (Array.isArray(processedField)) {
-      console.log('📱 Processing field array with length:', processedField.length);
+      // console.log('📱 Processing field array with length:', processedField.length);
       
       const result = processedField
         .filter(item => {
@@ -103,7 +98,7 @@ const RecipeViewScreen = ({ route, navigation }) => {
           return isValid;
         })
         .map((item, index) => {
-          console.log(`📱 Processing item ${index}:`, item);
+          // console.log(`📱 Processing item ${index}:`, item);
           let formatted = '';
           
           // Handle object items (this is the key fix!)
@@ -156,12 +151,12 @@ const RecipeViewScreen = ({ route, navigation }) => {
           // Remove any remaining JSON brackets or quotes
           formatted = formatted.replace(/^["'\[\]]+|["'\[\]]+$/g, '');
           
-          console.log(`📱 Final formatted item ${index}:`, formatted);
+          // console.log(`📱 Final formatted item ${index}:`, formatted);
           return formatted;
         })
         .filter(item => item && item.trim()); // Remove any empty items
         
-      console.log('📱 Final result array:', result);
+      // console.log('📱 Final result array:', result);
       return result;
     }
 

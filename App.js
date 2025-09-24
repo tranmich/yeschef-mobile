@@ -100,27 +100,29 @@ function CustomTabBar({ state, descriptors, navigation }) {
 // 🎯 NEW: Stack Navigator for Recipe Stack (with back navigation)
 function RecipeStack() {
   return (
-    <Stack.Navigator>
-      <Stack.Screen 
-        name="RecipeCollection" 
-        component={RecipeCollectionScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen 
-        name="RecipeDetail" 
-        component={RecipeViewScreen}
-        options={{ 
-          title: 'Recipe',
-          headerBackTitleVisible: false,
-          headerTintColor: '#111827',
-          headerStyle: {
-            backgroundColor: '#fafbfc',
-            borderBottomWidth: 1,
-            borderBottomColor: '#e5e7eb',
-          }
-        }}
-      />
-    </Stack.Navigator>
+    <SimpleErrorBoundary>
+      <Stack.Navigator>
+        <Stack.Screen 
+          name="RecipeCollection" 
+          component={RecipeCollectionScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="RecipeDetail" 
+          component={RecipeViewScreen}
+          options={{ 
+            title: 'Recipe',
+            headerBackTitleVisible: false,
+            headerTintColor: '#111827',
+            headerStyle: {
+              backgroundColor: '#fafbfc',
+              borderBottomWidth: 1,
+              borderBottomColor: '#e5e7eb',
+            }
+          }}
+        />
+      </Stack.Navigator>
+    </SimpleErrorBoundary>
   );
 }
 

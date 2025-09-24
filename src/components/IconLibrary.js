@@ -22,6 +22,7 @@ const ICON_MAPPINGS = {
   back: { family: Ionicons, name: 'arrow-back' },
   cancel: { family: Ionicons, name: 'close' },
   close: { family: Ionicons, name: 'close-outline' },
+  x: { family: Ionicons, name: 'close' },
   delete: { family: Ionicons, name: 'trash-outline' },
   edit: { family: Ionicons, name: 'pencil-outline' },
   save: { family: Ionicons, name: 'checkmark' },
@@ -72,6 +73,12 @@ const ICON_MAPPINGS = {
   warning: { family: Ionicons, name: 'warning' },
   info: { family: Ionicons, name: 'information-circle' },
   star: { family: Ionicons, name: 'star' },
+  
+  // Local-first UI Icons
+  clock: { family: Ionicons, name: 'time-outline' },
+  circle: { family: Ionicons, name: 'ellipse' },
+  'check-circle': { family: Ionicons, name: 'checkmark-circle' },
+  'alert-circle': { family: Ionicons, name: 'alert-circle' },
   
   // System
   settings: { family: Ionicons, name: 'settings-outline' },
