@@ -579,16 +579,30 @@ class YesChefAPI {
   }
 
   async deleteGroceryList(listId) {
-    this.log('Deleting grocery list:', { id: listId });
+    this.log('🗑️ DELETE REQUEST: Deleting grocery list:', { 
+      id: listId, 
+      idType: typeof listId, 
+      isAuthenticated: this.isAuthenticated(),
+      authToken: this.token ? 'present' : 'missing'
+    });
     
     if (!this.isAuthenticated()) {
       return { success: false, error: 'Authentication required' };
     }
 
     try {
-      const response = await this.debugFetch(`/api/grocery-lists/${listId}`, {
+      const url = `/api/grocery-lists/${listId}`;
+      this.log('🗑️ DELETE URL:', url);
+      
+      const response = await this.debugFetch(url, {
         method: 'DELETE',
         headers: this.getAuthHeaders(),
+      });
+
+      this.log('🗑️ DELETE RESPONSE:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
       });
 
       if (response.ok) {
@@ -596,7 +610,13 @@ class YesChefAPI {
         return { success: true };
       } else {
         const errorText = await response.text();
-        this.error('Delete grocery list failed:', errorText);
+        this.error('❌ Delete grocery list failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText: errorText,
+          listId: listId,
+          url: url
+        });
         return { success: false, error: 'Failed to delete grocery list' };
       }
     } catch (error) {

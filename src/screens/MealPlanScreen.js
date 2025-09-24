@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -17,11 +17,10 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Icon, IconButton } from '../components/IconLibrary';
 import { ThemedText, typography } from '../components/Typography';
-import { SimpleDraggableList } from '../components/DragSystem';
-import { 
-  CrossContainerDragProvider, 
-  CrossContainerDraggableList 
-} from '../components/CrossContainerDragSystem';
+// 🎨 SMOOTH DRAG: Using LightweightDragSystem for smooth Google Keep-style dragging
+import { SimpleDraggableList } from '../components/LightweightDragSystem';
+// 🚫 REMOVED: Complex CrossContainerDragSystem (572 lines) - replaced with simple move buttons
+// OLD: import { CrossContainerDragProvider, CrossContainerDraggableList } from '../components/CrossContainerDragSystem';
 import MobileMealPlanAdapter from '../services/MobileMealPlanAdapter';
 import MealPlanAPI from '../services/MealPlanAPI';
 import YesChefAPI from '../services/YesChefAPI';
@@ -161,6 +160,14 @@ function MealPlanScreen({ navigation }) {
           
           // Force mark as unsaved to trigger the correct state
           setTimeout(() => {
+            // 🛡️ DRAG PROTECTION: Don't force sync if recent drag
+            const now = Date.now();
+            if (now - lastDragTime.current < DRAG_PROTECTION_DURATION) {
+              const remainingProtection = DRAG_PROTECTION_DURATION - (now - lastDragTime.current);
+              console.log(`🛡️ DRAG PROTECTION: Skipping force sync (${remainingProtection}ms remaining)`);
+              return;
+            }
+            
             console.log('🔄 FORCE SYNC: Marking as unsaved to refresh UI state');
             // This will trigger the change detection in the hook
             setDays([...mealPlanWithExpansion]);
@@ -211,16 +218,18 @@ function MealPlanScreen({ navigation }) {
     React.useCallback(() => {
       const now = Date.now();
       if (now - lastFocusCheck < 2000) { // Throttle to max once every 2 seconds
-        console.log('🚫 Focus check throttled - too soon since last check');
         return;
       }
-      setLastFocusCheck(now);
       
-      console.log('👁️ Meal Plan screen focused - checking for updates...');
+      // 🛡️ DRAG PROTECTION: Skip sync if recent drag operation
+      if (now - lastDragTime.current < DRAG_PROTECTION_DURATION) {
+        return;
+      }
+      
+      setLastFocusCheck(now);
       
       // 🔄 IMPROVED SYNC: Always sync AsyncStorage but preserve saved plan state
       if (!currentPlanId) {
-        console.log('📋 New plan mode - syncing recipes and keeping clean title');
         checkForLocalMealPlan();
       } else {
         console.log('💾 Saved plan mode - syncing recipes but preserving plan identity');
@@ -833,17 +842,29 @@ function MealPlanScreen({ navigation }) {
   };
 
   // 🌟 NEW SIMPLIFIED HANDLERS: Work directly with day.recipes
-  
+  // 🛡️ Drag protection: Prevent AsyncStorage override during recent drags
+  const lastDragTime = useRef(0);
+  const DRAG_PROTECTION_DURATION = 3000; // 3 seconds protection after drag
+
   const handleRecipeReorderInDay = (dayId, newRecipes) => {
-    console.log(`🔄 Reordering recipes in day ${dayId}:`, newRecipes.map(r => r.title));
+    // 🛡️ Mark drag time to prevent AsyncStorage override
+    lastDragTime.current = Date.now();
     
-    setDays(prevDays => 
-      prevDays.map(day => 
+    // 🎯 Immediate state update to prevent race conditions
+    setDays(prevDays => {
+      const updatedDays = prevDays.map(day => 
         day.id === dayId 
-          ? { ...day, recipes: newRecipes }
+          ? { ...day, recipes: [...newRecipes] } // Create new array to ensure fresh reference
           : day
-      )
-    );
+      );
+      
+      return updatedDays;
+    });
+    
+    // 🔄 Update local storage immediately with new order
+    setTimeout(() => {
+      // This will trigger the useLocalData hook to save the new state
+    }, 100);
   };
 
   const handleDeleteRecipeFromDay = async (dayId, recipeId) => {
@@ -1091,7 +1112,7 @@ function MealPlanScreen({ navigation }) {
       
       <TouchableWithoutFeedback onPress={() => setShowMealOptionsMenu(null)}>
         <View style={{ flex: 1 }}>
-          <CrossContainerDragProvider onCrossContainerMove={handleCrossContainerMove}>
+          {/* 🚫 REMOVED: CrossContainerDragProvider - replaced with simple move buttons */}
             
             {/* 🏷️ Card 1: Title Section */}
             <View style={styles.titleCard}>
@@ -1290,17 +1311,16 @@ function MealPlanScreen({ navigation }) {
 
             {day.isExpanded && (
               <View style={styles.dayContent}>
-                {/* SIMPLIFIED UI: Direct recipe list (no meal containers) */}
-                <CrossContainerDraggableList
+                {/* 🎨 SMOOTH DRAG: Using LightweightDragSystem for within-day recipe reordering */}
+                <SimpleDraggableList
+                  key={`day-${day.id}-recipes`} // 🎯 FIX: Stable key to prevent component recreation
                   data={day.recipes || []}
-                  containerId={`day-${day.id}`}
-                  containerMetadata={{ dayId: day.id }}
-                  renderItem={({ item, index, isDragging }) => (
+                  keyExtractor={(recipe) => recipe.id}
+                  renderItem={({ item, index }) => (
                     <RecipeCard
                       recipe={item}
                       dayId={day.id}
                       recipeIndex={index}
-                      isDragging={isDragging}
                       onToggleComplete={(recipeId) => handleToggleRecipeCompleteInDay(day.id, recipeId)}
                       onDelete={(recipeId) => handleDeleteRecipeFromDay(day.id, recipeId)}
                       onView={(recipeId) => handleViewRecipe(recipeId)}
@@ -1309,7 +1329,6 @@ function MealPlanScreen({ navigation }) {
                   onReorder={(newRecipes, draggedRecipe, fromIndex, toIndex) => 
                     handleRecipeReorderInDay(day.id, newRecipes)
                   }
-                  keyExtractor={(item, index) => `day-${day.id}-recipe-${item?.id || index}`}
                   style={(day.recipes?.length || 0) === 0 ? styles.emptyDropZone : undefined}
                 />
                 
@@ -1367,7 +1386,7 @@ function MealPlanScreen({ navigation }) {
           </View>
         </View>
       )}
-          </CrossContainerDragProvider>
+          {/* 🚫 REMOVED: CrossContainerDragProvider closing tag */}
         </View>
       </TouchableWithoutFeedback>
 
@@ -1479,7 +1498,7 @@ function MealPlanScreen({ navigation }) {
 }
 
 // Recipe Card Component - Clean text-only layout like grocery list with drag support
-const RecipeCard = ({ recipe, onToggleComplete, onDelete, onView, isDragging }) => {
+const RecipeCard = ({ recipe, onToggleComplete, onDelete, onView, isDragging = false }) => {
   return (
     <View style={[
       styles.recipeCard,

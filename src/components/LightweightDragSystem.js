@@ -65,6 +65,9 @@ export const SimpleDraggableList = ({
       return;
     }
     
+    // 🎯 FIX: Use original data prop as source of truth (not current items state)
+    const sourceData = data; // Always use props data, not local state
+    
     // Quick, single layout animation for final reorder
     LayoutAnimation.configureNext({
       duration: 180,
@@ -73,12 +76,15 @@ export const SimpleDraggableList = ({
       },
     });
 
-    // Final array reordering (source of truth from props)
-    const newItems = [...data];
+    // Final array reordering from source data
+    const newItems = [...sourceData];
     const [movedItem] = newItems.splice(fromIndex, 1);
     newItems.splice(toIndex, 0, movedItem);
 
+    // Update local state for immediate visual feedback
     setItems(newItems);
+    
+    // Notify parent with the reordered data
     onReorder && onReorder(newItems, draggedItem, fromIndex, toIndex);
   };
 

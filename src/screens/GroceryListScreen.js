@@ -17,9 +17,9 @@ import {
 } from 'react-native';
 import { Icon, IconButton } from '../components/IconLibrary';
 import { ThemedText, typography } from '../components/Typography';
-// 🚀 TESTING: UltraSmoothDragSystem - Fixes animation driver conflicts
-import { SimpleDraggableList } from '../components/UltraSmoothDragSystem';
-// PREVIOUS: import { SimpleDraggableList } from '../components/LightweightDragSystem'; // (Had driver conflicts)
+// � BACK TO SMOOTH: LightweightDragSystem with driver conflict FIXED
+import { SimpleDraggableList } from '../components/LightweightDragSystem';
+// REGRESSION: import { SimpleDraggableList } from '../components/UltraSmoothDragSystem'; // (Lost smooth swapping)
 // FALLBACK: import { SimpleDraggableList } from '../components/DragSystem';
 import YesChefAPI from '../services/YesChefAPI';
 import FriendsAPI from '../services/FriendsAPI';
@@ -521,6 +521,8 @@ export default function GroceryListScreen({ route, navigation }) {
           onPress: async () => {
             try {
               console.log(`🗑️ DELETING list: ${currentBackendList.list_name} (ID: ${currentBackendList.id})`);
+              console.log('🗑️ FULL BACKEND LIST OBJECT:', JSON.stringify(currentBackendList, null, 2));
+              console.log('🗑️ ID TYPE CHECK:', typeof currentBackendList.id, 'VALUE:', currentBackendList.id);
               
               const result = await YesChefAPI.deleteGroceryList(currentBackendList.id);
               
