@@ -17,9 +17,9 @@ import {
 } from 'react-native';
 import { Icon, IconButton } from '../components/IconLibrary';
 import { ThemedText, typography } from '../components/Typography';
-// 🚀 TESTING: LightweightDragSystem - Visual-only live preview (Google Keep accurate)
-import { SimpleDraggableList } from '../components/LightweightDragSystem';
-// OLD: import { SimpleDraggableList } from '../components/GoogleKeepDragSystem';
+// 🚀 TESTING: UltraSmoothDragSystem - Fixes animation driver conflicts
+import { SimpleDraggableList } from '../components/UltraSmoothDragSystem';
+// PREVIOUS: import { SimpleDraggableList } from '../components/LightweightDragSystem'; // (Had driver conflicts)
 // FALLBACK: import { SimpleDraggableList } from '../components/DragSystem';
 import YesChefAPI from '../services/YesChefAPI';
 import FriendsAPI from '../services/FriendsAPI';

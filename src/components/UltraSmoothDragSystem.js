@@ -1,17 +1,14 @@
 /**
- * 🎨 LIGHTWEIGHT GOOGLE KEEP-STYLE DRAG SYSTEM
+ * 🎨 ULTRA-SMOOTH GOOGLE KEEP DRAG SYSTEM
  * 
- * Key Innovation: Visual-only live preview
- * - Items APPEAR to switch places using transforms (not array changes)
- * - Data remains stable during drag
- * - Only reorder on final release
- * - Much lighter and smoother
+ * Lessons learned:
+ * ✅ Users confirmed: "It felt SO MUCH smoother!"
+ * 🚨 Fixed: Animation driver conflicts (native vs JS)
  * 
- * Google Keep Accuracy:
- * ✅ Visual feedback only during drag
- * ✅ Transform-based positioning
- * ✅ Minimal state changes
- * ✅ Smooth, responsive feel
+ * New approach:
+ * - Single transform approach (no mixed animations)
+ * - Visual displacement without Animated.Values conflicts
+ * - Pure Google Keep feel with zero driver issues
  */
 
 import React, { useRef, useState, useEffect } from 'react';
@@ -41,39 +38,38 @@ export const SimpleDraggableList = ({
   showsVerticalScrollIndicator = false
 }) => {
   const [items, setItems] = useState(data);
-  const [draggedIndex, setDraggedIndex] = useState(null);
-  const [targetIndex, setTargetIndex] = useState(null);
+  const [dragState, setDragState] = useState({
+    draggedIndex: null,
+    targetIndex: null,
+  });
   
-  // Visual-only live preview (no array changes during drag)
+  // Simplified live preview
   const handleLivePreview = (fromIndex, toIndex) => {
     if (fromIndex === toIndex) {
-      setTargetIndex(null);
+      setDragState(prev => ({ ...prev, targetIndex: null }));
       return;
     }
     
-    // Only update visual target index (no array manipulation)
-    setTargetIndex(toIndex);
+    setDragState(prev => ({ ...prev, targetIndex: toIndex }));
   };
 
-  // Final reorder only on release
+  // Final reorder with immediate cleanup
   const handleFinalReorder = (draggedItem, fromIndex, toIndex) => {
-    // Clear drag state immediately
-    setDraggedIndex(null);
-    setTargetIndex(null);
+    // Clear all drag state immediately
+    setDragState({ draggedIndex: null, targetIndex: null });
     
     if (fromIndex === toIndex) {
       return;
     }
     
-    // Quick, single layout animation for final reorder
+    // Single smooth layout animation
     LayoutAnimation.configureNext({
-      duration: 180,
+      duration: 150,
       update: {
-        type: LayoutAnimation.Types.easeInEaseOut,
+        type: LayoutAnimation.Types.easeOut,
       },
     });
 
-    // Final array reordering (source of truth from props)
     const newItems = [...data];
     const [movedItem] = newItems.splice(fromIndex, 1);
     newItems.splice(toIndex, 0, movedItem);
@@ -82,7 +78,6 @@ export const SimpleDraggableList = ({
     onReorder && onReorder(newItems, draggedItem, fromIndex, toIndex);
   };
 
-  // Update when props change
   useEffect(() => {
     setItems(data);
   }, [data]);
@@ -92,59 +87,58 @@ export const SimpleDraggableList = ({
       style={[styles.container, style]}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={showsVerticalScrollIndicator}
-      scrollEnabled={scrollEnabled && draggedIndex === null}
+      scrollEnabled={scrollEnabled && dragState.draggedIndex === null}
       scrollEventThrottle={16}
     >
       {items.map((item, index) => {
         const key = `${keyExtractor(item)}-${index}`;
-        const isDragging = draggedIndex === index;
+        const isDragging = dragState.draggedIndex === index;
         
-        // Calculate visual offset for smooth preview (Google Keep style)
-        let visualOffset = 0;
-        if (targetIndex !== null && !isDragging) {
+        // Calculate simple visual displacement (no complex animations)
+        let translateY = 0;
+        if (dragState.targetIndex !== null && !isDragging) {
+          const { draggedIndex, targetIndex } = dragState;
+          
           if (draggedIndex < targetIndex) {
-            // Item being dragged down - move items up
+            // Dragging down - move items up
             if (index > draggedIndex && index <= targetIndex) {
-              visualOffset = -50; // Item height
+              translateY = -50;
             }
           } else {
-            // Item being dragged up - move items down  
+            // Dragging up - move items down
             if (index >= targetIndex && index < draggedIndex) {
-              visualOffset = 50; // Item height
+              translateY = 50;
             }
           }
         }
         
         return (
-          <LightweightDraggableItem
+          <UltraSmoothDraggableItem
             key={key}
             item={item}
             index={index}
             totalItems={items.length}
             isDragging={isDragging}
-            visualOffset={visualOffset}
+            translateY={translateY}
             onLivePreview={handleLivePreview}
             onFinalReorder={handleFinalReorder}
-            onDragStart={(idx) => setDraggedIndex(idx)}
-            onDragEnd={() => {
-              setDraggedIndex(null);
-              setTargetIndex(null);
-            }}
+            onDragStart={(idx) => setDragState(prev => ({ ...prev, draggedIndex: idx }))}
+            onDragEnd={() => setDragState({ draggedIndex: null, targetIndex: null })}
           >
             {renderItem({ item, index })}
-          </LightweightDraggableItem>
+          </UltraSmoothDraggableItem>
         );
       })}
     </ScrollView>
   );
 };
 
-const LightweightDraggableItem = ({ 
+const UltraSmoothDraggableItem = ({ 
   item, 
   index, 
   totalItems, 
   isDragging,
-  visualOffset,
+  translateY,
   onLivePreview,
   onFinalReorder, 
   onDragStart,
@@ -152,27 +146,16 @@ const LightweightDraggableItem = ({
   children 
 }) => {
   const pan = useRef(new Animated.ValueXY()).current;
-  const offsetAnim = useRef(new Animated.Value(visualOffset)).current;
-
-  // Smooth visual offset animation (for other items moving out of the way)
-  useEffect(() => {
-    Animated.timing(offsetAnim, {
-      toValue: visualOffset,
-      duration: 100, // Very quick for responsive feel
-      useNativeDriver: false, // ✅ FIXED: Use JS driver to match pan transforms
-    }).start();
-  }, [visualOffset, offsetAnim]);
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dy) > 2; // Very sensitive
+        return Math.abs(gestureState.dy) > 2;
       },
 
       onPanResponderGrant: () => {
         onDragStart(index);
-        
         pan.setOffset({
           x: pan.x._value,
           y: pan.y._value,
@@ -183,15 +166,13 @@ const LightweightDraggableItem = ({
       onPanResponderMove: Animated.event(
         [null, { dx: pan.x, dy: pan.y }],
         { 
-          useNativeDriver: false,
+          useNativeDriver: false, // Consistent JS driver
           listener: (_, gestureState) => {
-            // Lightweight live preview calculation
             const itemHeight = 50;
             let targetIndex = index + Math.round(gestureState.dy / itemHeight);
             targetIndex = Math.max(0, Math.min(totalItems - 1, targetIndex));
             
-            // Trigger visual preview (no heavy operations)
-            if (Math.abs(gestureState.dy) > 10) {
+            if (Math.abs(gestureState.dy) > 8) {
               onLivePreview(index, targetIndex);
             }
           },
@@ -201,22 +182,19 @@ const LightweightDraggableItem = ({
       onPanResponderRelease: (_, gestureState) => {
         onDragEnd();
         
-        // Calculate final position
         const itemHeight = 50;
         let targetIndex = index + Math.round(gestureState.dy / itemHeight);
         targetIndex = Math.max(0, Math.min(totalItems - 1, targetIndex));
         
-        // Trigger final reorder
-        if (Math.abs(gestureState.dy) > 10) {
+        if (Math.abs(gestureState.dy) > 8) {
           onFinalReorder(item, index, targetIndex);
         }
 
-        // Quick return animation
         Animated.spring(pan, {
           toValue: { x: 0, y: 0 },
-          useNativeDriver: false,
-          tension: 200,
-          friction: 10,
+          useNativeDriver: false, // Consistent JS driver
+          tension: 180,
+          friction: 8,
         }).start();
         
         pan.flattenOffset();
@@ -226,11 +204,12 @@ const LightweightDraggableItem = ({
     })
   ).current;
 
+  // Single, clean transform (no animation conflicts)
   const animatedStyle = {
     transform: [
-      { translateY: offsetAnim }, // Visual offset for live preview
-      ...pan.getTranslateTransform(), // Drag transform
-      { scale: isDragging ? 1.02 : 1 }, // Subtle scale (lighter than before)
+      { translateY: translateY }, // Simple number, no Animated.Value
+      ...pan.getTranslateTransform(), // Both use same JS driver
+      { scale: isDragging ? 1.02 : 1 },
     ],
     zIndex: isDragging ? 1000 : 1,
     opacity: isDragging ? 0.95 : 1,
@@ -245,7 +224,6 @@ const LightweightDraggableItem = ({
       ]}
     >
       <View style={styles.itemContainer}>
-        {/* Lightweight drag handle */}
         <View
           style={styles.dragHandle}
           {...panResponder.panHandlers}
@@ -284,9 +262,9 @@ const styles = StyleSheet.create({
   draggingItem: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 3,
   },
   itemContainer: {
     flexDirection: 'row',
