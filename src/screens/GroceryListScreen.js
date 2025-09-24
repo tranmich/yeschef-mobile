@@ -17,10 +17,10 @@ import {
 } from 'react-native';
 import { Icon, IconButton } from '../components/IconLibrary';
 import { ThemedText, typography } from '../components/Typography';
-// 🎨 TESTING: GoogleKeepDragSystem with live preview switching
-import { SimpleDraggableList } from '../components/GoogleKeepDragSystem';
-// OLD: import { SimpleDraggableList } from '../components/DragSystem';
-// DISABLED: import { SimpleDraggableList } from '../components/OptimizedDragSystem';
+// 🚀 TESTING: LightweightDragSystem - Visual-only live preview (Google Keep accurate)
+import { SimpleDraggableList } from '../components/LightweightDragSystem';
+// OLD: import { SimpleDraggableList } from '../components/GoogleKeepDragSystem';
+// FALLBACK: import { SimpleDraggableList } from '../components/DragSystem';
 import YesChefAPI from '../services/YesChefAPI';
 import FriendsAPI from '../services/FriendsAPI';
 import OfflineSyncManager from '../services/OfflineSyncManager';
