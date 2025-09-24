@@ -17,9 +17,10 @@ import {
 } from 'react-native';
 import { Icon, IconButton } from '../components/IconLibrary';
 import { ThemedText, typography } from '../components/Typography';
-// 🧪 TESTING: OptimizedDragSystem (Google Keep-inspired)
+// 🎨 TESTING: GoogleKeepDragSystem with live preview switching
+import { SimpleDraggableList } from '../components/GoogleKeepDragSystem';
 // OLD: import { SimpleDraggableList } from '../components/DragSystem';
-import { SimpleDraggableList } from '../components/OptimizedDragSystem';
+// DISABLED: import { SimpleDraggableList } from '../components/OptimizedDragSystem';
 import YesChefAPI from '../services/YesChefAPI';
 import FriendsAPI from '../services/FriendsAPI';
 import OfflineSyncManager from '../services/OfflineSyncManager';
