@@ -6,7 +6,7 @@
 
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { SimpleDraggableList } from '../components/SimpleDragSystem';
+import { SimpleDraggableList } from '../components/LightweightDragSystem';
 
 const DragTestScreen = () => {
   const [items, setItems] = useState([

@@ -30,7 +30,7 @@ import MobileGroceryAdapter from '../services/MobileGroceryAdapter';
 import { useMealPlanData } from '../hooks/useLocalData';
 import { LocalDataStatus, DraftPicker } from '../components/LocalDataStatus';
 
-function MealPlanScreen({ navigation }) {
+function MealPlanScreen({ navigation, route }) {
   // 🎨 Background Configuration (matches HomeScreen)
   const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/home_green.jpg');
   
@@ -102,6 +102,30 @@ function MealPlanScreen({ navigation }) {
       }, 100);
     }
   }, []);
+
+  // 🆕 Handle recipe addition from RecipeViewScreen
+  useEffect(() => {
+    if (route.params?.addRecipeFromView && global.tempRecipeToAdd) {
+      const { dayId, recipe } = global.tempRecipeToAdd;
+      console.log('📱 Adding recipe from RecipeView:', recipe.title);
+      
+      // Add recipe to the specified day
+      setDays(prevDays => {
+        return prevDays.map(day => 
+          day.id === dayId 
+            ? { ...day, recipes: [...(day.recipes || []), recipe] }
+            : day
+        );
+      });
+      
+      // Clear the global temp data
+      global.tempRecipeToAdd = null;
+      
+      // Clear the route params to prevent re-adding on re-renders
+      navigation.setParams({ addRecipeFromView: false });
+    }
+  }, [route.params?.addRecipeFromView]);
+
   const createNewMealPlan = async () => {
     console.log('🆕 Creating new meal plan - clean slate');
     

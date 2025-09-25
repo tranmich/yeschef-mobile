@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -20,6 +21,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import YesChefAPI from '../services/YesChefAPI';
 import MealPlanAPI from '../services/MealPlanAPI';
+import RecipeOptionsModal from '../components/RecipeOptionsModal';
+import RecipeSharingModal from '../components/RecipeSharingModal';
 
 // Safety function to ensure proper text rendering
 const safeTextRender = (value, fallback = '') => {
@@ -62,10 +65,62 @@ const RecipeCollectionScreen = ({ navigation }) => {
   const [selectedRecipeForPlan, setSelectedRecipeForPlan] = useState(null);
   const [showOptionsMenu, setShowOptionsMenu] = useState(null);
   const [showBottomSheet, setShowBottomSheet] = useState(null);
+  const [showSharingModal, setShowSharingModal] = useState(false);
+  const [selectedRecipeForSharing, setSelectedRecipeForSharing] = useState(null);
+  const [hiddenRecipeIds, setHiddenRecipeIds] = useState(new Set());
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('Added ✓');
+
+  // Load hidden recipe IDs from AsyncStorage on mount
+  useEffect(() => {
+    const loadHiddenRecipes = async () => {
+      try {
+        const hiddenIds = await AsyncStorage.getItem('hiddenRecipeIds');
+        if (hiddenIds) {
+          setHiddenRecipeIds(new Set(JSON.parse(hiddenIds)));
+        }
+      } catch (error) {
+        console.error('Failed to load hidden recipes:', error);
+      }
+    };
+    loadHiddenRecipes();
+  }, []);
+
+  // Save hidden recipe IDs to AsyncStorage whenever it changes
+  useEffect(() => {
+    const saveHiddenRecipes = async () => {
+      try {
+        await AsyncStorage.setItem('hiddenRecipeIds', JSON.stringify([...hiddenRecipeIds]));
+      } catch (error) {
+        console.error('Failed to save hidden recipes:', error);
+      }
+    };
+    if (hiddenRecipeIds.size > 0) {
+      saveHiddenRecipes();
+    }
+  }, [hiddenRecipeIds]);
+
+  // 🔄 Refresh hidden recipes when screen comes into focus (e.g., returning from RecipeView)
+  useFocusEffect(
+    useCallback(() => {
+      const refreshHiddenRecipes = async () => {
+        try {
+          const hiddenIds = await AsyncStorage.getItem('hiddenRecipeIds');
+          if (hiddenIds) {
+            const newHiddenSet = new Set(JSON.parse(hiddenIds));
+            console.log('🔄 Refreshed hidden recipes on focus:', newHiddenSet.size, 'hidden');
+            setHiddenRecipeIds(newHiddenSet);
+          }
+        } catch (error) {
+          console.error('Failed to refresh hidden recipes:', error);
+        }
+      };
+      refreshHiddenRecipes();
+    }, [])
+  );
   const [isUpdatingMealPlan, setIsUpdatingMealPlan] = useState(false);
 
   // 🍞 Toast notification state
-  const [showToast, setShowToast] = useState(false);
   const [toastAnimation] = useState(new Animated.Value(0));
 
   useEffect(() => {
@@ -149,8 +204,9 @@ const RecipeCollectionScreen = ({ navigation }) => {
     ];
   };
 
-  // 🍞 Show gentle mint toast notification
-  const showAddedToast = () => {
+  // 🍞 Show gentle mint toast notification with custom message
+  const showToastNotification = (message = 'Added ✓') => {
+    setToastMessage(message);
     setShowToast(true);
     
     // Gentle fade in
@@ -205,30 +261,39 @@ const RecipeCollectionScreen = ({ navigation }) => {
   }, [currentMealPlan]);
 
   const handleDeleteRecipe = async (recipe) => {
-    try {
-      Alert.alert(
-        'Delete Recipe',
-        `Are you sure you want to delete "${recipe.title}"?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: async () => {
-              await YesChefAPI.deleteRecipe(recipe.id);
-              setRecipes(prevRecipes => prevRecipes.filter(r => r.id !== recipe.id));
-              setShowOptionsMenu(null);
-            }
+    Alert.alert(
+      'Remove Recipe',
+      `Remove "${recipe.title}" from your recipes?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'default', // Changed from 'destructive' to be less scary
+          onPress: () => {
+            // Add to hidden recipes set
+            setHiddenRecipeIds(prev => new Set([...prev, recipe.id]));
+            
+            // Also remove from current recipes list for immediate UI update
+            setRecipes(prevRecipes => prevRecipes.filter(r => r.id !== recipe.id));
+            
+            // Close the modal
+            setShowBottomSheet(null);
+            
+            // Show light mint toast instead of heavy alert
+            showToastNotification('Removed ✓');
           }
-        ]
-      );
-    } catch (error) {
-      console.error('? Error deleting recipe:', error);
-      Alert.alert('Error', 'Failed to delete recipe');
-    }
+        }
+      ]
+    );
   };
 
-  // 🌟 SIMPLIFIED: Add recipe directly to day.recipes (no meal containers)
+  // � Share recipe handler
+  const handleShareRecipe = (recipe) => {
+    setSelectedRecipeForSharing(recipe);
+    setShowSharingModal(true);
+  };
+
+  // �🌟 SIMPLIFIED: Add recipe directly to day.recipes (no meal containers)
   const addRecipeToDay = async (dayId, recipeToAdd = null) => {
     try {
       // Use passed recipe or fall back to selectedRecipeForPlan
@@ -338,7 +403,7 @@ const RecipeCollectionScreen = ({ navigation }) => {
       await saveLocalMealPlan(saveCompatibleMealPlan);
 
       // Show gentle success notification
-      showAddedToast();
+      showToastNotification('Added ✓');
       setSelectedRecipeForPlan(null);
       
     } catch (error) {
@@ -754,6 +819,9 @@ const RecipeCollectionScreen = ({ navigation }) => {
     
     let categoryRecipes = getCategoryRecipes(selectedCategory) || [];
     
+    // Filter out hidden recipes
+    categoryRecipes = categoryRecipes.filter(recipe => !hiddenRecipeIds.has(recipe.id));
+    
     // Apply search filter if there's a search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -767,7 +835,7 @@ const RecipeCollectionScreen = ({ navigation }) => {
     
     // Limit initial render to first 100 recipes for better performance
     return categoryRecipes.slice(0, 100);
-  }, [selectedCategory, searchQuery, recipes]); // Re-calculate when category, search, or recipes change
+  }, [selectedCategory, searchQuery, recipes, hiddenRecipeIds]); // Re-calculate when category, search, recipes, or hidden recipes change
 
   // Check loading and recipes state occasionally
   // console.log('?? Component state - isLoading:', isLoading, 'recipes count:', recipes.length);
@@ -821,7 +889,7 @@ const RecipeCollectionScreen = ({ navigation }) => {
             }
           ]}
         >
-          <Text style={styles.simpleToastText}>Added ✓</Text>
+          <Text style={styles.simpleToastText}>{toastMessage}</Text>
         </Animated.View>
       )}
       
@@ -1135,60 +1203,33 @@ const RecipeCollectionScreen = ({ navigation }) => {
               </TouchableWithoutFeedback>
             </Modal>
             
-            {/* Bottom sheet modal for recipe options */}
-            <Modal
+            {/* Recipe Options Modal - Reusable component */}
+            <RecipeOptionsModal
               visible={showBottomSheet !== null}
-              transparent={true}
-              animationType="slide"
-              onRequestClose={() => setShowBottomSheet(null)}
-            >
-              <TouchableWithoutFeedback onPress={() => setShowBottomSheet(null)}>
-                <View style={styles.bottomSheetOverlay}>
-                  <TouchableWithoutFeedback onPress={() => {}}>
-                    <View style={styles.bottomSheet}>
-                      <View style={styles.bottomSheetHandle} />
-                      
-                      <Text style={styles.bottomSheetTitle}>Recipe Options</Text>
-                      
-                      <TouchableOpacity
-                        style={styles.bottomSheetButton}
-                        onPress={() => {
-                          const recipe = displayRecipes.find(r => r.id === showBottomSheet);
-                          if (recipe) {
-                            setShowBottomSheet(null);
-                            addRecipeToDay(1, recipe); // Add directly to Day 1 (simplified)
-                          }
-                        }}
-                      >
-                        <Ionicons name="add" size={20} color="#374151" style={styles.bottomSheetButtonIcon} />
-                        <Text style={styles.bottomSheetButtonText}>Add to Meal Plan</Text>
-                      </TouchableOpacity>
+              onClose={() => setShowBottomSheet(null)}
+              recipe={displayRecipes.find(r => r.id === showBottomSheet)}
+              onAddToMealPlan={(recipe) => addRecipeToDay(1, recipe)}
+              onShare={(recipe) => handleShareRecipe(recipe)}
+              onDelete={(recipe) => handleDeleteRecipe(recipe)}
+              showShare={true}
+              showAddToMealPlan={true}
+              showDelete={true}
+            />
 
-                      <TouchableOpacity
-                        style={[styles.bottomSheetButton, styles.deleteButton]}
-                        onPress={() => {
-                          const recipe = displayRecipes.find(r => r.id === showBottomSheet);
-                          if (recipe) {
-                            setShowBottomSheet(null);
-                            handleDeleteRecipe(recipe);
-                          }
-                        }}
-                      >
-                        <Ionicons name="trash-outline" size={20} color="#ef4444" style={styles.bottomSheetButtonIcon} />
-                        <Text style={styles.bottomSheetButtonText}>Delete</Text>
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity
-                        style={[styles.bottomSheetButton, styles.cancelButton]}
-                        onPress={() => setShowBottomSheet(null)}
-                      >
-                        <Text style={styles.bottomSheetButtonText}>Cancel</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableWithoutFeedback>
-                </View>
-              </TouchableWithoutFeedback>
-            </Modal>
+            {/* Recipe Sharing Modal */}
+            <RecipeSharingModal
+              visible={showSharingModal}
+              recipe={selectedRecipeForSharing}
+              onClose={() => {
+                setShowSharingModal(false);
+                setSelectedRecipeForSharing(null);
+              }}
+              onSuccess={() => {
+                setShowSharingModal(false);
+                setSelectedRecipeForSharing(null);
+                Alert.alert('Success', 'Recipe shared successfully!');
+              }}
+            />
           </View>
         </TouchableWithoutFeedback>
       </SafeAreaView>

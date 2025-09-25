@@ -399,6 +399,34 @@ class YesChefAPI {
     }
   }
 
+  async deleteRecipe(recipeId) {
+    this.log('Deleting recipe:', recipeId);
+    
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Authentication required - please login' };
+    }
+
+    try {
+      const response = await this.debugFetch(`/api/recipes/${recipeId}`, {
+        method: 'DELETE',
+        headers: this.getAuthHeaders(),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        this.log('✅ Recipe deleted successfully');
+        return { success: true };
+      } else {
+        this.error('Delete failed:', data);
+        return { success: false, error: data.error || 'Delete failed' };
+      }
+    } catch (error) {
+      this.error('Delete recipe error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
   // Grocery List Methods - Authenticated Only
   async getGroceryLists() {
     this.log('Getting grocery lists...');

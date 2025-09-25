@@ -9,6 +9,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from './IconLibrary';
 
 const RecipeSharingModal = ({ visible, recipe, onClose, onShare }) => {
@@ -59,25 +60,26 @@ const RecipeSharingModal = ({ visible, recipe, onClose, onShare }) => {
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.cancelButton}>
-            <Text style={styles.cancelText}>Cancel</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Share Recipe</Text>
-          <TouchableOpacity 
-            onPress={handleShare} 
-            style={[styles.shareButton, isSharing && styles.shareButtonDisabled]}
-            disabled={isSharing}
-          >
-            <Text style={styles.shareText}>
-              {isSharing ? 'Sharing...' : 'Share'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+      <SafeAreaView style={styles.safeContainer}>
+        <View style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={onClose} style={styles.cancelButton}>
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Share Recipe</Text>
+            <TouchableOpacity 
+              onPress={handleShare} 
+              style={[styles.shareButton, isSharing && styles.shareButtonDisabled]}
+              disabled={isSharing}
+            >
+              <Text style={styles.shareText}>
+                {isSharing ? 'Sharing...' : 'Share'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-        <ScrollView style={styles.content}>
+          <ScrollView style={styles.content}>
           {/* Recipe Preview */}
           <View style={[styles.previewCard, { backgroundColor: backgroundOptions.find(b => b.id === selectedBackground)?.color }]}>
             <Text style={styles.previewIcon}>{selectedIcon}</Text>
@@ -152,12 +154,17 @@ const RecipeSharingModal = ({ visible, recipe, onClose, onShare }) => {
             </View>
           </View>
         </ScrollView>
-      </View>
+        </View>
+      </SafeAreaView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
+  safeContainer: {
+    flex: 1,
+    backgroundColor: '#ffffff', // White background for status bar area
+  },
   container: {
     flex: 1,
     backgroundColor: '#ffffff',

@@ -8,10 +8,13 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Alert,
+  Animated,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import YesChefAPI from '../services/YesChefAPI';
 import { Icon } from '../components/IconLibrary';
 import RecipeSharingModal from '../components/RecipeSharingModal';
+import RecipeOptionsModal from '../components/RecipeOptionsModal';
 
 const RecipeViewScreen = ({ route, navigation }) => {
   const [recipe, setRecipe] = useState(null);
@@ -20,6 +23,8 @@ const RecipeViewScreen = ({ route, navigation }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showSharingModal, setShowSharingModal] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastAnimation] = useState(new Animated.Value(0));
 
   // 🔧 Enhanced OCR text repair (from webapp)
   const repairOCRText = (text) => {
@@ -287,14 +292,85 @@ const RecipeViewScreen = ({ route, navigation }) => {
     }
   };
 
+  // 🍞 Show mint toast notification
+  const showToastNotification = () => {
+    setShowToast(true);
+    
+    Animated.timing(toastAnimation, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+
+    // Auto-dismiss after 2 seconds, then navigate
+    setTimeout(() => {
+      Animated.timing(toastAnimation, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        setShowToast(false);
+        navigation.goBack();
+      });
+    }, 2000);
+  };
+
   const handleOptionsMenuPress = () => {
-    setShowOptionsMenu(!showOptionsMenu);
+    setShowOptionsMenu(true); // Show bottom sheet modal
   };
 
   const handleBackgroundTap = () => {
     if (showOptionsMenu) {
       setShowOptionsMenu(false);
     }
+  };
+
+  // 🆕 Add to Meal Plan functionality
+  const handleAddToMealPlan = () => {
+    setShowOptionsMenu(false);
+    
+    // Store recipe in global for MealPlanScreen to pick up
+    global.tempRecipeToAdd = {
+      dayId: 1, // Add to first day by default
+      recipe: recipe
+    };
+    
+    // Navigate to Meal Plan screen
+    navigation.navigate('MealPlan', { addRecipeFromView: true });
+  };
+
+  // 🆕 Remove Recipe functionality  
+  const handleDeleteRecipe = () => {
+    setShowOptionsMenu(false);
+    
+    Alert.alert(
+      'Remove Recipe',
+      `Remove "${recipe.title || recipe.name}" from your recipes?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Remove', 
+          style: 'default',
+          onPress: async () => {
+            try {
+              // Add recipe to hidden list in AsyncStorage
+              const hiddenIds = await AsyncStorage.getItem('hiddenRecipeIds');
+              const hiddenSet = hiddenIds ? new Set(JSON.parse(hiddenIds)) : new Set();
+              hiddenSet.add(recipe.id);
+              await AsyncStorage.setItem('hiddenRecipeIds', JSON.stringify([...hiddenSet]));
+              
+              console.log('✅ Recipe hidden:', recipe.id, 'Hidden count:', hiddenSet.size);
+              
+              // Show toast, then navigate back
+              showToastNotification();
+            } catch (error) {
+              console.error('Failed to hide recipe:', error);
+              Alert.alert('Error', 'Could not remove recipe');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const nextStep = () => {
@@ -479,13 +555,46 @@ const RecipeViewScreen = ({ route, navigation }) => {
         <Text style={styles.cookingButtonText}>🔥 Start Cooking Mode</Text>
       </TouchableOpacity>
 
-      {/* 📤 Recipe Sharing Modal */}
+      {/* � Recipe Options Modal - Bottom Sheet */}
+      <RecipeOptionsModal
+        visible={showOptionsMenu}
+        onClose={() => setShowOptionsMenu(false)}
+        recipe={recipe}
+        onAddToMealPlan={handleAddToMealPlan}
+        onShare={() => setShowSharingModal(true)}
+        onDelete={handleDeleteRecipe}
+        showShare={true}
+        showAddToMealPlan={true}
+        showDelete={true}
+      />
+
+      {/* �📤 Recipe Sharing Modal */}
       <RecipeSharingModal
         visible={showSharingModal}
         recipe={recipe}
         onClose={() => setShowSharingModal(false)}
         onShare={handleShareConfirm}
       />
+
+      {/* 🍞 Mint Toast Notification - Matching RecipeCollection Style */}
+      {showToast && (
+        <Animated.View
+          style={[
+            styles.simpleToast,
+            {
+              opacity: toastAnimation,
+              transform: [{
+                translateY: toastAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [20, 0], // Gentle slide up from bottom
+                }),
+              }],
+            }
+          ]}
+        >
+          <Text style={styles.simpleToastText}>Removed ✓</Text>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 };
@@ -742,6 +851,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Nunito-Bold',
     color: '#ffffff',
+  },
+  simpleToast: {
+    position: 'absolute',
+    bottom: 120, // Bottom positioning for calm feel
+    left: 20,
+    right: 20,
+    alignItems: 'center',
+    zIndex: 9998,
+  },
+  simpleToastText: {
+    backgroundColor: '#e6fffa', // Soft mint color (Tailwind teal-50)
+    color: '#1f2937', // Gentle dark gray text
+    fontSize: 15,
+    fontWeight: '500', // Lighter weight for calm feel
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: '#a7f3d0', // Subtle mint border (Tailwind emerald-200)
+    textAlign: 'center',
+    overflow: 'hidden',
+    // Soft shadow for subtle depth
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
 });
 
