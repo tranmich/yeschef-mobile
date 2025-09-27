@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
+  Image,
 } from 'react-native';
 import YesChefAPI from '../services/YesChefAPI';
 
@@ -76,11 +77,13 @@ export default function LoginScreen({ onLoginSuccess }) {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
           <View style={styles.content}>
-          {/* Logo Placeholder */}
+          {/* Beautiful YesChef Logo */}
           <View style={styles.logoContainer}>
-            <View style={styles.logoPlaceholder}>
-              <Text style={styles.logoText}>YC</Text>
-            </View>
+            <Image 
+              source={require('../../assets/images/YesChefLogo.png')} 
+              style={styles.logo}
+              resizeMode="contain"
+            />
           </View>
 
           {/* Floating Login Form */}
@@ -152,28 +155,17 @@ const styles = StyleSheet.create({
     marginBottom: 60,
     alignItems: 'center',
   },
-  logoPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 1)', // Reduced opacity to match form
-    justifyContent: 'center',
-    alignItems: 'center',
+  logo: {
+    width: 100,
+    height: 100,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 4.65,
     elevation: 8,
-  },
-    logoText: {
-    fontSize: 32,
-    fontFamily: 'Nunito-ExtraBold', // Use consistent name
-    // fontWeight: 'bold', // REMOVED - conflicts with ExtraBold
-    color: '#FFFFFF', // Back to white
-    textAlign: 'center',
   },
   floatingForm: {
     width: width * 0.85,

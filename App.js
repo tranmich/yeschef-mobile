@@ -110,16 +110,7 @@ function RecipeStack() {
         <Stack.Screen 
           name="RecipeDetail" 
           component={RecipeViewScreen}
-          options={{ 
-            title: 'Recipe',
-            headerBackTitleVisible: false,
-            headerTintColor: '#111827',
-            headerStyle: {
-              backgroundColor: '#fafbfc',
-              borderBottomWidth: 1,
-              borderBottomColor: '#e5e7eb',
-            }
-          }}
+          options={{ headerShown: false }}
         />
       </Stack.Navigator>
     </SimpleErrorBoundary>
@@ -138,16 +129,7 @@ function MealPlanStack() {
       <Stack.Screen 
         name="RecipeDetail" 
         component={RecipeViewScreen}
-        options={{ 
-          title: 'Recipe',
-          headerBackTitleVisible: false,
-          headerTintColor: '#111827',
-          headerStyle: {
-            backgroundColor: '#fafbfc',
-            borderBottomWidth: 1,
-            borderBottomColor: '#e5e7eb',
-          }
-        }}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );

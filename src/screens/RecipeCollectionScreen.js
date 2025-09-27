@@ -23,6 +23,7 @@ import YesChefAPI from '../services/YesChefAPI';
 import MealPlanAPI from '../services/MealPlanAPI';
 import RecipeOptionsModal from '../components/RecipeOptionsModal';
 import RecipeSharingModal from '../components/RecipeSharingModal';
+import DaySelectionModal from '../components/DaySelectionModal';
 
 // Safety function to ensure proper text rendering
 const safeTextRender = (value, fallback = '') => {
@@ -70,6 +71,9 @@ const RecipeCollectionScreen = ({ navigation }) => {
   const [hiddenRecipeIds, setHiddenRecipeIds] = useState(new Set());
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('Added ✓');
+  const [showDaySelection, setShowDaySelection] = useState(false);
+  const [availableDays, setAvailableDays] = useState([]);
+  const [selectedRecipeForDay, setSelectedRecipeForDay] = useState(null);
 
   // Load hidden recipe IDs from AsyncStorage on mount
   useEffect(() => {
@@ -242,23 +246,133 @@ const RecipeCollectionScreen = ({ navigation }) => {
     }
   };
 
-  const handleAddToMealPlan = useCallback((recipe) => {
-    setSelectedRecipeForPlan(recipe);
+  const handleAddToMealPlan = useCallback(async (recipe) => {
     setShowOptionsMenu(null); // Close options menu
-    setShowMealPlanModal(true);
     
-    // 🎯 NEW LOGIC: Check local state first, then saved plans
-    if (!currentMealPlan || currentMealPlan.length === 0) {
-      console.log('🎯 No local meal plan - creating default local state first');
-      // Create a default local meal plan that user can work with immediately
-      const defaultPlan = getDefaultMealPlan();
-      setCurrentMealPlan(defaultPlan);
-      // Note: No currentPlanId means this is a "new" unsaved plan
-      console.log('✅ Created local meal plan for immediate use');
-    } else {
-      console.log('✅ Using existing local meal plan with', currentMealPlan.length, 'days');
+    try {
+      // 🎯 SMART DAY DETECTION: Check current meal plan for multiple days
+      // 🎯 SMART DAY DETECTION: Always check AsyncStorage first (MealPlanScreen format)
+      let mealPlanDays = [];
+      
+      const localMealPlan = await AsyncStorage.getItem('localMealPlan');
+      if (localMealPlan) {
+        const parsed = JSON.parse(localMealPlan);
+        console.log('🔍 FULL AsyncStorage data structure:', JSON.stringify(parsed, null, 2));
+        // FIXED: The mealPlan is an array directly, not an object with days
+        mealPlanDays = parsed.mealPlan || parsed.days || [];
+        console.log('🔍 Found AsyncStorage meal plan with', mealPlanDays.length, 'days');
+        console.log('🔍 Day details:', mealPlanDays.map(day => ({ id: day.id, name: day.name, recipes: day.recipes?.length || 0 })));
+      } else {
+        console.log('🔍 No AsyncStorage meal plan - checking local state');
+        mealPlanDays = currentMealPlan || [];
+      }
+      
+      // Filter to include all valid days (not just days with recipes)
+      const activeDays = mealPlanDays.filter(day => 
+        day && (day.id || day.name) // Include any day that exists
+      );
+      
+      console.log('🎯 Smart day detection:', activeDays.length, 'active days found');
+      
+      if (activeDays.length === 0) {
+        // No days exist - create a default Day 1 and add recipe directly
+        console.log('📱 No days found - creating Day 1 and adding recipe directly');
+        
+        const defaultMealPlan = {
+          mealPlan: [{
+            id: 1,
+            name: 'Day 1',
+            isExpanded: true,
+            recipes: [recipe],
+            meals: []
+          }],
+          lastUpdated: Date.now(),
+          isLocal: true
+        };
+        
+        await AsyncStorage.setItem('localMealPlan', JSON.stringify(defaultMealPlan));
+        showToastNotification('Added ✓');
+        
+      } else if (activeDays.length === 1) {
+        // Single day exists - add directly to that day
+        console.log('📱 Single day - adding directly to day:', activeDays[0].id);
+        
+        const updatedDays = activeDays.map(day => 
+          ({ ...day, recipes: [...(day.recipes || []), recipe] })
+        );
+        
+        const localMealPlan = await AsyncStorage.getItem('localMealPlan');
+        const parsed = JSON.parse(localMealPlan);
+        const updatedMealPlan = {
+          ...parsed,
+          mealPlan: updatedDays,
+          lastUpdated: Date.now()
+        };
+        
+        await AsyncStorage.setItem('localMealPlan', JSON.stringify(updatedMealPlan));
+        showToastNotification('Added ✓');
+        
+      } else {
+        // Multiple days - show smart day selection modal
+        console.log('📅 Multiple days - showing day selection modal');
+        setSelectedRecipeForDay(recipe);
+        setAvailableDays(activeDays);
+        setShowDaySelection(true);
+      }
+      
+    } catch (error) {
+      console.error('Error in smart day detection:', error);
+      // Fallback to existing modal system
+      setSelectedRecipeForPlan(recipe);
+      setShowMealPlanModal(true);
     }
   }, [currentMealPlan]);
+
+  // 📅 Handle day selection from smart day modal - FIXED to use AsyncStorage
+  const handleDaySelected = useCallback(async (dayId) => {
+    console.log('📅 Day selected:', dayId, 'for recipe:', selectedRecipeForDay?.title);
+    
+    try {
+      // Get the current AsyncStorage data (same as smart day detection)
+      const localMealPlan = await AsyncStorage.getItem('localMealPlan');
+      if (!localMealPlan) {
+        console.error('❌ No meal plan data found in AsyncStorage');
+        return;
+      }
+      
+      const parsed = JSON.parse(localMealPlan);
+      const mealPlanDays = parsed.mealPlan || [];
+      
+      // Add recipe to the selected day
+      console.log('🔍 RECIPE FORMAT DEBUG - selectedRecipeForDay:', JSON.stringify(selectedRecipeForDay, null, 2));
+      const updatedDays = mealPlanDays.map(day => 
+        day.id === dayId 
+          ? { ...day, recipes: [...(day.recipes || []), selectedRecipeForDay] }
+          : day
+      );
+      
+      // Save back to AsyncStorage
+      const updatedMealPlan = {
+        ...parsed,
+        mealPlan: updatedDays,
+        lastUpdated: Date.now()
+      };
+      
+      await AsyncStorage.setItem('localMealPlan', JSON.stringify(updatedMealPlan));
+      console.log('💾 Recipe added to day', dayId, 'and saved to AsyncStorage');
+      
+      setShowDaySelection(false);
+      
+      // Show success toast
+      showToastNotification('Added ✓');
+      
+    } catch (error) {
+      console.error('❌ Error in handleDaySelected:', error);
+    }
+    
+    console.log('✅ Recipe added to day', dayId, '- new recipe count:', 
+      updatedMealPlan.find(d => d.id === dayId)?.recipes?.length);
+  }, [currentMealPlan, selectedRecipeForDay, showToastNotification]);
 
   const handleDeleteRecipe = async (recipe) => {
     Alert.alert(
@@ -1208,12 +1322,21 @@ const RecipeCollectionScreen = ({ navigation }) => {
               visible={showBottomSheet !== null}
               onClose={() => setShowBottomSheet(null)}
               recipe={displayRecipes.find(r => r.id === showBottomSheet)}
-              onAddToMealPlan={(recipe) => addRecipeToDay(1, recipe)}
+              onAddToMealPlan={(recipe) => handleAddToMealPlan(recipe)}
               onShare={(recipe) => handleShareRecipe(recipe)}
               onDelete={(recipe) => handleDeleteRecipe(recipe)}
               showShare={true}
               showAddToMealPlan={true}
               showDelete={true}
+            />
+
+            {/* 📅 Smart Day Selection Modal */}
+            <DaySelectionModal
+              visible={showDaySelection}
+              onClose={() => setShowDaySelection(false)}
+              onSelectDay={handleDaySelected}
+              availableDays={availableDays}
+              recipe={selectedRecipeForDay}
             />
 
             {/* Recipe Sharing Modal */}

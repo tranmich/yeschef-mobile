@@ -105,25 +105,59 @@ function MealPlanScreen({ navigation, route }) {
 
   // 🆕 Handle recipe addition from RecipeViewScreen
   useEffect(() => {
-    if (route.params?.addRecipeFromView && global.tempRecipeToAdd) {
-      const { dayId, recipe } = global.tempRecipeToAdd;
-      console.log('📱 Adding recipe from RecipeView:', recipe.title);
-      
-      // Add recipe to the specified day
-      setDays(prevDays => {
-        return prevDays.map(day => 
-          day.id === dayId 
-            ? { ...day, recipes: [...(day.recipes || []), recipe] }
-            : day
-        );
-      });
-      
-      // Clear the global temp data
-      global.tempRecipeToAdd = null;
-      
-      // Clear the route params to prevent re-adding on re-renders
-      navigation.setParams({ addRecipeFromView: false });
-    }
+    const handleRecipeFromView = async () => {
+      if (route.params?.addRecipeFromView && global.tempRecipeToAdd) {
+        const { dayId, recipe } = global.tempRecipeToAdd;
+        console.log('📱 Adding recipe from RecipeView:', recipe.title);
+        
+        // Add recipe to the specified day - FIXED to preserve existing recipes
+        setDays(prevDays => {
+          console.log('🔍 Previous days before adding recipe:', prevDays.length, 'days');
+          const updatedDays = prevDays.map(day => {
+            if (day.id === dayId) {
+              const existingRecipes = day.recipes || [];
+              const newRecipes = [...existingRecipes, recipe];
+              console.log('📝 Day', dayId, 'recipes before:', existingRecipes.length, 'after:', newRecipes.length);
+              return { ...day, recipes: newRecipes };
+            }
+            return day;
+          });
+          return updatedDays;
+        });
+        
+        // ALSO save to AsyncStorage to maintain persistence
+        try {
+          const localMealPlan = await AsyncStorage.getItem('localMealPlan');
+          if (localMealPlan) {
+            const mealPlanData = JSON.parse(localMealPlan);
+            const updatedDays = mealPlanData.mealPlan.days.map(day => 
+              day.id === dayId 
+                ? { ...day, recipes: [...(day.recipes || []), recipe] }
+                : day
+            );
+            
+            const updatedMealPlan = {
+              ...mealPlanData,
+              mealPlan: { ...mealPlanData.mealPlan, days: updatedDays },
+              lastUpdated: Date.now()
+            };
+            
+            await AsyncStorage.setItem('localMealPlan', JSON.stringify(updatedMealPlan));
+            console.log('💾 Recipe also saved to AsyncStorage for persistence');
+          }
+        } catch (error) {
+          console.error('⚠️ Failed to save to AsyncStorage:', error);
+        }
+        
+        // Clear the global temp data
+        global.tempRecipeToAdd = null;
+        
+        // Clear the route params to prevent re-adding on re-renders
+        navigation.setParams({ addRecipeFromView: false });
+      }
+    };
+    
+    handleRecipeFromView();
   }, [route.params?.addRecipeFromView]);
 
   const createNewMealPlan = async () => {
@@ -170,11 +204,51 @@ function MealPlanScreen({ navigation, route }) {
         console.log('🔄 Found local meal plan from AsyncStorage, updated:', new Date(lastUpdated).toLocaleTimeString());
         
         // Process AsyncStorage data and force sync with local-first system
-        if (isLocal && mealPlan && Array.isArray(mealPlan)) {
+        if (mealPlan && Array.isArray(mealPlan)) {
           console.log('📦 SYNC: Force updating local-first system with AsyncStorage data');
           
+          // 🔧 NORMALIZE DATA: Consolidate recipes from both old and new formats
+          const normalizedMealPlan = mealPlan.map(day => {
+            // Get recipes from new format (day.recipes)
+            const newFormatRecipes = day.recipes || [];
+            
+            // Get recipes from old format (day.meals[].recipes)
+            const oldFormatRecipes = [];
+            if (day.meals && Array.isArray(day.meals)) {
+              day.meals.forEach(meal => {
+                if (meal.recipes && Array.isArray(meal.recipes)) {
+                  oldFormatRecipes.push(...meal.recipes);
+                }
+              });
+            }
+            
+            // Combine both formats, avoiding duplicates
+            const allRecipes = [...newFormatRecipes];
+            oldFormatRecipes.forEach(oldRecipe => {
+              // Check if recipe already exists in new format (avoid duplicates)
+              const exists = allRecipes.some(newRecipe => 
+                newRecipe.id === oldRecipe.id || newRecipe.title === oldRecipe.title
+              );
+              if (!exists) {
+                allRecipes.push(oldRecipe);
+              }
+            });
+            
+            console.log(`🔧 NORMALIZED Day ${day.name}:`, {
+              oldRecipesCount: newFormatRecipes.length,
+              migratedRecipesCount: oldFormatRecipes.length,
+              totalRecipesCount: allRecipes.length
+            });
+            
+            return {
+              ...day,
+              recipes: allRecipes, // All recipes in unified format
+              meals: day.meals || [] // Keep meals structure but recipes are now in day.recipes
+            };
+          });
+          
           // Ensure proper expansion state for better UX
-          const mealPlanWithExpansion = mealPlan.map(day => ({
+          const mealPlanWithExpansion = normalizedMealPlan.map(day => ({
             ...day,
             isExpanded: day.isExpanded !== undefined ? day.isExpanded : true
           }));
@@ -283,14 +357,83 @@ function MealPlanScreen({ navigation, route }) {
     console.log('💾 Saving meal plan:', mealPlanTitle);
     
     try {
-      const result = await MealPlanAPI.saveMealPlan(days, mealPlanTitle);
+      // 🔍 CHECK FOR DUPLICATES: Get existing meal plans to check for name conflicts
+      const existingPlansResult = await MealPlanAPI.loadMealPlansList();
+      const existingPlans = existingPlansResult.success ? existingPlansResult.plans : [];
+      const existingPlan = existingPlans.find(plan => 
+        plan.plan_name.toLowerCase().trim() === mealPlanTitle.toLowerCase().trim()
+      );
+      
+      if (existingPlan) {
+        // If we're updating the same plan (currentPlanId matches), allow it without dialog
+        if (currentPlanId && currentPlanId.toString() === existingPlan.id.toString()) {
+          console.log('🔄 Updating same plan - no dialog needed');
+        } else {
+          // Different plan with same name - show dialog
+          console.log('🔄 Different plan with same name - showing dialog');
+          
+          // Show confirmation dialog for overwrite
+          const shouldOverwrite = await new Promise((resolve) => {
+            Alert.alert(
+              'Duplicate Name Detected',
+              `A meal plan named "${mealPlanTitle}" already exists. Do you want to replace it?`,
+              [
+                {
+                  text: 'Cancel', 
+                  style: 'cancel',
+                  onPress: () => resolve(false)
+                },
+                {
+                  text: 'Replace',
+                  style: 'destructive', 
+                  onPress: () => resolve(true)
+                }
+              ]
+            );
+          });
+          
+          if (!shouldOverwrite) {
+            setIsLoading(false);
+            console.log('💾 Save cancelled by user - duplicate name');
+            return;
+          }
+          
+          console.log('🔄 Overwriting existing meal plan:', existingPlan.id);
+          
+          // Delete the existing plan first to avoid duplicates
+          console.log('🗑️ Deleting existing plan before save:', existingPlan.id);
+          const deleteResult = await MealPlanAPI.deleteMealPlan(existingPlan.id);
+          if (!deleteResult.success) {
+            console.error('❌ Failed to delete existing plan for overwrite');
+            Alert.alert('Error', 'Could not overwrite existing meal plan. Please try again.');
+            setIsLoading(false);
+            return;
+          }
+          console.log('✅ Existing plan deleted, proceeding with save');
+          
+          // Ensure we don't have a currentPlanId set (this will be a new plan)
+          setCurrentPlanId(null);
+        }
+      }
+      
+      // 🔧 CHOOSE API CALL: Use update if we have currentPlanId, create if new plan
+      let result;
+      if (currentPlanId) {
+        console.log('🔄 Updating existing plan:', currentPlanId);
+        result = await MealPlanAPI.updateMealPlan(currentPlanId, days, mealPlanTitle);
+      } else {
+        console.log('➕ Creating new plan');
+        result = await MealPlanAPI.saveMealPlan(days, mealPlanTitle);
+      }
       
       if (result.success) {
         console.log('✅ Meal plan saved successfully! Plan ID:', result.planId);
         
-        // 🧹 CLEAN SLATE: Clear all conflicting local state after save
-        await clearAllLocalState();
-        console.log('🧹 Local state cleared after successful save');
+        // 🔧 DON'T CLEAR: Keep AsyncStorage so recipe addition can find the plan data
+        // await clearAllLocalState();
+        // console.log('🧹 Local state cleared after successful save');
+        
+        console.log('💾 Keeping AsyncStorage data for recipe addition compatibility');
         
         // Update the current plan ID so we can track this plan for future updates
         setCurrentPlanId(result.planId);
@@ -372,6 +515,17 @@ function MealPlanScreen({ navigation, route }) {
         setDays(compatibleDays);
         setMealPlanTitle(result.planName || result.planTitle || `Plan ${planId}`);
         setCurrentPlanId(planId); // Track the loaded plan
+        
+        // 🔧 FIX: Save loaded data to AsyncStorage so RecipeCollectionScreen can detect it
+        const asyncStorageData = {
+          mealPlan: compatibleDays,
+          lastUpdated: Date.now(),
+          isLocal: false, // This is from backend, not local
+          planId: planId  // Track which backend plan this is
+        };
+        
+        await AsyncStorage.setItem('localMealPlan', JSON.stringify(asyncStorageData));
+        console.log('💾 Loaded plan data saved to AsyncStorage for recipe adding compatibility');
         
         console.log('🎉 Meal plan loaded into mobile app!');
       } else {
@@ -458,8 +612,13 @@ function MealPlanScreen({ navigation, route }) {
     }
   };
 
-  const handleNew = () => {
+  const handleNew = async () => {
     console.log('➕ Creating new meal plan');
+    
+    // 🔧 FIX: Clear AsyncStorage to prevent stale data confusion
+    await clearAllLocalState();
+    console.log('🧹 Cleared stale AsyncStorage data for new plan');
+    
     setDays([
       {
         id: 1,
@@ -473,6 +632,7 @@ function MealPlanScreen({ navigation, route }) {
       }
     ]);
     setMealPlanTitle('New Meal Plan');
+    setCurrentPlanId(null); // Clear saved plan ID
   };
 
   const handleDelete = () => {
@@ -500,6 +660,10 @@ function MealPlanScreen({ navigation, route }) {
               
               if (result.success) {
                 console.log('✅ Meal plan deleted successfully');
+                
+                // 🔧 FIX: Clear AsyncStorage to prevent stale data confusion
+                await clearAllLocalState();
+                console.log('🧹 Cleared stale AsyncStorage data after delete');
                 
                 // Clear the current plan state
                 setCurrentPlanId(null);

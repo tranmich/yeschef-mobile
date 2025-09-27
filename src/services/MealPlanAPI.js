@@ -17,22 +17,25 @@ class MealPlanAPI {
    */
   static async saveMealPlan(mobileDays, planTitle, userId = null) {
     console.log('💾 Saving meal plan:', planTitle);
-    console.log('📱 Mobile data:', mobileDays);
     
     try {
       // Convert mobile format to NotionMealPlanner format
       const notionMealPlan = MobileMealPlanAdapter.mobileToNotion(mobileDays, planTitle);
-      console.log('🔄 Converted to Notion format for backend:', notionMealPlan);
+      console.log('🔄 Converted to Notion format for backend');
       
       // Prepare API request
       const requestData = {
         plan_name: planTitle,
         week_start_date: new Date().toISOString().split('T')[0], // Today's date
         meal_data: notionMealPlan,
-        plan_type: 'notion_style' // Indicate this is from the mobile app using notion format
+        plan_type: 'notion_style' // Specify format type for backend compatibility
       };
       
-      console.log('🌐 Sending to backend:', requestData);
+      console.log('🌐 Sending to backend:', {
+        plan_name: planTitle,
+        meal_data: '...',
+        plan_type: 'notion_style'
+      });
       
       // Make API call using YesChefAPI's debugFetch with auth headers
       const response = await YesChefAPI.debugFetch('/api/meal-plans', {
@@ -73,55 +76,51 @@ class MealPlanAPI {
   }
 
   /**
-   * Update an existing meal plan by ID
-   * Converts mobile format to NotionMealPlanner format for storage
+   * Update an existing meal plan on the backend
    */
   static async updateMealPlan(planId, mobileDays, planTitle = null) {
     console.log('🔄 Updating meal plan:', planId);
-    console.log('📱 Mobile data:', mobileDays);
     
     try {
       // Convert mobile format to NotionMealPlanner format
-      const notionMealPlan = MobileMealPlanAdapter.mobileToNotion(mobileDays, planTitle || 'Updated Plan');
-      console.log('🔄 Converted to Notion format for backend:', notionMealPlan);
+      const notionMealPlan = MobileMealPlanAdapter.mobileToNotion(mobileDays, planTitle);
       
-      // Prepare API request for update
       const requestData = {
         meal_data: notionMealPlan,
-        plan_type: 'notion_style' // Indicate this is from the mobile app using notion format
+        plan_type: 'notion_style'
       };
       
       if (planTitle) {
         requestData.plan_name = planTitle;
       }
       
-      console.log('🌐 Updating plan', planId, 'with:', requestData);
+      console.log('🌐 Updating plan', planId, 'with:', {
+        plan_name: planTitle || '(unchanged)',
+        meal_data: '...'
+      });
       
-      // Make API call to update existing plan
       const response = await YesChefAPI.debugFetch(`/api/meal-plans/${planId}`, {
-        method: 'PUT', // Use PUT for update
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...YesChefAPI.getAuthHeaders()
         },
         body: JSON.stringify(requestData)
       });
       
       const result = await response.json();
-      console.log('📡 Backend response:', result);
       
       if (result.success) {
-        console.log(`✅ Meal plan updated successfully: ${planId}`);
+        console.log('✅ Meal plan updated successfully:', planId);
         return {
           success: true,
-          planId: planId,
-          planName: result.plan_name || planTitle,
-          weekStartDate: result.week_start_date
+          planId: result.plan_id || planId
         };
       } else {
-        console.error('❌ Backend update failed:', result.error);
+        console.error('❌ Update failed:', result.error);
         return {
           success: false,
-          error: result.error || 'Backend update failed'
+          error: result.error || 'Unknown update error'
         };
       }
       
@@ -129,7 +128,7 @@ class MealPlanAPI {
       console.error('💥 Update meal plan error:', error);
       return {
         success: false,
-        error: error.message || 'Network error while updating'
+        error: error.message || 'Failed to update meal plan'
       };
     }
   }

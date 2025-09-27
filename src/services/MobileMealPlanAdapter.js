@@ -65,6 +65,7 @@ class MobileMealPlanAdapter {
       // Our simplified system stores recipes at day level, but backend stores in breakfast column
       const breakfastData = dayData['breakfast'] || [];
       console.log(`🔍 BACKEND BREAKFAST DEBUG for ${notionDay.name}:`, JSON.stringify(breakfastData, null, 2));
+      console.log(`🔍 FULL DAY DATA DEBUG for ${notionDay.name}:`, JSON.stringify(dayData, null, 2));
       
       const dayRecipes = MobileMealPlanAdapter.convertRecipesToMobileFormat(breakfastData);
       
@@ -280,7 +281,6 @@ class MobileMealPlanAdapter {
         // Add to breakfast column for backend storage
         notionData[dayId]['breakfast'] = dayRecipeObjects;
         console.log('🔄 DEBUG: Added', dayRecipeObjects.length, 'day recipes to breakfast column');
-        console.log('🔍 DETAILED DEBUG: Breakfast column data:', JSON.stringify(dayRecipeObjects, null, 2));
       }
 
       // Populate with mobile meal data (original meal-based logic)
@@ -304,7 +304,10 @@ class MobileMealPlanAdapter {
         console.log('🔄 DEBUG: Converted to recipe objects:', recipeObjects);
 
         if (notionData[dayId][columnId]) {
-          notionData[dayId][columnId] = recipeObjects; // Save full objects for compatibility
+          // 🔧 FIX: Append to existing data instead of overwriting (preserve day.recipes)
+          const existingRecipes = notionData[dayId][columnId] || [];
+          notionData[dayId][columnId] = [...existingRecipes, ...recipeObjects];
+          console.log(`🔧 MERGE DEBUG: Combined ${existingRecipes.length} existing + ${recipeObjects.length} meal = ${notionData[dayId][columnId].length} total recipes for ${columnId}`);
         }
       });
     });

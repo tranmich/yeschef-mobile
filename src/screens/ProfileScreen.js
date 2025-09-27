@@ -12,8 +12,10 @@ import {
   TextInput,
   ActivityIndicator,
   Platform,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Icon } from '../components/IconLibrary';
 import YesChefAPI from '../services/YesChefAPI';
 
@@ -23,14 +25,24 @@ export default function ProfileScreen({ navigation, user = null }) {
   const [profileData, setProfileData] = useState(null);
   const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [editingUsername, setEditingUsername] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showFirstDeleteModal, setShowFirstDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   // 🎯 Static background (matching other screens)
   const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/home_modern.jpg');
 
-  // 🔄 Load Profile Data
+  // 🔄 Load Profile Data on mount and when screen focuses
   useEffect(() => {
     loadProfileData();
   }, []);
+
+  // 🔄 Reload stats when screen comes into focus (real-time updates)
+  useFocusEffect(
+    React.useCallback(() => {
+      loadProfileData();
+    }, [])
+  );
 
   const loadProfileData = async () => {
     setIsLoading(true);
@@ -50,30 +62,14 @@ export default function ProfileScreen({ navigation, user = null }) {
       } else {
         console.error('❌ Profile load failed:', result.error);
         Alert.alert('Error', result.error || 'Failed to load profile data');
-        
-        // Fallback to mock data if API fails
-        const mockProfile = {
-          username: user?.email ? user.email.split('@')[0] + 'Chef' : 'YesChef User',
-          firstName: 'Not Set',
-          lastName: 'Not Set',
-          email: user?.email || 'user@example.com',
-          cookingLevel: 'Beginner',
-          householdSize: 2,
-          measurementUnits: 'Imperial',
-          profilePhotoUrl: null,
-          stats: {
-            recipesSaved: 0,
-            recipesShared: 0,
-            groceryListsCreated: 0,
-            friendsCount: 0
-          }
-        };
-        setProfileData(mockProfile);
-        setEditingUsername(mockProfile.username);
+        // No fallback - user must have valid API connection for real-time stats
+        return;
       }
     } catch (error) {
       console.error('❌ Profile load error:', error);
       Alert.alert('Error', 'Network error - check your connection');
+      // No mock data - require real API connection for authentic stats
+      return;
     } finally {
       setIsLoading(false);
     }
@@ -149,6 +145,70 @@ export default function ProfileScreen({ navigation, user = null }) {
   //  Handle Back Navigation
   const handleBack = () => {
     navigation.goBack();
+  };
+
+  // 🗑️ Handle Account Deletion
+  const handleDeleteAccount = () => {
+    setShowFirstDeleteModal(true);
+  };
+
+  const handleFirstDeleteModalCancel = () => {
+    setShowFirstDeleteModal(false);
+  };
+
+  const handleFirstDeleteModalConfirm = () => {
+    setShowFirstDeleteModal(false);
+    setDeleteConfirmText('');
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteModalConfirm = () => {
+    if (deleteConfirmText === 'DELETE') {
+      setShowDeleteModal(false);
+      executeAccountDeletion();
+    } else {
+      Alert.alert('Verification Failed', 'You must type "DELETE" exactly to confirm account deletion.');
+    }
+  };
+
+  const handleDeleteModalCancel = () => {
+    setShowDeleteModal(false);
+    setDeleteConfirmText('');
+  };
+
+  const executeAccountDeletion = async () => {
+    try {
+      setIsLoading(true);
+      
+      const result = await YesChefAPI.deleteAccount();
+      
+      if (result.success) {
+        Alert.alert(
+          'Account Deleted',
+          'Your account has been permanently deleted. Thank you for using YesChef!',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Clear auth data and navigate to login
+                YesChefAPI.clearAuthData();
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'Login' }]
+                });
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Error', result.error || 'Failed to delete account');
+      }
+    } catch (error) {
+      console.error('❌ Account deletion error:', error);
+      Alert.alert('Error', 'Network error - please try again');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isLoading) {
@@ -241,21 +301,30 @@ export default function ProfileScreen({ navigation, user = null }) {
           <View style={styles.infoCard}>
             <Text style={styles.cardTitle}>Personal Information</Text>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>First Name</Text>
-              <Text style={styles.infoValue}>{profileData?.firstName}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Last Name</Text>
-              <Text style={styles.infoValue}>{profileData?.lastName}</Text>
-            </View>
-            <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Email</Text>
               <Text style={styles.infoValue}>{profileData?.email}</Text>
             </View>
-            <TouchableOpacity style={styles.editInfoButton}>
-              <Text style={styles.editInfoButtonText}>Edit Information</Text>
-              <Icon name="chevron-right" size={16} color="#6b7280" />
-            </TouchableOpacity>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Date Joined</Text>
+              <Text style={styles.infoValue}>
+                {profileData?.created_at 
+                  ? new Date(profileData.created_at).toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'long' 
+                    })
+                  : 'September 2025'
+                }
+              </Text>
+            </View>
+            <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
+              <Text style={styles.infoLabel}>Account Type</Text>
+              <View style={styles.accountTypeContainer}>
+                <Text style={styles.accountTypeText}>Free Member</Text>
+                <View style={styles.freeBadge}>
+                  <Text style={styles.freeBadgeText}>FREE</Text>
+                </View>
+              </View>
+            </View>
           </View>
 
           {/* 📊 Your Culinary Journey Card */}
@@ -275,31 +344,10 @@ export default function ProfileScreen({ navigation, user = null }) {
                 <Text style={styles.statLabel}>Grocery Lists</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{profileData?.stats?.friendsCount || 0}</Text>
-                <Text style={styles.statLabel}>Friends</Text>
+                <Text style={styles.statNumber}>{profileData?.stats?.mealPlansCreated || 0}</Text>
+                <Text style={styles.statLabel}>Meal Plans</Text>
               </View>
             </View>
-          </View>
-
-          {/* 🍳 Cooking Preferences Card */}
-          <View style={styles.preferencesCard}>
-            <Text style={styles.cardTitle}>Cooking Preferences</Text>
-            <View style={styles.preferenceRow}>
-              <Text style={styles.preferenceLabel}>Cooking Level</Text>
-              <Text style={styles.preferenceValue}>{profileData?.cookingLevel}</Text>
-            </View>
-            <View style={styles.preferenceRow}>
-              <Text style={styles.preferenceLabel}>Household Size</Text>
-              <Text style={styles.preferenceValue}>{profileData?.householdSize} people</Text>
-            </View>
-            <View style={styles.preferenceRow}>
-              <Text style={styles.preferenceLabel}>Measurement Units</Text>
-              <Text style={styles.preferenceValue}>{profileData?.measurementUnits}</Text>
-            </View>
-            <TouchableOpacity style={styles.editPreferencesButton}>
-              <Text style={styles.editPreferencesButtonText}>Edit Preferences</Text>
-              <Icon name="chevron-right" size={16} color="#6b7280" />
-            </TouchableOpacity>
           </View>
 
           {/* 💳 Subscription Management Card */}
@@ -315,9 +363,114 @@ export default function ProfileScreen({ navigation, user = null }) {
             </TouchableOpacity>
           </View>
 
+          {/* 🗑️ Danger Zone Card */}
+          <View style={styles.dangerZoneCard}>
+            <Text style={styles.dangerZoneTitle}>Caution: Hot Surface</Text>
+            <Text style={styles.dangerZoneDescription}>
+              Once you delete your account, there is no going back. Please be certain.
+            </Text>
+            <TouchableOpacity style={styles.deleteAccountButton} onPress={handleDeleteAccount}>
+              <Icon name="delete" size={16} color="#ffffff" />
+              <Text style={styles.deleteAccountButtonText}>Delete Account</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Spacing at bottom */}
           <View style={styles.bottomSpacing} />
         </ScrollView>
+
+        {/* 🗑️ First Delete Account Confirmation Modal */}
+        <Modal
+          visible={showFirstDeleteModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={handleFirstDeleteModalCancel}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.firstDeleteModal}>
+              <Text style={styles.firstDeleteModalTitle}>Delete Account</Text>
+              <Text style={styles.firstDeleteModalDescription}>
+                Are you sure you want to permanently delete your account?
+              </Text>
+              
+              <View style={styles.warningSection}>
+                <Text style={styles.warningTitle}>⚠️ This action cannot be undone and will:</Text>
+                <View style={styles.warningList}>
+                  <Text style={styles.warningItem}>• Delete all your recipes and data</Text>
+                  <Text style={styles.warningItem}>• Remove your grocery lists and meal plans</Text>
+                  <Text style={styles.warningItem}>• Permanently close your account</Text>
+                </View>
+              </View>
+              
+              <View style={styles.firstDeleteModalButtons}>
+                <TouchableOpacity 
+                  style={styles.firstDeleteModalCancelButton} 
+                  onPress={handleFirstDeleteModalCancel}
+                >
+                  <Text style={styles.firstDeleteModalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.firstDeleteModalContinueButton} 
+                  onPress={handleFirstDeleteModalConfirm}
+                >
+                  <Text style={styles.firstDeleteModalContinueText}>Continue</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* 🗑️ Delete Account Confirmation Modal */}
+        <Modal
+          visible={showDeleteModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={handleDeleteModalCancel}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.deleteModal}>
+              <Text style={styles.deleteModalTitle}>Final Confirmation</Text>
+              <Text style={styles.deleteModalDescription}>
+                Type "DELETE" exactly to permanently delete your account:
+              </Text>
+              
+              <TextInput
+                style={styles.deleteModalInput}
+                value={deleteConfirmText}
+                onChangeText={setDeleteConfirmText}
+                placeholder="Type DELETE here"
+                autoFocus={true}
+                autoCapitalize="characters"
+              />
+              
+              <View style={styles.deleteModalButtons}>
+                <TouchableOpacity 
+                  style={styles.deleteModalCancelButton} 
+                  onPress={handleDeleteModalCancel}
+                >
+                  <Text style={styles.deleteModalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[
+                    styles.deleteModalConfirmButton,
+                    deleteConfirmText === 'DELETE' ? {} : styles.deleteModalConfirmButtonDisabled
+                  ]} 
+                  onPress={handleDeleteModalConfirm}
+                  disabled={deleteConfirmText !== 'DELETE'}
+                >
+                  <Text style={[
+                    styles.deleteModalConfirmText,
+                    deleteConfirmText === 'DELETE' ? {} : styles.deleteModalConfirmTextDisabled
+                  ]}>
+                    Delete Account
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </ImageBackground>
   );
@@ -544,19 +697,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  preferencesCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    margin: 16,
-    marginTop: 8,
-    marginBottom: 8,
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
   subscriptionCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     margin: 16,
@@ -596,20 +736,29 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito-Regular',
     color: '#111827',
   },
-  editInfoButton: {
+  accountTypeContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    backgroundColor: '#f9fafb',
-    borderRadius: 8,
-    marginTop: 12,
   },
-  editInfoButtonText: {
+  accountTypeText: {
     fontSize: 16,
     fontFamily: 'Nunito-Regular',
-    color: '#10b981',
+    color: '#111827',
+    marginRight: 8,
+  },
+  freeBadge: {
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  freeBadgeText: {
+    fontSize: 11,
+    fontFamily: 'Nunito-ExtraBold',
+    color: '#166534',
+    letterSpacing: 0.5,
   },
 
   // Stats Card Styles
@@ -637,41 +786,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito-Regular',
     color: '#6b7280',
     textAlign: 'center',
-  },
-
-  // Preferences Card Styles
-  preferenceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  preferenceLabel: {
-    fontSize: 16,
-    fontFamily: 'Nunito-Regular',
-    color: '#6b7280',
-  },
-  preferenceValue: {
-    fontSize: 16,
-    fontFamily: 'Nunito-Regular',
-    color: '#111827',
-  },
-  editPreferencesButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    backgroundColor: '#f9fafb',
-    borderRadius: 8,
-    marginTop: 12,
-  },
-  editPreferencesButtonText: {
-    fontSize: 16,
-    fontFamily: 'Nunito-Regular',
-    color: '#10b981',
   },
 
   // Subscription Card Styles
@@ -703,6 +817,249 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Nunito-ExtraBold',
     color: '#ffffff',
+  },
+
+  // Danger Zone Card Styles
+  dangerZoneCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    margin: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#fecaca',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  dangerZoneTitle: {
+    fontSize: 18,
+    fontFamily: 'Nunito-ExtraBold',
+    color: '#dc2626',
+    marginBottom: 8,
+  },
+  dangerZoneDescription: {
+    fontSize: 14,
+    fontFamily: 'Nunito-Regular',
+    color: '#6b7280',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  deleteAccountButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: '#dc2626',
+    borderRadius: 8,
+    gap: 8,
+  },
+  deleteAccountButtonText: {
+    fontSize: 14,
+    fontFamily: 'Nunito-ExtraBold',
+    color: '#ffffff',
+  },
+
+  // Delete Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  firstDeleteModal: {
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderRadius: 16,
+    padding: 28,
+    width: '100%',
+    maxWidth: 380,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  firstDeleteModalTitle: {
+    fontSize: 24,
+    fontFamily: 'Nunito-ExtraBold',
+    color: '#dc2626',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  firstDeleteModalDescription: {
+    fontSize: 18,
+    fontFamily: 'Nunito-Regular',
+    color: '#374151',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 26,
+  },
+  warningSection: {
+    backgroundColor: 'rgba(254, 202, 202, 0.3)',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  warningTitle: {
+    fontSize: 16,
+    fontFamily: 'Nunito-ExtraBold',
+    color: '#dc2626',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  warningList: {
+    paddingLeft: 8,
+  },
+  warningItem: {
+    fontSize: 15,
+    fontFamily: 'Nunito-Regular',
+    color: '#374151',
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  firstDeleteModalButtons: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  firstDeleteModalCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    backgroundColor: 'rgba(243, 244, 246, 0.95)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  firstDeleteModalCancelText: {
+    fontSize: 16,
+    fontFamily: 'Nunito-ExtraBold',
+    color: '#374151',
+    textAlign: 'center',
+  },
+  firstDeleteModalContinueButton: {
+    flex: 1,
+    paddingVertical: 14,
+    backgroundColor: '#dc2626',
+    borderRadius: 12,
+    shadowColor: '#dc2626',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  firstDeleteModalContinueText: {
+    fontSize: 16,
+    fontFamily: 'Nunito-ExtraBold',
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  deleteModal: {
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderRadius: 16,
+    padding: 28,
+    width: '100%',
+    maxWidth: 380,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  deleteModalTitle: {
+    fontSize: 24,
+    fontFamily: 'Nunito-ExtraBold',
+    color: '#dc2626',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  deleteModalDescription: {
+    fontSize: 16,
+    fontFamily: 'Nunito-Regular',
+    color: '#374151',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  deleteModalInput: {
+    fontSize: 18,
+    fontFamily: 'Nunito-Regular',
+    color: '#111827',
+    backgroundColor: 'rgba(249, 250, 251, 0.95)',
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    marginBottom: 28,
+    textAlign: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  deleteModalCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    backgroundColor: 'rgba(243, 244, 246, 0.95)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  deleteModalCancelText: {
+    fontSize: 16,
+    fontFamily: 'Nunito-ExtraBold',
+    color: '#374151',
+    textAlign: 'center',
+  },
+  deleteModalConfirmButton: {
+    flex: 1,
+    paddingVertical: 14,
+    backgroundColor: '#dc2626',
+    borderRadius: 12,
+    shadowColor: '#dc2626',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  deleteModalConfirmButtonDisabled: {
+    backgroundColor: '#d1d5db',
+    shadowOpacity: 0.1,
+    elevation: 2,
+  },
+  deleteModalConfirmText: {
+    fontSize: 16,
+    fontFamily: 'Nunito-ExtraBold',
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  deleteModalConfirmTextDisabled: {
+    color: '#9ca3af',
   },
 
   bottomSpacing: {
