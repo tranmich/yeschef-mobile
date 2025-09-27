@@ -5,10 +5,9 @@ import * as SecureStore from 'expo-secure-store';
 
 class YesChefAPI {
   constructor() {
-    // 🔧 IMPORTANT: Update this to your computer's IP address!
-    // Your backend is running on: http://192.168.1.72:5000
-    this.baseURL = 'http://192.168.1.72:5000'; // Use your computer's IP
-    // this.baseURL = 'http://localhost:5000'; // Only works in web browser
+    // � PRODUCTION: Use live Railway deployment URL
+    this.baseURL = 'https://yeschefapp-production.up.railway.app';
+    // this.baseURL = 'http://192.168.1.72:5000'; // Local development
     
     this.token = null;
     this.user = null;
@@ -113,6 +112,45 @@ class YesChefAPI {
       }
     } catch (error) {
       this.error('Login error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  // Google Sign-In authentication
+  async googleSignIn(googleUser) {
+    this.log('🔐 Attempting Google Sign-In for:', googleUser.email);
+    try {
+      const response = await this.debugFetch('/api/auth/google', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          google_id: googleUser.id,
+          email: googleUser.email,
+          name: googleUser.name,
+          photo: googleUser.picture, // Different field name in Google API v2
+        }),
+      });
+
+      const data = await response.json();
+      this.log('Google Sign-In response data:', data);
+      
+      if (response.ok) {
+        this.token = data.access_token;
+        this.user = data.user;
+        
+        // Store securely for persistence
+        await this.storeAuthData(data);
+        this.log('✅ Google Sign-In successful!');
+        
+        return { success: true, user: data.user };
+      } else {
+        this.error('Google Sign-In failed:', data);
+        return { success: false, error: data.error || 'Google sign-in failed' };
+      }
+    } catch (error) {
+      this.error('Google Sign-In error:', error);
       return { success: false, error: 'Network error - check connection' };
     }
   }
@@ -866,13 +904,6 @@ class YesChefAPI {
       
       if (response.success) {
         this.log('✅ Profile updated successfully!');
-        
-        // If username/name was updated, also update user's recipes
-        if (profileData.name || profileData.username) {
-          this.log('📝 Username changed - updating user recipes...');
-          await this.updateUserRecipes(profileData.name || profileData.username);
-        }
-        
         return response;
       } else {
         this.error('Update profile failed:', response.error);
@@ -884,26 +915,7 @@ class YesChefAPI {
     }
   }
 
-  async updateUserRecipes(newUsername) {
-    this.log('Updating user recipes with new username:', newUsername);
-    try {
-      const response = await this.put('/api/profile/update-recipes', { 
-        username: newUsername 
-      });
-      
-      if (response.success) {
-        this.log('✅ User recipes updated successfully!');
-      } else {
-        this.log('⚠️ Recipe update failed (may not be implemented):', response.error);
-      }
-      
-      return response;
-    } catch (error) {
-      this.log('⚠️ Recipe update error (backend may not support this):', error);
-      return { success: false, error: 'Recipe update not supported' };
-    }
-  }
-
+  // 📊 Get User Statistics
   async getUserStats() {
     this.log('Getting user statistics...');
     try {
@@ -978,6 +990,39 @@ class YesChefAPI {
       }
     } catch (error) {
       this.error('Username check error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  // 🗑️ Delete user account permanently
+  async deleteAccount() {
+    this.log('🗑️ Initiating account deletion...');
+    
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Authentication required' };
+    }
+
+    try {
+      const response = await this.debugFetch('/api/auth/delete-account', {
+        method: 'DELETE',
+        headers: this.getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        this.log('✅ Account deleted successfully');
+        
+        // Clear all auth data after successful deletion
+        await this.clearAuthData();
+        
+        return { success: true, ...data };
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        this.error('❌ Account deletion failed:', response.status, errorData);
+        return { success: false, error: errorData.error || `Failed to delete account (HTTP ${response.status})` };
+      }
+    } catch (error) {
+      this.error('Account deletion error:', error);
       return { success: false, error: 'Network error - check connection' };
     }
   }
