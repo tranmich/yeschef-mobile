@@ -155,6 +155,68 @@ class YesChefAPI {
     }
   }
 
+  // Forgot Password
+  async forgotPassword(email) {
+    this.log('🔑 Requesting password reset for:', email);
+    try {
+      const response = await this.debugFetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+      this.log('Forgot password response:', data);
+      
+      if (response.ok) {
+        this.log('✅ Password reset request successful!');
+        return { success: true, message: data.message };
+      } else {
+        this.error('Forgot password failed:', data);
+        return { success: false, error: data.error || 'Failed to send reset link' };
+      }
+    } catch (error) {
+      this.error('Forgot password error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  // User Registration
+  async register(name, email, password) {
+    this.log('📝 Attempting registration for:', email);
+    try {
+      const response = await this.debugFetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, email, password }),
+      });
+
+      const data = await response.json();
+      this.log('Registration response data:', data);
+      
+      if (response.ok) {
+        this.token = data.access_token;
+        this.user = data.user;
+        
+        // Store securely for persistence
+        await this.storeAuthData(data);
+        this.log('✅ Registration successful!');
+        
+        return { success: true, user: data.user };
+      } else {
+        this.error('Registration failed:', data);
+        return { success: false, error: data.error || 'Registration failed' };
+      }
+    } catch (error) {
+      this.error('Registration error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
   async logout() {
     this.log('Logging out and clearing all auth data...');
     
