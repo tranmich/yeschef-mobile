@@ -9,18 +9,20 @@ import SimpleErrorBoundary from './src/components/SimpleErrorBoundary';
 import DevConsole from './src/components/DevConsole';
 import { Icon, IconButton } from './src/components/IconLibrary';
 import { ThemedText, typography, loadFonts } from './src/components/Typography';
+import { PremiumProvider } from './src/contexts/PremiumContext';
 
 // Import our screens
 import GroceryListScreen from './src/screens/GroceryListScreen';
 import RecipeViewScreen from './src/screens/RecipeViewScreen';
 import RecipeCollectionScreen from './src/screens/RecipeCollectionScreen';
+import RecipeImportReviewScreen from './src/screens/RecipeImportReviewScreen';
 import MealPlanScreen from './src/screens/MealPlanScreen';
 import FriendsScreen from './src/screens/FriendsScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import CommunityRecipeDetailScreen from './src/screens/CommunityRecipeDetailScreen';
 import UserCommunityPostsScreen from './src/screens/UserCommunityPostsScreen';
-import DebugScreen from './src/screens/DebugScreen';
+// DebugScreen removed
 import DragTestScreen from './src/screens/DragTestScreen';
 import LoginScreen from './src/screens/LoginScreen';
 
@@ -112,6 +114,11 @@ function RecipeStack() {
           component={RecipeViewScreen}
           options={{ headerShown: false }}
         />
+        <Stack.Screen 
+          name="RecipeImportReview" 
+          component={RecipeImportReviewScreen}
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     </SimpleErrorBoundary>
   );
@@ -192,17 +199,13 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false); // Added missing state variable
   const [fontsLoaded, setFontsLoaded] = useState(false);
 
-  // Background images array (same as login screen)
+  // Use consistent mint background across all screens
   const backgroundImages = [
-    require('./assets/images/backgrounds/login_background_avocado.jpg'),
-    require('./assets/images/backgrounds/login_background_fig.jpg'),
-    require('./assets/images/backgrounds/login_background_lemon.jpg'),
-    require('./assets/images/backgrounds/login_background_pasta.jpg'),
-    require('./assets/images/backgrounds/login_background_tomato.jpg'),
+    require('./assets/images/backgrounds/mintbackground.jpg'),
   ];
 
-  // Randomly select a background image
-  const randomBackground = backgroundImages[Math.floor(Math.random() * backgroundImages.length)];
+  // Use the consistent mint background (no random selection)
+  const randomBackground = backgroundImages[0];
 
   // 🚨 Initialize simple logging for React Native + Load fonts
   useEffect(() => {
@@ -298,7 +301,7 @@ export default function App() {
 
   // Show main app if authenticated
   return (
-    // <DevConsole> {/* Temporarily disabled to fix React error */}
+    <PremiumProvider>
       <SimpleErrorBoundary>
         <GestureHandlerRootView style={{ flex: 1 }}>
         <NavigationContainer>
@@ -396,26 +399,12 @@ export default function App() {
           }}
         />
         
-        {/* #6 DEBUG - Development Testing (Hidden unless scrolled) */}
-        <Tab.Screen 
-          name="Debug"
-          options={{
-            title: 'Debug',
-            tabBarIcon: ({ color, size, focused }) => (
-              <Icon 
-                name={focused ? 'debugTabFilled' : 'debugTab'} 
-                size={size} 
-                color={color}
-              />
-            ),
-          }}
-        >
-          {() => <DebugScreen user={user} onLogout={handleLogout} />}
-        </Tab.Screen>
+        {/* Debug tab removed for cleaner navigation */}
       </Tab.Navigator>
     </NavigationContainer>
     </GestureHandlerRootView>
     </SimpleErrorBoundary>
+    </PremiumProvider>
   );
 }
 

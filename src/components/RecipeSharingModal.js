@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,40 +11,67 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from './IconLibrary';
+import { getCommunityBackgroundColor, getBackgroundOptions, getIconOptions } from '../utils/communityStyles';
+import { usePremiumFeature } from '../hooks/usePremiumFeature';
 
 const RecipeSharingModal = ({ visible, recipe, onClose, onShare }) => {
-  const [communityTitle, setCommunityTitle] = useState(recipe?.title || '');
-  const [communityDescription, setCommunityDescription] = useState(recipe?.description || '');
+  const [communityTitle, setCommunityTitle] = useState('');
+  const [communityDescription, setCommunityDescription] = useState('');
   const [selectedBackground, setSelectedBackground] = useState('default');
   const [selectedIcon, setSelectedIcon] = useState('🍽️');
   const [isSharing, setIsSharing] = useState(false);
 
-  // Background options (simple for Phase 1)
-  const backgroundOptions = [
-    { id: 'default', name: 'Classic', color: '#f8fafc' },
-    { id: 'warm', name: 'Warm', color: '#fef3e2' },
-    { id: 'fresh', name: 'Fresh', color: '#f0fdf4' },
-    { id: 'elegant', name: 'Elegant', color: '#faf7ff' },
-  ];
+  // 🌟 Premium feature hook for recipe sharing
+  const { requirePremium } = usePremiumFeature('recipe_sharing', 'Recipe Sharing');
 
-  // Icon options (simple emoji selection)
-  const iconOptions = ['🍽️', '🍝', '🍕', '🌮', '🍗', '🥗', '🍰', '☕'];
+  // 🔄 Update form fields when recipe changes
+  useEffect(() => {
+    if (recipe) {
+      console.log('🔄 Loading recipe data for sharing:', {
+        id: recipe.id,
+        title: recipe.title,
+        description: recipe.description
+      });
+      setCommunityTitle(recipe.title || '');
+      setCommunityDescription(recipe.description || '');
+    } else {
+      // Reset form when no recipe is selected
+      setCommunityTitle('');
+      setCommunityDescription('');
+      setSelectedBackground('default');
+      setSelectedIcon('🍽️');
+    }
+  }, [recipe]);
+
+  // Background and icon options from utility
+  const backgroundOptions = getBackgroundOptions();
+  const iconOptions = getIconOptions();
 
   const handleShare = async () => {
+    // 🌟 Check premium access before allowing share
+    requirePremium(() => {
+      performShare();
+    });
+  };
+
+  const performShare = async () => {
     if (!communityTitle.trim()) {
       Alert.alert('Missing Title', 'Please add a title for your shared recipe.');
       return;
     }
 
+    const shareData = {
+      community_title: communityTitle.trim(),
+      community_description: communityDescription.trim(),
+      community_background: selectedBackground,
+      community_icon: selectedIcon,
+    };
+
+    console.log('📤 Sharing recipe with data:', shareData);
     setIsSharing(true);
     
     try {
-      await onShare({
-        community_title: communityTitle.trim(),
-        community_description: communityDescription.trim(),
-        community_background: selectedBackground,
-        community_icon: selectedIcon,
-      });
+      await onShare(shareData);
       onClose();
     } catch (error) {
       Alert.alert('Error', 'Failed to share recipe. Please try again.');
@@ -81,7 +108,7 @@ const RecipeSharingModal = ({ visible, recipe, onClose, onShare }) => {
 
           <ScrollView style={styles.content}>
           {/* Recipe Preview */}
-          <View style={[styles.previewCard, { backgroundColor: backgroundOptions.find(b => b.id === selectedBackground)?.color }]}>
+          <View style={[styles.previewCard, { backgroundColor: getCommunityBackgroundColor(selectedBackground) }]}>
             <Text style={styles.previewIcon}>{selectedIcon}</Text>
             <Text style={styles.previewTitle}>{communityTitle || 'Recipe Title'}</Text>
             <Text style={styles.previewDescription}>
@@ -118,7 +145,7 @@ const RecipeSharingModal = ({ visible, recipe, onClose, onShare }) => {
           {/* Background Selection */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Background Theme</Text>
-            <View style={styles.optionsGrid}>
+            <View style={styles.backgroundGrid}>
               {backgroundOptions.map((bg) => (
                 <TouchableOpacity
                   key={bg.id}
@@ -138,7 +165,15 @@ const RecipeSharingModal = ({ visible, recipe, onClose, onShare }) => {
           {/* Icon Selection */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Recipe Icon</Text>
-            <View style={styles.optionsGrid}>
+            <Text style={styles.sectionSubtitle}>Choose from 48 food emojis • Swipe left and right to browse →</Text>
+            <ScrollView 
+              horizontal
+              style={styles.iconScrollView}
+              contentContainerStyle={styles.iconHorizontalGrid}
+              showsHorizontalScrollIndicator={false}
+              decelerationRate="fast"
+              snapToInterval={60} // Snap to each icon for better UX
+            >
               {iconOptions.map((icon) => (
                 <TouchableOpacity
                   key={icon}
@@ -151,7 +186,7 @@ const RecipeSharingModal = ({ visible, recipe, onClose, onShare }) => {
                   <Text style={styles.iconText}>{icon}</Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
           </View>
         </ScrollView>
         </View>
@@ -243,6 +278,12 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     marginBottom: 12,
   },
+  sectionSubtitle: {
+    fontSize: 14,
+    fontFamily: 'Nunito-Regular',
+    color: '#6b7280',
+    marginBottom: 12,
+  },
   textInput: {
     borderWidth: 1,
     borderColor: '#d1d5db',
@@ -256,41 +297,79 @@ const styles = StyleSheet.create({
     height: 80,
     textAlignVertical: 'top',
   },
+  backgroundGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  iconGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  iconHorizontalGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  iconScrollContainer: {
+    height: 160, // Fixed height for scrollable area
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    backgroundColor: '#f9fafb',
+  },
+  iconScrollView: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    paddingVertical: 8,
+    maxHeight: 68, // Just enough for one row of icons
+  },
   optionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
   },
   backgroundOption: {
-    flex: 1,
-    minWidth: 80,
-    padding: 16,
+    width: '30%', // 3 per row for backgrounds
+    aspectRatio: 2,
+    padding: 12,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#e5e7eb',
+    marginBottom: 8,
   },
   iconOption: {
-    width: 60,
-    height: 60,
+    width: 52, // Fixed width for horizontal scrolling
+    height: 52, // Fixed height for consistent appearance
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#e5e7eb',
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#ffffff',
+    marginHorizontal: 2, // Small spacing between icons
   },
   selectedOption: {
     borderColor: '#10b981',
     borderWidth: 2,
   },
   backgroundName: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: 'Nunito-Regular',
     color: '#374151',
+    textAlign: 'center',
   },
   iconText: {
-    fontSize: 24,
+    fontSize: 22, // Slightly larger for better visibility in horizontal scroll
   },
 });
 

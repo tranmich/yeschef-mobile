@@ -16,6 +16,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Icon } from '../components/IconLibrary';
 import { ThemedText } from '../components/Typography';
 import YesChefAPI from '../services/YesChefAPI';
+import { getCommunityBackgroundColor } from '../utils/communityStyles';
 
 export default function HomeScreen({ navigation, user = null, onLogout = null }) {
   // 📱 UI State
@@ -35,12 +36,9 @@ export default function HomeScreen({ navigation, user = null, onLogout = null })
   // Animation values
   const [overlayAnimation] = useState(new Animated.Value(0));
 
-  // 🎯 Static background (no cycling) - easily changeable at the top of this file
-  const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/home_modern.jpg');
-  // const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/home_green.jpg');
-  // const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/home_orange.jpg');
-  // const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/home_retro.jpg');
-  // const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/home_yellow.jpg');
+  // 🎯 Static background - using mint background
+  const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/mintbackground.jpg');
+
 
   // 🖱️ Handle background tap (close options menu)
   const handleBackgroundTap = () => {
@@ -107,6 +105,15 @@ export default function HomeScreen({ navigation, user = null, onLogout = null })
       const response = await YesChefAPI.get('/api/community/recipes?limit=10&sort=recent');
       
       if (response.success) {
+        console.log('✅ Community recipes loaded:', {
+          count: response.recipes?.length || 0,
+          sample_recipe: response.recipes?.[0] ? {
+            id: response.recipes[0].id,
+            community_title: response.recipes[0].community_title,
+            community_background: response.recipes[0].community_background,
+            community_icon: response.recipes[0].community_icon
+          } : null
+        });
         setCommunityRecipes(response.recipes || []);
       } else {
         console.error('Failed to load community recipes:', response.error);
@@ -250,8 +257,7 @@ export default function HomeScreen({ navigation, user = null, onLogout = null })
         style={styles.backgroundImage}
         resizeMode="cover"
       >
-        {/* 🌫️ Opaque White Overlay */}
-        <View style={styles.whiteOverlay} />
+        {/* 🌫️ White overlay removed to show mint background */}
 
         {/* 📱 Top Status Bar Background - matches GroceryListScreen */}
         <View style={styles.topStatusBarOverlay} />
@@ -281,7 +287,7 @@ export default function HomeScreen({ navigation, user = null, onLogout = null })
                 onPress={handleMyCommunityPosts}
               >
                 <Icon name="community" size={16} color="#10b981" />
-                <Text style={[styles.menuOptionText, { color: '#10b981' }]}>My Community Posts</Text>
+                <Text style={[styles.menuOptionText, { color: '#10b981' }]}>My Posts</Text>
               </TouchableOpacity>
               
               <View style={styles.menuDivider} />
@@ -338,21 +344,26 @@ export default function HomeScreen({ navigation, user = null, onLogout = null })
                     ))
                   ) : communityRecipes.length > 0 ? (
                     // Real community recipes data
-                    communityRecipes.map((recipe) => (
-                      <TouchableOpacity 
-                        key={recipe.id} 
-                        style={styles.recipeHomeCard}
-                        onPress={() => handleCommunityRecipePress(recipe)}
-                      >
-                        <Text style={styles.recipeHomeImage}>{recipe.community_icon || recipe.image}</Text>
-                        <Text style={styles.recipeHomeTitle}>{recipe.community_title || recipe.title}</Text>
-                        <Text style={styles.recipeHomeUser}>by {recipe.display_name || recipe.author_name || recipe.shared_by || recipe.user || 'Unknown Chef'}</Text>
-                        <View style={styles.recipeHomeLikes}>
-                          <Icon name="heart" size={12} color="#EF4444" />
-                          <Text style={styles.likesHomeText}>{recipe.likes || 0}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))
+                    communityRecipes.map((recipe) => {
+                      // 🎨 Get background color from community_background
+                      const backgroundColor = getCommunityBackgroundColor(recipe.community_background);
+                      
+                      return (
+                        <TouchableOpacity 
+                          key={recipe.id} 
+                          style={[styles.recipeHomeCard, { backgroundColor }]}
+                          onPress={() => handleCommunityRecipePress(recipe)}
+                        >
+                          <Text style={styles.recipeHomeImage}>{recipe.community_icon || recipe.image}</Text>
+                          <Text style={styles.recipeHomeTitle}>{recipe.community_title || recipe.title}</Text>
+                          <Text style={styles.recipeHomeUser}>by {recipe.display_name || recipe.author_name || recipe.shared_by || recipe.user || 'Unknown Chef'}</Text>
+                          <View style={styles.recipeHomeLikes}>
+                            <Icon name="heart" size={12} color="#EF4444" />
+                            <Text style={styles.likesHomeText}>{recipe.likes || 0}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })
                   ) : (
                     // Empty state
                     <View style={styles.emptyState}>
@@ -421,16 +432,7 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
 
-  // 🌫️ White Opaque Overlay (matches GroceryListScreen)
-  whiteOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)', // White opaque overlay for readability
-    zIndex: 1,
-  },
+  // 🌫️ Removed white overlay to show mint background
 
   // 🖱️ Background Tap Area
   backgroundTapArea: {
@@ -449,7 +451,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 50, // Enough to cover status bar area
-    backgroundColor: 'rgba(255, 255, 255, 0.95)', // More opaque for better status bar visibility
+    backgroundColor: 'rgba(255,255,255, 0)', // Let mint background show through
     zIndex: 3, // Above main overlay to ensure status bar area is clearly visible
   },  // 🔧 Floating 3-Dot Menu Container  
   floatingMenuContainer: {
@@ -475,7 +477,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 45,
     right: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)', // Keep options menu opaque for readability
     borderRadius: 12,
     padding: 8,
     minWidth: 140,
@@ -532,7 +534,7 @@ const styles = StyleSheet.create({
 
   // 🎨 Section Containers (New visual consistency) - subtle shadows like GroceryListScreen
   sectionContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: 'rgba(255,255,255, 0.95)', // Let mint background show through
     borderRadius: 16,
     marginHorizontal: 20,
     marginBottom: 20,
@@ -565,7 +567,7 @@ const styles = StyleSheet.create({
   refreshButton: {
     padding: 8,
     borderRadius: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)', // Subtle transparency
   },
   
   homeSectionTitle: {

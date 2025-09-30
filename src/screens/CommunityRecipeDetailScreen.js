@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 import YesChefAPI from '../services/YesChefAPI';
 import { Icon } from '../components/IconLibrary';
+import { getCommunityBackgroundColor } from '../utils/communityStyles';
 
 const CommunityRecipeDetailScreen = ({ route, navigation }) => {
   const { communityRecipe } = route.params;
@@ -335,7 +336,12 @@ const CommunityRecipeDetailScreen = ({ route, navigation }) => {
         </View>
 
         {/* Community Recipe Title Section */}
-        <View style={styles.titleSection}>
+        <View style={[
+          styles.titleSection,
+          {
+            backgroundColor: getCommunityBackgroundColor(recipe.community_background)
+          }
+        ]}>
           <Text style={styles.communityIcon}>{recipe.community_icon || '🍽️'}</Text>
           <Text style={styles.title}>{recipe.community_title || recipe.title}</Text>
           <Text style={styles.sharedBy}>Shared by {recipe.shared_by || recipe.user}</Text>

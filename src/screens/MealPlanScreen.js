@@ -32,7 +32,7 @@ import { LocalDataStatus, DraftPicker } from '../components/LocalDataStatus';
 
 function MealPlanScreen({ navigation, route }) {
   // 🎨 Background Configuration (matches HomeScreen)
-  const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/home_green.jpg');
+  const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/mintbackground.jpg');
   
   // Main meal plan state
   const [mealPlanTitle, setMealPlanTitle] = useState('Weekly Meal Plan');
@@ -1365,12 +1365,12 @@ function MealPlanScreen({ navigation, route }) {
           
           <TouchableOpacity style={styles.menuItem} onPress={() => { setShowOptionsMenu(false); handleNew(); }}>
             <Icon name="add" size={18} color="#E7993F" style={{marginRight: 12}} />
-            <Text style={styles.menuText}>New</Text>
+            <Text style={styles.menuText}>New List</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.menuItem} onPress={() => { setShowOptionsMenu(false); handleAddDay(); }}>
             <Icon name="add" size={18} color="#7C3AED" style={{marginRight: 12}} />
-            <Text style={styles.menuText}>Day</Text>
+            <Text style={styles.menuText}>Add Day</Text>
           </TouchableOpacity>
           
           <View style={styles.menuDivider} />
@@ -1743,7 +1743,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)', // White opaque overlay for readability
+    backgroundColor: 'transparent', // Let mint background show through
     zIndex: 1,
   },
   topStatusBarOverlay: {
@@ -1752,7 +1752,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 50, // Enough to cover status bar area
-    backgroundColor: 'rgba(255, 255, 255, 0.95)', // More opaque for better status bar visibility
+    backgroundColor: 'transparent', // Let mint background show through
     zIndex: 3, // Above main overlay to ensure status bar area is clearly visible
   },
   

@@ -18,6 +18,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Icon } from '../components/IconLibrary';
 import YesChefAPI from '../services/YesChefAPI';
+import ProfileIconCreatorScreen from './ProfileIconCreatorScreen';
+import ProfileAvatar from '../components/ProfileAvatar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import PremiumStatus from '../components/PremiumStatus';
+import { RevenueCatValidator } from '../utils/RevenueCatValidator';
+import RevenueCatService from '../services/RevenueCatServiceMock'; // For mock premium toggle
 
 export default function ProfileScreen({ navigation, user = null }) {
   // 📱 UI State
@@ -28,9 +34,12 @@ export default function ProfileScreen({ navigation, user = null }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showFirstDeleteModal, setShowFirstDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [showAvatarCreator, setShowAvatarCreator] = useState(false);
+  const [userProfile, setUserProfile] = useState({ background: 'default', icon: '🍎' });
+  const [avatarLoading, setAvatarLoading] = useState(true);
 
   // 🎯 Static background (matching other screens)
-  const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/home_modern.jpg');
+  const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/mintbackground.jpg');
 
   // 🔄 Load Profile Data on mount and when screen focuses
   useEffect(() => {
@@ -44,24 +53,44 @@ export default function ProfileScreen({ navigation, user = null }) {
     }, [])
   );
 
+  // 🔍 Debug: Track avatar changes
+  useEffect(() => {
+    console.log('👤 User profile state changed:', userProfile);
+  }, [userProfile]);
+
   const loadProfileData = async () => {
     setIsLoading(true);
     try {
       console.log('🔄 Loading profile data from API...');
-      const result = await YesChefAPI.getProfile();
       
-      if (result.success) {
-        console.log('✅ Profile data loaded:', result.profile);
+      // Load profile data first
+      const profileResult = await YesChefAPI.getProfile();
+      
+      if (profileResult.success) {
+        console.log('✅ Profile data loaded:', profileResult.profile);
+        
         // Use name field as username since backend username field isn't updating properly
         const profileWithFixedUsername = {
-          ...result.profile,
-          username: result.profile.name || result.profile.username || 'YesChef User'
+          ...profileResult.profile,
+          username: profileResult.profile.name || profileResult.profile.username || 'YesChef User'
         };
         setProfileData(profileWithFixedUsername);
         setEditingUsername(profileWithFixedUsername.username);
+        
+        // Check if profile includes avatar data
+        if (profileResult.profile.avatar) {
+          console.log('🎨 Found avatar data in profile:', profileResult.profile.avatar);
+          setUserProfile(profileResult.profile.avatar);
+          
+          // Update local storage with backend data
+          await AsyncStorage.setItem('userProfileAvatar', JSON.stringify(profileResult.profile.avatar));
+        } else {
+          // Load avatar separately if not in profile
+          await loadAvatarData();
+        }
       } else {
-        console.error('❌ Profile load failed:', result.error);
-        Alert.alert('Error', result.error || 'Failed to load profile data');
+        console.error('❌ Profile load failed:', profileResult.error);
+        Alert.alert('Error', profileResult.error || 'Failed to load profile data');
         // No fallback - user must have valid API connection for real-time stats
         return;
       }
@@ -211,6 +240,128 @@ export default function ProfileScreen({ navigation, user = null }) {
     }
   };
 
+  // 🎨 Avatar Save Handler
+  const handleAvatarSave = async (avatarData) => {
+    try {
+      console.log('🎨 Saving avatar data to backend:', avatarData);
+      
+      // Save to backend API
+      const result = await YesChefAPI.saveProfileAvatar(avatarData);
+      
+      if (result.success) {
+        console.log('✅ Avatar saved to backend successfully!');
+        
+        // Update local state
+        setUserProfile(avatarData);
+        
+        // Also save to AsyncStorage as backup
+        await AsyncStorage.setItem('userProfileAvatar', JSON.stringify(avatarData));
+        console.log('💾 Avatar also saved to local storage as backup');
+        
+        Alert.alert('Success', 'Your avatar has been updated and saved!');
+      } else {
+        console.error('❌ Backend save failed:', result.error);
+        
+        // Fallback to local storage if backend fails
+        await AsyncStorage.setItem('userProfileAvatar', JSON.stringify(avatarData));
+        setUserProfile(avatarData);
+        
+        Alert.alert('Saved Locally', 'Avatar saved locally. It will sync when connection is restored.');
+      }
+    } catch (error) {
+      console.error('❌ Failed to save avatar:', error);
+      
+      // Fallback to local storage on error
+      try {
+        await AsyncStorage.setItem('userProfileAvatar', JSON.stringify(avatarData));
+        setUserProfile(avatarData);
+        Alert.alert('Saved Locally', 'Avatar saved locally due to connection issues.');
+      } catch (localError) {
+        console.error('❌ Local save also failed:', localError);
+        Alert.alert('Error', 'Failed to save avatar. Please try again.');
+      }
+    }
+  };
+
+  // 🔄 Load Avatar Data
+  const loadAvatarData = async () => {
+    try {
+      setAvatarLoading(true);
+      
+      // First try to load from backend
+      try {
+        const result = await YesChefAPI.get('/api/profile/avatar');
+        if (result.success && result.avatar) {
+          console.log('📥 Loaded avatar from backend:', result.avatar);
+          setUserProfile(result.avatar);
+          
+          // Update local storage with backend data
+          await AsyncStorage.setItem('userProfileAvatar', JSON.stringify(result.avatar));
+          return;
+        }
+      } catch (backendError) {
+        console.warn('⚠️ Backend avatar load failed, trying local storage:', backendError);
+      }
+      
+      // Fallback to local storage
+      const savedAvatar = await AsyncStorage.getItem('userProfileAvatar');
+      if (savedAvatar) {
+        const avatarData = JSON.parse(savedAvatar);
+        console.log('📥 Loaded avatar from local storage:', avatarData);
+        setUserProfile(avatarData);
+      } else {
+        console.log('ℹ️ No saved avatar found, using default');
+      }
+    } catch (error) {
+      console.error('❌ Failed to load avatar data:', error);
+      // Keep default avatar if loading fails
+    } finally {
+      setAvatarLoading(false);
+    }
+  };
+
+  // 🧹 Clear Avatar Data (for debugging/reset)
+  const clearAvatarData = async () => {
+    try {
+      await AsyncStorage.removeItem('userProfileAvatar');
+      setUserProfile({ background: 'default', icon: '🍎' });
+      console.log('🧹 Avatar data cleared');
+      Alert.alert('Debug', 'Avatar data cleared. Default avatar restored.');
+    } catch (error) {
+      console.error('❌ Failed to clear avatar data:', error);
+    }
+  };
+
+  // 🔍 Debug: Check what's in storage
+  const debugAvatarStorage = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('userProfileAvatar');
+      const backendAvatar = await YesChefAPI.get('/api/profile/avatar');
+      
+      console.log('🔍 Debug - Stored avatar data:', stored);
+      console.log('🔍 Debug - Backend avatar data:', backendAvatar);
+      
+      Alert.alert('Debug Info', `Local: ${stored || 'No data'}\nBackend: ${JSON.stringify(backendAvatar?.avatar || 'No data')}\nCurrent: ${JSON.stringify(userProfile)}`);
+    } catch (error) {
+      console.error('❌ Debug check failed:', error);
+      Alert.alert('Debug Error', error.message);
+    }
+  };
+
+  // 🔧 Debug: RevenueCat Configuration Check
+  const debugRevenueCat = () => {
+    RevenueCatValidator.showValidationAlert();
+  };
+
+  // 🧪 Debug: Toggle Mock Premium Status
+  const toggleMockPremium = () => {
+    const newStatus = RevenueCatService.toggleMockPremium();
+    Alert.alert(
+      '🧪 Mock Premium Toggled',
+      `Premium status is now: ${newStatus ? 'ACTIVE' : 'INACTIVE'}\n\nRefresh the screen to see changes.`
+    );
+  };
+
   if (isLoading) {
     return (
       <ImageBackground source={SELECTED_BACKGROUND} style={styles.backgroundImage} resizeMode="cover">
@@ -257,15 +408,19 @@ export default function ProfileScreen({ navigation, user = null }) {
           {/* 👤 Profile Header Card */}
           <View style={styles.profileHeaderCard}>
             <View style={styles.profilePhotoContainer}>
-              {profileData?.profilePhotoUrl ? (
-                <Image source={{ uri: profileData.profilePhotoUrl }} style={styles.profilePhoto} />
-              ) : (
-                <View style={styles.profilePhotoPlaceholder}>
-                  <Text style={styles.profilePhotoInitials}>
-                    {profileData?.username?.substring(0, 2).toUpperCase() || 'YC'}
-                  </Text>
-                </View>
-              )}
+              <ProfileAvatar 
+                profile={userProfile}
+                size="xlarge"
+                onPress={() => setShowAvatarCreator(true)}
+                showBorder={true}
+                style={styles.profileAvatarStyle}
+              />
+              <TouchableOpacity 
+                style={styles.editAvatarButton}
+                onPress={() => setShowAvatarCreator(true)}
+              >
+                <Icon name="edit" size={16} color="#ffffff" />
+              </TouchableOpacity>
             </View>
             
             <View style={styles.usernameContainer}>
@@ -350,20 +505,35 @@ export default function ProfileScreen({ navigation, user = null }) {
             </View>
           </View>
 
-          {/* 💳 Subscription Management Card */}
-          <View style={styles.subscriptionCard}>
-            <Text style={styles.cardTitle}>Subscription</Text>
-            <View style={styles.subscriptionInfo}>
-              <Text style={styles.subscriptionStatus}>Free Plan</Text>
-              <Text style={styles.subscriptionDescription}>Enjoy basic features with limited access</Text>
-            </View>
-            <TouchableOpacity style={styles.upgradeButton}>
-              <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
-              <Icon name="star" size={16} color="#f59e0b" />
-            </TouchableOpacity>
-          </View>
+          {/* 🌟 Premium Status Card */}
+          <PremiumStatus style={styles.premiumCard} />
 
-          {/* 🗑️ Danger Zone Card */}
+          {/* � Development Debug Section */}
+          {__DEV__ && (
+            <View style={styles.debugCard}>
+              <Text style={styles.cardTitle}>🔧 Development Tools</Text>
+              <TouchableOpacity 
+                style={styles.debugButton} 
+                onPress={debugRevenueCat}
+              >
+                <Text style={styles.debugButtonText}>Check RevenueCat Config</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.debugButton} 
+                onPress={debugAvatarStorage}
+              >
+                <Text style={styles.debugButtonText}>Check Avatar Storage</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.debugButton, { backgroundColor: '#10b981' }]} 
+                onPress={toggleMockPremium}
+              >
+                <Text style={styles.debugButtonText}>Toggle Mock Premium</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* �🗑️ Danger Zone Card */}
           <View style={styles.dangerZoneCard}>
             <Text style={styles.dangerZoneTitle}>Caution: Hot Surface</Text>
             <Text style={styles.dangerZoneDescription}>
@@ -471,6 +641,14 @@ export default function ProfileScreen({ navigation, user = null }) {
             </View>
           </View>
         </Modal>
+
+        {/* 🎨 Profile Avatar Creator Modal */}
+        <ProfileIconCreatorScreen
+          visible={showAvatarCreator}
+          currentProfile={userProfile}
+          onClose={() => setShowAvatarCreator(false)}
+          onSave={handleAvatarSave}
+        />
       </SafeAreaView>
     </ImageBackground>
   );
@@ -585,6 +763,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  profileAvatarStyle: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  editAvatarButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#10b981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   profilePhotoInitials: {
     fontSize: 36,
     fontFamily: 'Nunito-ExtraBold',
@@ -696,6 +899,33 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+  },
+  premiumCard: {
+    margin: 16,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  debugCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    margin: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#f59e0b',
+  },
+  debugButton: {
+    backgroundColor: '#f59e0b',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  debugButtonText: {
+    color: '#ffffff',
+    fontFamily: 'Nunito-Bold',
+    fontSize: 14,
   },
   subscriptionCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',

@@ -31,10 +31,11 @@ const safeTextRender = (value, fallback = '') => {
   return typeof result === 'string' ? result : String(result || fallback || '');
 };
 
-const RecipeCollectionScreen = ({ navigation }) => {
-  try {
+const RecipeCollectionScreen = ({ navigation, route }) => {
   // Background configuration (matches HomeScreen)
-  const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/home_green.jpg');
+  const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/mintbackground.jpg');
+  
+  try {
   
   // 📚 Match exact categories from web app CookbookSidebar.js
   const defaultCategories = [
@@ -104,10 +105,24 @@ const RecipeCollectionScreen = ({ navigation }) => {
     }
   }, [hiddenRecipeIds]);
 
+  // 🧹 Clean up hidden recipe IDs that no longer exist in backend
+  useEffect(() => {
+    if (recipes && recipes.length > 0 && hiddenRecipeIds.size > 0) {
+      const existingRecipeIds = new Set(recipes.map(recipe => recipe.id));
+      const validHiddenIds = new Set([...hiddenRecipeIds].filter(id => existingRecipeIds.has(id)));
+      
+      if (validHiddenIds.size !== hiddenRecipeIds.size) {
+        console.log(`🧹 Cleaning up hidden recipes: ${hiddenRecipeIds.size - validHiddenIds.size} IDs removed`);
+        setHiddenRecipeIds(validHiddenIds);
+      }
+    }
+  }, [recipes, hiddenRecipeIds]);
+
   // 🔄 Refresh hidden recipes when screen comes into focus (e.g., returning from RecipeView)
+  // 🔄 Load hidden recipes from storage on focus (no infinite loop)
   useFocusEffect(
     useCallback(() => {
-      const refreshHiddenRecipes = async () => {
+      const loadHiddenRecipes = async () => {
         try {
           const hiddenIds = await AsyncStorage.getItem('hiddenRecipeIds');
           if (hiddenIds) {
@@ -116,12 +131,14 @@ const RecipeCollectionScreen = ({ navigation }) => {
             setHiddenRecipeIds(newHiddenSet);
           }
         } catch (error) {
-          console.error('Failed to refresh hidden recipes:', error);
+          console.error('Failed to load hidden recipes:', error);
         }
       };
-      refreshHiddenRecipes();
+      
+      loadHiddenRecipes();
     }, [])
   );
+  
   const [isUpdatingMealPlan, setIsUpdatingMealPlan] = useState(false);
 
   // 🍞 Toast notification state
@@ -131,23 +148,115 @@ const RecipeCollectionScreen = ({ navigation }) => {
     loadRecipes();
   }, []);
 
+  // 🆕 Listen for refresh parameter (from import workflow)
+  useEffect(() => {
+    if (route.params?.refresh) {
+      console.log('🔄 Refreshing recipes due to route param');
+      loadRecipes();
+      // Clear the refresh param to prevent repeated refreshes
+      navigation.setParams({ refresh: undefined });
+    }
+  }, [route.params?.refresh]);
+
+  // 🆕 Listen for force refresh parameter (delayed refresh)
+  useEffect(() => {
+    if (route.params?.forceRefresh) {
+      console.log('🔄🔄 Force refreshing recipes due to delayed param');
+      loadRecipes();
+      // Clear the forceRefresh param
+      navigation.setParams({ forceRefresh: undefined });
+    }
+  }, [route.params?.forceRefresh]);
+
   const loadRecipes = async () => {
     setIsLoading(true);
     try {
+      console.log('🔍 RECIPE DEBUG: Loading recipes...');
+      
+      // Single API call with simple parameters
       const result = await YesChefAPI.getRecipes();
+      
+      console.log('🔍 RECIPE DEBUG: API result:', {
+        success: result.success,
+        recipesLength: result.recipes?.length,
+        error: result.error
+      });
+      
       if (result.success) {
         setRecipes(result.recipes || []);
         console.log(`✅ Loaded ${result.recipes?.length || 0} recipes`);
+        
+        // 🔍 Debug: Check for recently saved recipe
+        if (result.recipes && result.recipes.length > 0) {
+          const recentRecipes = result.recipes
+            .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+            .slice(0, 3);
+          console.log('🔍 Most recent recipes:', recentRecipes.map(r => ({
+            id: r.id,
+            title: r.title,
+            category: r.category,
+            created_at: r.created_at
+          })));
+          
+          // 🎯 Success! Recipe import system is working
+          console.log('🎉 Recipe import system operational - showing most recent recipes:');
+          
+          // 🚨 Check for specific missing recipe (2599 from latest logs) 
+          const recipe2599 = result.recipes.find(r => r.id === 2599);
+          if (recipe2599) {
+            console.log('✅ Found recipe 2599:', {
+              id: recipe2599.id,
+              title: recipe2599.title,
+              category: recipe2599.category,
+              created_at: recipe2599.created_at,
+              user_id: recipe2599.user_id,
+              source: recipe2599.source
+            });
+          } else {
+            console.log('❌ Recipe 2599 NOT FOUND in backend response');
+            
+            // Check for ALL BBQ Mushroom Pizza recipes to see what's different
+            const bbqRecipes = result.recipes.filter(r => 
+              r.title && r.title.toLowerCase().includes('bbq mushroom')
+            );
+            console.log('🔍 All BBQ Mushroom recipes found:', bbqRecipes.map(r => ({
+              id: r.id,
+              title: r.title,
+              category: r.category,
+              source: r.source,
+              user_id: r.user_id
+            })));
+            
+            // Check if any recipe with similar title exists
+            const similarRecipes = result.recipes.filter(r => 
+              r.title && r.title.toLowerCase().includes('bbq mushroom pizza test')
+            );
+            if (similarRecipes.length > 0) {
+              console.log('🔍 Found similar recipes:', similarRecipes.map(r => ({
+                id: r.id,
+                title: r.title,
+                category: r.category
+              })));
+            } else {
+              console.log('❌ No recipes with "BBQ Mushroom Pizza Test" found at all');
+              
+              // Check total count vs expected
+              console.log('📊 Recipe count analysis:', {
+                backend_count: result.recipes.length,
+                expected_with_new_recipe: 23, // Should be 23 if recipe 2597 was included
+              });
+            }
+          }
+        }
       } else {
+        console.log('❌ RECIPE DEBUG: Failed to load recipes:', result.error);
         Alert.alert('Error', result.error || 'Failed to load recipes');
       }
     } catch (error) {
+      console.log('❌ RECIPE DEBUG: Exception loading recipes:', error);
       Alert.alert('Error', 'Failed to connect to backend');
     } finally {
-      // Add small delay to prevent React Native state transition issues
-      setTimeout(() => {
-        setIsLoading(false);
-      }, 100);
+      setIsLoading(false);
     }
   };
 
@@ -159,27 +268,34 @@ const RecipeCollectionScreen = ({ navigation }) => {
 
     setIsImporting(true);
     try {
-      const result = await YesChefAPI.importRecipe(importUrl.trim());
+      // 🆕 NEW APPROACH: Extract recipe data without saving to backend
+      const result = await YesChefAPI.extractRecipeFromUrl(importUrl.trim());
       if (result.success) {
-        const confidenceText = result.confidence > 0.8 ? 'High quality extraction!' : 
-                              result.confidence > 0.6 ? 'Good extraction' : 
-                              'May need review';
+        console.log('🔍 EXTRACT SUCCESS: Navigating to review screen');
         
-        Alert.alert(
-          'Recipe Imported! ??', 
-          `"${result.recipe.title}" imported successfully!\n\nQuality: ${confidenceText}\nMethod: ${result.extraction_method}`,
-          [{ text: 'OK', onPress: () => {
-            setImportUrl('');
-            loadRecipes(); // Refresh the list
-          }}]
-        );
+        setImportUrl(''); // Clear the URL input
+        setIsImporting(false); // Reset loading state
+        
+        // Navigate to the review screen with extracted (but unsaved) data
+        navigation.navigate('RecipeImportReview', {
+          importResult: {
+            recipe: result.recipe,
+            temp_recipe_id: result.recipe_id, // Temporary ID for deletion if cancelled
+            confidence: result.confidence,
+            extraction_method: result.extraction_method,
+            needs_review: true, // Always needs review since it's not saved yet
+            isTemporary: true // Flag to indicate this is not yet saved
+          }
+        });
+        
       } else {
-        Alert.alert('Import Failed', result.error || 'Failed to import recipe');
+        setIsImporting(false);
+        Alert.alert('Import Failed', result.error || 'Failed to extract recipe from URL');
       }
     } catch (error) {
-      Alert.alert('Error', 'Network error during import');
-    } finally {
       setIsImporting(false);
+      console.error('Import error:', error);
+      Alert.alert('Error', 'Network error during import');
     }
   };
 
@@ -402,8 +518,38 @@ const RecipeCollectionScreen = ({ navigation }) => {
   };
 
   // � Share recipe handler
-  const handleShareRecipe = (recipe) => {
-    setSelectedRecipeForSharing(recipe);
+  const handleShareRecipe = async (recipe) => {
+    console.log('🔄 Sharing recipe:', {
+      id: recipe.id,
+      title: recipe.title,
+      description: recipe.description,
+      hasIngredients: !!recipe.ingredients,
+      hasInstructions: !!recipe.instructions
+    });
+    
+    try {
+      // Fetch full recipe details to ensure we have all data
+      console.log('🔍 Fetching full recipe details for sharing...');
+      const fullRecipe = await YesChefAPI.getRecipe(recipe.id);
+      
+      if (fullRecipe.success) {
+        console.log('✅ Full recipe loaded for sharing:', {
+          id: fullRecipe.recipe.id,
+          title: fullRecipe.recipe.title,
+          description: fullRecipe.recipe.description,
+          hasIngredients: !!fullRecipe.recipe.ingredients,
+          hasInstructions: !!fullRecipe.recipe.instructions
+        });
+        setSelectedRecipeForSharing(fullRecipe.recipe);
+      } else {
+        console.error('❌ Failed to load full recipe details:', fullRecipe.error);
+        setSelectedRecipeForSharing(recipe); // Fallback to original recipe
+      }
+    } catch (error) {
+      console.error('❌ Error fetching recipe details:', error);
+      setSelectedRecipeForSharing(recipe); // Fallback to original recipe
+    }
+    
     setShowSharingModal(true);
   };
 
@@ -834,10 +980,16 @@ const RecipeCollectionScreen = ({ navigation }) => {
     const timeoutId = setTimeout(() => {
       // Calculate filteredRecipes locally in useEffect to avoid dependency issues
       const currentFilteredRecipes = (recipes || []).filter(recipe => {
-        if (!searchQuery) return true;
-        return (recipe.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-               (recipe.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-               (recipe.source || '').toLowerCase().includes(searchQuery.toLowerCase());
+        // First filter by search query
+        const matchesSearch = !searchQuery || 
+          (recipe.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (recipe.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (recipe.source || '').toLowerCase().includes(searchQuery.toLowerCase());
+        
+        // Then filter out hidden recipes
+        const notHidden = !hiddenRecipeIds.has(recipe.id);
+        
+        return matchesSearch && notHidden;
       });
       
       // ?? SAFETY: Don't calculate until we have valid recipes
@@ -905,7 +1057,7 @@ const RecipeCollectionScreen = ({ navigation }) => {
     }, 100); // 100ms debounce to avoid excessive calculations
     
     return () => clearTimeout(timeoutId);
-  }, [recipes, searchQuery]); // Run when underlying data changes, not computed filteredRecipes
+  }, [recipes, searchQuery, hiddenRecipeIds]); // Run when underlying data changes, not computed filteredRecipes
 
   const selectCategory = useCallback((categoryId) => {
     setSelectedCategory(categoryId);
@@ -981,8 +1133,7 @@ const RecipeCollectionScreen = ({ navigation }) => {
     >
       <View style={styles.overlay} />
       
-      {/* White overlay for better readability */}
-      <View style={styles.whiteOverlay} />
+      {/* White overlay removed to show mint background */}
       
       {/* Top status bar background */}
       <View style={styles.topStatusBarOverlay} />
@@ -1065,7 +1216,7 @@ const RecipeCollectionScreen = ({ navigation }) => {
           <View style={{
             backgroundColor: 'rgba(255, 255, 255, 0.9)', 
             marginHorizontal: 16,
-            marginTop: 32, // REDUCED from 72 to create smaller gap
+            marginTop: 70, // REDUCED from 72 to create smaller gap
             marginBottom: 8,
             padding: 12,
             borderRadius: 12,
@@ -1347,10 +1498,30 @@ const RecipeCollectionScreen = ({ navigation }) => {
                 setShowSharingModal(false);
                 setSelectedRecipeForSharing(null);
               }}
-              onSuccess={() => {
-                setShowSharingModal(false);
-                setSelectedRecipeForSharing(null);
-                Alert.alert('Success', 'Recipe shared successfully!');
+              onShare={async (shareData) => {
+                console.log('🔄 Sharing recipe to community:', {
+                  recipe_id: selectedRecipeForSharing?.id,
+                  community_title: shareData.community_title,
+                  community_description: shareData.community_description
+                });
+                
+                try {
+                  // Call the sharing API
+                  const result = await YesChefAPI.shareRecipe(selectedRecipeForSharing.id, shareData);
+                  
+                  if (result.success) {
+                    console.log('✅ Recipe shared successfully!');
+                    setShowSharingModal(false);
+                    setSelectedRecipeForSharing(null);
+                    Alert.alert('Success', 'Recipe shared to community successfully!');
+                  } else {
+                    console.error('❌ Failed to share recipe:', result.error);
+                    throw new Error(result.error);
+                  }
+                } catch (error) {
+                  console.error('❌ Failed to share recipe:', error);
+                  throw error; // Re-throw so modal can handle it
+                }
               }}
             />
           </View>
@@ -1647,7 +1818,7 @@ const RecipeCollectionScreen = ({ navigation }) => {
     console.error('Component render error:', error);
     return (
       <ImageBackground 
-        source={require('../../assets/images/backgrounds/home_green.jpg')} 
+        source={SELECTED_BACKGROUND} 
         style={{ flex: 1 }} 
         resizeMode="cover"
       >
@@ -1677,7 +1848,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)', // Dark overlay for contrast
+    backgroundColor: 'rgba(0, 0, 0, 0.1)', // Light overlay to let mint background show through
     zIndex: 1,
   },
   whiteOverlay: {
@@ -1686,7 +1857,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)', // White opaque overlay for readability
+    backgroundColor: 'transparent', // Let mint background show through
     zIndex: 2,
   },
   whiteText: {
@@ -1696,7 +1867,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent', // Changed from '#f9fafb' to transparent
-    paddingTop: 50, // Match GroceryListScreen padding
+    paddingTop: 10, // Match GroceryListScreen padding
     zIndex: 2, // Above overlay
   },
   topStatusBarOverlay: {
@@ -1705,7 +1876,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: 'transparent', // Let mint background show through
     zIndex: 10,
   },
   
@@ -1713,7 +1884,7 @@ const styles = StyleSheet.create({
   headerCard: {
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: 'transparent', // Let mint background show through
     marginHorizontal: 16,
     marginTop: 8,
     borderRadius: 12,
@@ -1799,7 +1970,9 @@ const styles = StyleSheet.create({
   },
   importCard: {
     backgroundColor: '#ffffff',
-    margin: 16,
+    marginHorizontal: 16, // Better spacing like other screens
+    marginTop: 0, // Proper spacing from status bar
+    marginBottom: 16,
     borderRadius: 12,
     padding: 16,
     shadowColor: '#000000',
@@ -1850,6 +2023,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     padding: 16,
     backgroundColor: '#ffffff',
+    marginTop: 30,
   },
   searchInput: {
     borderWidth: 1,
@@ -1862,6 +2036,7 @@ const styles = StyleSheet.create({
   },
   mainContent: {
     flex: 1,
+    marginTop: 0, // Consistent with other screens for proper status bar spacing
     // Removed extra padding - content should flow naturally
   },
   // ?? Category Grid Styles

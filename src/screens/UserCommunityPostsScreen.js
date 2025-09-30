@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import YesChefAPI from '../services/YesChefAPI';
 import { Icon } from '../components/IconLibrary';
+import { getCommunityBackgroundColor } from '../utils/communityStyles';
 
 const UserCommunityPostsScreen = ({ navigation }) => {
   const [userPosts, setUserPosts] = useState([]);
@@ -212,43 +213,48 @@ const UserCommunityPostsScreen = ({ navigation }) => {
               </Text>
             </View>
 
-            {userPosts.map((post) => (
-              <View key={post.id} style={styles.postCard}>
-                <View style={styles.postHeader}>
-                  <View style={styles.postInfo}>
-                    <Text style={styles.postIcon}>{post.community_icon}</Text>
-                    <View style={styles.postDetails}>
-                      <Text style={styles.postTitle}>{post.community_title}</Text>
-                      <Text style={styles.postSubtitle}>Original: {post.title}</Text>
-                      <Text style={styles.postTime}>Shared {formatTimeAgo(post.shared_at)}</Text>
+            {userPosts.map((post) => {
+              // 🎨 Get background color from community_background
+              const backgroundColor = getCommunityBackgroundColor(post.community_background);
+              
+              return (
+                <View key={post.id} style={[styles.postCard, { backgroundColor }]}>
+                  <View style={styles.postHeader}>
+                    <View style={styles.postInfo}>
+                      <Text style={styles.postIcon}>{post.community_icon}</Text>
+                      <View style={styles.postDetails}>
+                        <Text style={styles.postTitle}>{post.community_title}</Text>
+                        <Text style={styles.postSubtitle}>Original: {post.title}</Text>
+                        <Text style={styles.postTime}>Shared {formatTimeAgo(post.shared_at)}</Text>
+                      </View>
+                    </View>
+                    
+                    <TouchableOpacity 
+                      style={styles.deleteButton}
+                      onPress={() => handleDeletePost(post)}
+                      disabled={deletingPostId === post.id}
+                    >
+                      {deletingPostId === post.id ? (
+                        <ActivityIndicator size="small" color="#ef4444" />
+                      ) : (
+                        <Icon name="delete" size={20} color="#ef4444" />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.postStats}>
+                    <View style={styles.statItem}>
+                      <Icon name="heart" size={16} color="#ef4444" />
+                      <Text style={styles.statText}>{post.likes} likes</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Icon name="chat" size={16} color="#6b7280" />
+                      <Text style={styles.statText}>{post.comments_count} comments</Text>
                     </View>
                   </View>
-                  
-                  <TouchableOpacity 
-                    style={styles.deleteButton}
-                    onPress={() => handleDeletePost(post)}
-                    disabled={deletingPostId === post.id}
-                  >
-                    {deletingPostId === post.id ? (
-                      <ActivityIndicator size="small" color="#ef4444" />
-                    ) : (
-                      <Icon name="delete" size={20} color="#ef4444" />
-                    )}
-                  </TouchableOpacity>
                 </View>
-
-                <View style={styles.postStats}>
-                  <View style={styles.statItem}>
-                    <Icon name="heart" size={16} color="#ef4444" />
-                    <Text style={styles.statText}>{post.likes} likes</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Icon name="chat" size={16} color="#6b7280" />
-                    <Text style={styles.statText}>{post.comments_count} comments</Text>
-                  </View>
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </>
         ) : (
           <View style={styles.emptyState}>

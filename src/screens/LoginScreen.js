@@ -27,7 +27,7 @@ export default function LoginScreen({ onLoginSuccess }) {
   const [forgotEmail, setForgotEmail] = useState('');
   const [isForgotLoading, setIsForgotLoading] = useState(false);
   const [showSignUpModal, setShowSignUpModal] = useState(false);
-  const [signUpData, setSignUpData] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [signUpData, setSignUpData] = useState({ email: '', password: '', confirmPassword: '' });
   const [isSignUpLoading, setIsSignUpLoading] = useState(false);
 
   // Listen for deep link returns from Google OAuth
@@ -131,9 +131,9 @@ export default function LoginScreen({ onLoginSuccess }) {
 
   // Handle sign up
   const handleSignUp = async () => {
-    const { name, email, password, confirmPassword } = signUpData;
+    const { email, password, confirmPassword } = signUpData;
     
-    if (!name.trim() || !email.trim() || !password || !confirmPassword) {
+    if (!email.trim() || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
@@ -151,7 +151,9 @@ export default function LoginScreen({ onLoginSuccess }) {
     setIsSignUpLoading(true);
     
     try {
-      const response = await YesChefAPI.register(name.trim(), email.trim(), password);
+      // Generate name from email (before @ symbol)
+      const name = email.split('@')[0];
+      const response = await YesChefAPI.register(name, email.trim(), password);
       
       if (response.success) {
         Alert.alert(
@@ -161,7 +163,7 @@ export default function LoginScreen({ onLoginSuccess }) {
             text: 'OK', 
             onPress: () => {
               setShowSignUpModal(false);
-              setSignUpData({ name: '', email: '', password: '', confirmPassword: '' });
+              setSignUpData({ email: '', password: '', confirmPassword: '' });
               onLoginSuccess(response.user);
             }
           }]
@@ -176,19 +178,13 @@ export default function LoginScreen({ onLoginSuccess }) {
     }
   };
 
-  // Background images array
+  // Single mint background
   const backgroundImages = [
-    require('../../assets/images/backgrounds/login_background_avocado.jpg'),
-    require('../../assets/images/backgrounds/login_background_fig.jpg'),
-    require('../../assets/images/backgrounds/login_background_lemon.jpg'),
-    require('../../assets/images/backgrounds/login_background_pasta.jpg'),
-    require('../../assets/images/backgrounds/login_background_tomato.jpg'),
+    require('../../assets/images/backgrounds/mintbackground.jpg'),
   ];
 
-  // Randomly select a background image ONCE using useState to prevent re-selection on re-renders
-  const [randomBackground] = useState(() => 
-    backgroundImages[Math.floor(Math.random() * backgroundImages.length)]
-  );
+  // Use the single mint background
+  const [randomBackground] = useState(() => backgroundImages[0]);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -235,7 +231,7 @@ export default function LoginScreen({ onLoginSuccess }) {
           {/* Beautiful YesChef Logo */}
           <View style={styles.logoContainer}>
             <Image 
-              source={require('../../assets/images/YesChefLogo.png')} 
+              source={require('../../assets/images/YesChefLoginWhite.png')} 
               style={styles.logo}
               resizeMode="contain"
             />
@@ -388,16 +384,6 @@ export default function LoginScreen({ onLoginSuccess }) {
             
             <TextInput
               style={styles.signUpInput}
-              placeholder="Full Name"
-              placeholderTextColor="#9CA3AF"
-              value={signUpData.name}
-              onChangeText={(text) => setSignUpData(prev => ({...prev, name: text}))}
-              autoCapitalize="words"
-              autoComplete="name"
-            />
-            
-            <TextInput
-              style={styles.signUpInput}
               placeholder="Email Address"
               placeholderTextColor="#9CA3AF"
               value={signUpData.email}
@@ -432,7 +418,7 @@ export default function LoginScreen({ onLoginSuccess }) {
                 style={styles.signUpCancelButton} 
                 onPress={() => {
                   setShowSignUpModal(false);
-                  setSignUpData({ name: '', email: '', password: '', confirmPassword: '' });
+                  setSignUpData({ email: '', password: '', confirmPassword: '' });
                 }}
               >
                 <Text style={styles.signUpCancelText}>Cancel</Text>

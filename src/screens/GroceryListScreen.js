@@ -28,7 +28,7 @@ import MobileGroceryAdapter from '../services/MobileGroceryAdapter';
 
 export default function GroceryListScreen({ route, navigation }) {
   // 🎨 Background Configuration (matches other screens)
-  const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/home_green.jpg');
+  const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/mintbackground.jpg');
   
   const [groceryItems, setGroceryItems] = useState([]);
   const [newItem, setNewItem] = useState('');
@@ -965,7 +965,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 50, // Enough to cover status bar area
-    backgroundColor: 'rgba(255, 255, 255, 0.95)', // More opaque for better status bar visibility
+    backgroundColor: 'transparent', // Let mint background show through
     zIndex: 3, // Above main overlay to ensure status bar area is clearly visible
   },
   overlay: {
@@ -974,7 +974,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)', // White opaque overlay for readability
+    backgroundColor: 'transparent', // Let mint background show through
     zIndex: 1,
   },
   
@@ -1007,13 +1007,13 @@ const styles = StyleSheet.create({
   syncCard: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(255, 255, 255,)', // More transparent
     marginHorizontal: 16,
     marginTop: 8,
     borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.5,
     shadowRadius: 2,
     elevation: 1,
   },
@@ -1076,12 +1076,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontFamily: 'Nunito-ExtraBold',
-    color: '#111827',
+    color: '#1F2937', // Match other container text colors
   },
   titleInput: {
     fontSize: 24,
     fontFamily: 'Nunito-ExtraBold',
-    color: '#111827',
+    color: '#1F2937', // Match other container text colors
     borderBottomWidth: 1,
     borderBottomColor: '#3b82f6',
     paddingVertical: 4,

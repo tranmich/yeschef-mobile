@@ -22,7 +22,7 @@ import FriendsAPI from '../services/FriendsAPI';
 
 export default function FriendsScreen({ navigation }) {
   // 🎨 Background Configuration (matches other screens)
-  const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/home_green.jpg');
+  const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/mintbackground.jpg');
   
   // State for Friends page
   const [isLoading, setIsLoading] = useState(true);
@@ -306,18 +306,21 @@ export default function FriendsScreen({ navigation }) {
 
   const getInitialsCircle = (initials, size = 40) => (
     <View style={[styles.initialsCircle, { width: size, height: size, borderRadius: size / 2 }]}>
-      <Text style={[styles.initialsText, { fontSize: size * 0.35 }]}>{initials || 'U'}</Text>
+      <Text style={[styles.initialsText, { fontSize: size * 0.35 }]}>{String(initials || 'U')}</Text>
     </View>
   );
 
-  const renderFriendCard = ({ item }) => (
+  const renderFriendCard = ({ item }) => {
+    if (!item || typeof item !== 'object') return null; // Enhanced safety check
+    
+    return (
     <View style={styles.friendCard}>
       <View style={styles.friendHeader}>
         <View style={styles.friendInfo}>
-          {getInitialsCircle(item.initials || 'U', 56)} {/* Larger profile picture */}
+          {getInitialsCircle(item?.initials || 'U', 56)}
           <View style={styles.friendDetails}>
-            <Text style={styles.friendName}>{item.name || 'Unknown User'}</Text>
-            <Text style={styles.friendStatus}>Status: {item.status || 'Unknown'}</Text>
+            <Text style={styles.friendName}>{String(item?.name || 'Unknown User')}</Text>
+            <Text style={styles.friendStatus}>Status: {String(item?.status || 'Unknown')}</Text>
           </View>
         </View>
         <View style={styles.friendActionsContainer}>
@@ -334,7 +337,7 @@ export default function FriendsScreen({ navigation }) {
               <TouchableOpacity 
                 style={styles.optionItem}
                 onPress={() => {
-                  const friend = friends.find(f => f.id === showFriendActionMenu);
+                  const friend = (friends || []).find(f => f?.id === showFriendActionMenu);
                   if (friend) handleRemoveFriend(friend);
                 }}
               >
@@ -347,26 +350,30 @@ export default function FriendsScreen({ navigation }) {
       </View>
       <View style={styles.friendStats}>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{item.sharedLists || 0}</Text>
+          <Text style={styles.statValue}>{(item?.sharedLists ?? 0).toString()}</Text>
           <Text style={styles.statLabel}>Shared Lists</Text>
         </View>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{item.lastActive || 'Unknown'}</Text>
+          <Text style={styles.statValue}>{item?.lastActive || 'Unknown'}</Text>
           <Text style={styles.statLabel}>Last Active</Text>
         </View>
       </View>
     </View>
-  );
+    );
+  };
 
-  const renderRequestCard = ({ item }) => (
+  const renderRequestCard = ({ item }) => {
+    if (!item || typeof item !== 'object') return null; // Enhanced safety check
+    
+    return (
     <View style={styles.requestCard}>
       <View style={styles.requestHeader}>
-        {getInitialsCircle(item.initials || 'U', 48)} {/* Slightly smaller for requests */}
+        {getInitialsCircle(item?.initials || 'U', 48)}
         <View style={styles.requestInfo}>
-          <Text style={styles.requestName}>{item.name || 'Unknown User'}</Text>
-          <Text style={styles.requestEmail}>{item.email || 'No email'}</Text>
-          <Text style={styles.requestMessage}>"{item.message || 'No message'}"</Text>
-          <Text style={styles.requestTime}>{item.sentAt || 'Unknown time'}</Text>
+          <Text style={styles.requestName}>{String(item?.name || 'Unknown User')}</Text>
+          <Text style={styles.requestEmail}>{String(item?.email || 'No email')}</Text>
+          <Text style={styles.requestMessage}>"{String(item?.message || 'No message')}"</Text>
+          <Text style={styles.requestTime}>{String(item?.sentAt || 'Unknown time')}</Text>
         </View>
       </View>
       {item.type === 'incoming' && (
@@ -391,95 +398,96 @@ export default function FriendsScreen({ navigation }) {
         </View>
       )}
     </View>
-  );
+    );
+  };
 
-  const renderHouseholdCard = ({ item }) => (
+  const renderHouseholdCard = ({ item }) => {
+    if (!item || typeof item !== 'object') return null; // Enhanced safety check
+    
+    return (
     <View style={styles.householdCard}>
       <View style={styles.householdHeader}>
         <View style={styles.householdInfo}>
-          <View style={[styles.initialsCircle, { backgroundColor: '#059669', width: 56, height: 56, borderRadius: 28 }]}>
-            <Icon name="home" size={28} color="white" />
+          <View style={[styles.initialsCircle, { backgroundColor: '#AAC6AD', width: 56, height: 56, borderRadius: 28 }]}>
+            <Text style={[styles.initialsText, { fontSize: 20 }]}>{String((item?.initials || item?.name?.charAt(0) || 'H')).toUpperCase()}</Text>
           </View>
           <View style={styles.householdDetails}>
-            <Text style={styles.householdName}>{item.name || 'Unknown Household'}</Text>
-            <Text style={styles.householdRole}>You are: {item.role || 'member'}</Text>
-            <Text style={styles.householdMeta}>
-              {item.members || 0} members • Created {item.createdAt || 'Unknown'}
-            </Text>
+            <Text style={styles.householdName}>{String(item?.name || 'Unknown Household')}</Text>
           </View>
         </View>
         <View style={styles.householdActionsContainer}>
           <TouchableOpacity 
             style={styles.householdActions}
-            onPress={() => setShowHouseholdActionMenu(showHouseholdActionMenu === item.id ? null : item.id)}
+            onPress={() => setShowHouseholdActionMenu(showHouseholdActionMenu === item?.id ? null : item?.id)}
           >
             <Icon name="more-horizontal" size={20} color="#6b7280" />
           </TouchableOpacity>
           
           {/* Household options dropdown */}
-          {showHouseholdActionMenu === item.id && (
+          {showHouseholdActionMenu === item?.id && (
             <View style={styles.householdOptionsMenu}>
               <TouchableOpacity 
                 style={styles.optionItem}
                 onPress={() => {
                   setSelectedHousehold(item);
-                  setShowHouseholdActionMenu(null);
                   setShowAddMemberModal(true);
+                  setShowHouseholdActionMenu(null);
                 }}
               >
                 <Icon name="add" size={18} color="#22C55E" style={{marginRight: 12}} />
-                <Text style={styles.optionText}>Member</Text>
+                <Text style={styles.optionText}>Add Member</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
                 style={styles.optionItem}
                 onPress={() => {
                   setSelectedHousehold(item);
-                  setShowHouseholdActionMenu(null);
-                  loadHouseholdMembers(item.id);
                   setShowRemoveMemberModal(true);
+                  setShowHouseholdActionMenu(null);
                 }}
               >
                 <Icon name="minus" size={18} color="#DC313F" style={{marginRight: 12}} />
-                <Text style={styles.optionText}>Member</Text>
+                <Text style={styles.optionText}>Remove Member</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
-                style={[styles.optionItem, styles.deleteOptionItem]}
+                style={styles.optionItem}
                 onPress={() => {
-                  setShowHouseholdActionMenu(null);
                   handleDeleteHousehold(item);
+                  setShowHouseholdActionMenu(null);
                 }}
               >
                 <Icon name="delete" size={18} color="#DC313F" style={{marginRight: 12}} />
-                <Text style={styles.deleteOptionText}>Delete</Text>
+                <Text style={styles.optionText}>Delete Household</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
       </View>
+
       <View style={styles.householdStats}>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{item.members || 0}</Text>
+          <Text style={styles.statValue}>{(item?.members ?? 0).toString()}</Text>
           <Text style={styles.statLabel}>Members</Text>
         </View>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{item.sharedLists || 0}</Text>
+          <Text style={styles.statValue}>{(item?.sharedLists ?? 0).toString()}</Text>
           <Text style={styles.statLabel}>Shared Lists</Text>
         </View>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{item.sharedPlans || 0}</Text>
+          <Text style={styles.statValue}>{(item?.sharedPlans ?? 0).toString()}</Text>
           <Text style={styles.statLabel}>Meal Plans</Text>
         </View>
       </View>
     </View>
-  );
+    );
+  };
 
   const renderTabContent = () => {
     if (isLoading) {
       return (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3b82f6" />
+          <ActivityIndicator size="large" color="#AAC6AD" />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       );
@@ -489,9 +497,9 @@ export default function FriendsScreen({ navigation }) {
       case 'friends':
         return (
           <FlatList
-            data={friends}
+            data={friends || []} // Ensure data is never null/undefined
             renderItem={renderFriendCard}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={(item) => (item?.id || Math.random()).toString()}
             contentContainerStyle={styles.listContainer}
             showsVerticalScrollIndicator={false}
             refreshing={refreshing}
@@ -501,9 +509,9 @@ export default function FriendsScreen({ navigation }) {
       case 'requests':
         return (
           <FlatList
-            data={requests}
+            data={requests || []} // Ensure data is never null/undefined
             renderItem={renderRequestCard}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={(item) => (item?.id || Math.random()).toString()}
             contentContainerStyle={styles.listContainer}
             showsVerticalScrollIndicator={false}
             refreshing={refreshing}
@@ -513,9 +521,9 @@ export default function FriendsScreen({ navigation }) {
       case 'households':
         return (
           <FlatList
-            data={households}
+            data={households || []} // Ensure data is never null/undefined
             renderItem={renderHouseholdCard}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={(item) => (item?.id || Math.random()).toString()}
             contentContainerStyle={styles.listContainer}
             showsVerticalScrollIndicator={false}
             refreshing={refreshing}
@@ -544,27 +552,27 @@ export default function FriendsScreen({ navigation }) {
               style={[styles.tab, activeTab === 'friends' && styles.activeTab]}
               onPress={() => setActiveTab('friends')}
             >
-              <Icon name="user-friends" size={20} color={activeTab === 'friends' ? '#1d4ed8' : '#6b7280'} />
+              <Icon name="user-friends" size={20} color={activeTab === 'friends' ? '#AAC6AD' : '#6b7280'} />
               <Text style={[styles.tabText, activeTab === 'friends' && styles.activeTabText]}>
-                Friends ({friends.length})
+                Friends ({(friends || []).length})
               </Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.tab, activeTab === 'requests' && styles.activeTab]}
               onPress={() => setActiveTab('requests')}
             >
-              <Icon name="user-plus" size={20} color={activeTab === 'requests' ? '#1d4ed8' : '#6b7280'} />
+              <Icon name="user-plus" size={20} color={activeTab === 'requests' ? '#AAC6AD' : '#6b7280'} />
               <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>
-                Requests ({requests.length})
+                Requests ({(requests || []).length})
               </Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.tab, activeTab === 'households' && styles.activeTab]}
               onPress={() => setActiveTab('households')}
             >
-              <Icon name="home" size={20} color={activeTab === 'households' ? '#1d4ed8' : '#6b7280'} />
+              <Icon name="home" size={20} color={activeTab === 'households' ? '#AAC6AD' : '#6b7280'} />
               <Text style={[styles.tabText, activeTab === 'households' && styles.activeTabText]}>
-                Households ({households.length})
+                Households ({(households || []).length})
               </Text>
             </TouchableOpacity>
           </View>
@@ -704,8 +712,8 @@ export default function FriendsScreen({ navigation }) {
                 </Text>
                 
                 <ScrollView style={styles.friendsListScroll}>
-                  {friends.length > 0 ? (
-                    friends.map((friend) => (
+                  {(friends || []).length > 0 ? (
+                    (friends || []).map((friend) => (
                       <TouchableOpacity
                         key={friend.id}
                         style={styles.friendSelectItem}
@@ -755,8 +763,8 @@ export default function FriendsScreen({ navigation }) {
                 </Text>
                 
                 <ScrollView style={styles.friendsListScroll}>
-                  {householdMembers.length > 0 ? (
-                    householdMembers
+                  {(householdMembers || []).length > 0 ? (
+                    (householdMembers || [])
                       .filter(member => member.role !== 'owner') // Can't remove owner
                       .map((member) => (
                         <TouchableOpacity
@@ -801,7 +809,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)', // White opaque background like grocery/meal plan
+    backgroundColor: 'transparent', // Let mint background show through
   },
   topStatusBarOverlay: {
     position: 'absolute',
@@ -809,7 +817,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: 'transparent', // Let mint background show through
     zIndex: 1,
   },
   container: {
@@ -845,7 +853,7 @@ const styles = StyleSheet.create({
     gap: 4, // Space between icon and text
   },
   activeTab: {
-    backgroundColor: '#e5f3ff',
+    backgroundColor: '#E8F5E8', // Light mint background
   },
   tabText: {
     textAlign: 'center',
@@ -854,7 +862,7 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   activeTabText: {
-    color: '#1d4ed8',
+    color: '#AAC6AD', // Mint active tab text
     fontWeight: '600',
   },
   actionButtonsContainer: {
@@ -867,7 +875,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#AAC6AD', // Mint button
     borderRadius: 8,
     paddingVertical: 12,
     gap: 6,
@@ -918,7 +926,7 @@ const styles = StyleSheet.create({
   },
   // Initials Circle Styles
   initialsCircle: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#AAC6AD', // Mint circle
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -1074,7 +1082,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   acceptButton: {
-    backgroundColor: '#10b981',
+    backgroundColor: '#AAC6AD', // Mint accept button
   },
   acceptButtonText: {
     color: 'white',
@@ -1237,7 +1245,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   submitButton: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#AAC6AD', // Mint submit button
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',

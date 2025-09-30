@@ -390,8 +390,14 @@ class YesChefAPI {
         }
       });
 
-      // 🔧 FIX #1: Request all recipes (increase from default 50 to 10000)
-      const url = `/api/recipes?limit=10000${queryParams.toString() ? '&' + queryParams.toString() : ''}`;
+      // 🔧 FIX: Request more recipes with a reasonable limit
+      const baseUrl = '/api/recipes';
+      const limit = 10000; // High limit to get more recipes
+      const url = queryParams.toString() ? 
+        `${baseUrl}?limit=${limit}&${queryParams.toString()}` : 
+        `${baseUrl}?limit=${limit}`;
+      
+      this.log('🔍 Making recipes API call to:', url);
       
       const response = await this.debugFetch(url, {
         headers: this.getAuthHeaders(),
@@ -454,7 +460,52 @@ class YesChefAPI {
     }
   }
 
-  // Import recipe using your Universal Recipe Intelligence System
+  // 🆕 Extract recipe data from URL without saving (for review workflow)
+  async extractRecipeFromUrl(url) {
+    this.log('Extracting recipe from URL (no save):', url);
+    
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Authentication required - please login first' };
+    }
+
+    try {
+      // For now, we'll use the existing import endpoint but delete the recipe if user cancels
+      // This is a workaround until we have a proper preview endpoint
+      const response = await this.debugFetch('/api/recipes/import/url', {
+        method: 'POST',
+        headers: {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url }),
+      });
+
+      const data = await response.json();
+      this.log('Extract response:', data);
+      
+      if (response.ok && data.success) {
+        this.log('✅ Recipe extracted (temporary save):', {
+          title: data.recipe_data?.title,
+          recipe_id: data.recipe_id,
+          confidence: data.confidence
+        });
+        return { 
+          success: true, 
+          recipe: data.recipe_data,
+          recipe_id: data.recipe_id, // We'll need this for deletion if user cancels
+          confidence: data.confidence,
+          extraction_method: data.extraction_method
+        };
+      } else {
+        this.error('Extract failed:', data);
+        return { success: false, error: data.error || 'Extraction failed' };
+      }
+    } catch (error) {
+      this.error('Extract recipe error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
   async importRecipe(url) {
     this.log('Importing recipe from:', url);
     
@@ -496,6 +547,72 @@ class YesChefAPI {
     } catch (error) {
       this.error('Import recipe error:', error);
       return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  // 🆕 Save reviewed imported recipe with category
+  async saveReviewedImportedRecipe(recipeData) {
+    this.log('Saving reviewed imported recipe:', recipeData.title);
+    
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Authentication required - please login first' };
+    }
+
+    try {
+      // Clean up the request body - remove undefined values and ensure user_id
+      const cleanRequestBody = Object.fromEntries(
+        Object.entries({
+          ...recipeData,
+          source: null, // ✅ Match existing recipes (they have source: null)
+          is_reviewed: true, // Flag to indicate user reviewed
+        }).filter(([key, value]) => value !== undefined && value !== null)
+      );
+      
+      this.log('📤 Sending recipe data to backend:', {
+        title: cleanRequestBody.title,
+        category: cleanRequestBody.category,
+        source: cleanRequestBody.source,
+        is_reviewed: cleanRequestBody.is_reviewed,
+        hasIngredients: !!cleanRequestBody.ingredients,
+        hasInstructions: !!cleanRequestBody.instructions,
+        cleanedFields: Object.keys(cleanRequestBody).sort()
+      });
+      
+      const response = await this.debugFetch('/api/recipes', {
+        method: 'POST',
+        headers: {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(cleanRequestBody),
+      });
+
+      const data = await response.json();
+      this.log('Save reviewed recipe response:', data);
+      
+      if (response.ok && data.success) {
+        this.log('✅ Reviewed recipe saved successfully!', {
+          title: recipeData.title,
+          category: recipeData.category,
+          recipe_id: data.data?.id || data.recipe?.id || data.recipe_id,
+          backend_response: data
+        });
+        return { 
+          success: true, 
+          recipe: data.recipe || data.data,
+          recipe_id: data.data?.id || data.recipe?.id || data.recipe_id
+        };
+      } else {
+        this.error('Save reviewed recipe failed:', data);
+        return { success: false, error: data.error || 'Failed to save recipe' };
+      }
+    } catch (error) {
+      this.error('Save reviewed recipe error:', error);
+      return { 
+        success: false, 
+        error: 'Network error - check backend connection',
+        details: error.message 
+      };
     }
   }
 
@@ -1086,6 +1203,125 @@ class YesChefAPI {
     } catch (error) {
       this.error('Account deletion error:', error);
       return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  // 🌟 Share Recipe to Community
+  async shareRecipe(recipeId, shareData) {
+    this.log('Sharing recipe to community:', {
+      recipe_id: recipeId,
+      community_title: shareData.community_title
+    });
+    
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Authentication required - please login first' };
+    }
+
+    try {
+      const response = await this.debugFetch('/api/community/recipes', {
+        method: 'POST',
+        headers: {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          recipe_id: recipeId,
+          community_title: shareData.community_title,
+          community_description: shareData.community_description,
+          community_background: shareData.community_background,
+          community_icon: shareData.community_icon,
+        }),
+      });
+
+      const data = await response.json();
+      this.log('Share recipe response:', data);
+      
+      if (response.ok && data.success) {
+        this.log('✅ Recipe shared successfully!', {
+          recipe_id: recipeId,
+          community_title: shareData.community_title,
+          community_background: shareData.community_background,
+          community_icon: shareData.community_icon,
+          backend_response: data
+        });
+        return { success: true, shared_recipe: data.shared_recipe };
+      } else {
+        this.error('Share recipe failed:', data);
+        return { success: false, error: data.error || 'Failed to share recipe' };
+      }
+    } catch (error) {
+      this.error('Share recipe error:', error);
+      return { success: false, error: 'Network error' };
+    }
+  }
+
+    // 🎨 Save Profile Avatar
+  async saveProfileAvatar(avatarData) {
+    this.log('Saving profile avatar:', avatarData);
+    
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Authentication required - please login first' };
+    }
+
+    try {
+      const response = await this.debugFetch('/api/profile/avatar', {
+        method: 'PUT',
+        headers: {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          background: avatarData.background,
+          icon: avatarData.icon,
+        }),
+      });
+
+      const data = await response.json();
+      this.log('Save avatar response:', data);
+      
+      if (response.ok && data.success) {
+        this.log('✅ Profile avatar saved successfully!', {
+          background: avatarData.background,
+          icon: avatarData.icon
+        });
+        return { success: true, avatar: data.avatar };
+      } else {
+        this.error('Save avatar failed:', data);
+        return { success: false, error: data.error || 'Failed to save avatar' };
+      }
+    } catch (error) {
+      this.error('Save avatar error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  // 🎨 Get Profile Avatar
+  async getProfileAvatar() {
+    this.log('Getting profile avatar');
+    
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Authentication required - please login first' };
+    }
+
+    try {
+      const response = await this.debugFetch('/api/profile/avatar', {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      const data = await response.json();
+      this.log('Get avatar response:', data);
+      
+      if (response.ok && data.success) {
+        this.log('✅ Profile avatar loaded successfully!', data.avatar);
+        return { success: true, avatar: data.avatar };
+      } else {
+        this.error('Get avatar failed:', data);
+        return { success: false, error: data.error || 'Failed to get avatar' };
+      }
+    } catch (error) {
+      this.error('Get avatar error:', error);
+      return { success: false, error: 'Network error' };
     }
   }
 }
