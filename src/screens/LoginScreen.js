@@ -311,6 +311,14 @@ export default function LoginScreen({ onLoginSuccess }) {
                 <Text style={styles.signUpLink}>Sign Up</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Privacy Policy Link */}
+            <TouchableOpacity 
+              style={styles.privacyPolicyContainer}
+              onPress={() => Linking.openURL('https://yeschef-app.vercel.app/privacypolicy.html')}
+            >
+              <Text style={styles.privacyPolicyText}>Privacy Policy</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -656,6 +664,19 @@ const styles = StyleSheet.create({
     color: '#AAC6AD',
     fontSize: 16,
     fontFamily: 'Nunito-ExtraBold',
+    textDecorationLine: 'underline',
+  },
+
+  // Privacy Policy Link
+  privacyPolicyContainer: {
+    alignItems: 'center',
+    marginTop: 16,
+    paddingVertical: 8,
+  },
+  privacyPolicyText: {
+    color: '#9CA3AF',
+    fontSize: 14,
+    fontFamily: 'Nunito-Regular',
     textDecorationLine: 'underline',
   },
 

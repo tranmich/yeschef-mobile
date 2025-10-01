@@ -23,6 +23,7 @@ import ProfileAvatar from '../components/ProfileAvatar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import PremiumStatus from '../components/PremiumStatus';
 import { RevenueCatValidator } from '../utils/RevenueCatValidator';
+import RecipeDebugger from '../utils/RecipeDebugger';
 import RevenueCatService from '../services/RevenueCatServiceMock'; // For mock premium toggle
 
 export default function ProfileScreen({ navigation, user = null }) {
@@ -353,6 +354,33 @@ export default function ProfileScreen({ navigation, user = null }) {
     RevenueCatValidator.showValidationAlert();
   };
 
+  // 🔍 Debug: Recipe Issues  
+  const debugRecipes = async () => {
+    try {
+      const report = await RecipeDebugger.showDiagnosticAlert();
+      
+      const summary = [
+        `🏗️ Build: ${report.buildType}`,
+        `🌐 API: ${report.apiConnection || 'Unknown'}`,
+        `🔐 Auth: ${report.authenticated ? 'Yes' : 'No'}`,
+        `📝 Recipes: ${report.recipeCount || 0}`,
+        `👥 Community: ${report.communityRecipeCount || 0}`,
+        `⚠️ Issues: ${report.issues.length}`,
+      ].join('\n');
+
+      Alert.alert(
+        '🔍 Recipe Diagnostic Report',
+        summary,
+        [
+          { text: 'Copy Report', onPress: () => console.log('Full Report:', report) },
+          { text: 'OK', style: 'default' }
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Debug Error', error.message);
+    }
+  };
+
   // 🧪 Debug: Toggle Mock Premium Status
   const toggleMockPremium = () => {
     const newStatus = RevenueCatService.toggleMockPremium();
@@ -523,6 +551,12 @@ export default function ProfileScreen({ navigation, user = null }) {
                 onPress={debugAvatarStorage}
               >
                 <Text style={styles.debugButtonText}>Check Avatar Storage</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.debugButton} 
+                onPress={debugRecipes}
+              >
+                <Text style={styles.debugButtonText}>🔍 Debug Recipe Issues</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.debugButton, { backgroundColor: '#10b981' }]} 

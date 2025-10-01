@@ -123,19 +123,20 @@ export default function HomeScreen({ navigation, user = null, onLogout = null })
       console.error('Failed to load community recipes:', error);
       
       // Fallback to mock data for development - start with realistic low counts
-      setCommunityRecipes([
-        { 
-          id: 1, 
-          title: 'Grandma\'s Pasta', 
-          community_title: 'Grandma\'s Secret Pasta Recipe',
-          user: 'SarahChef', 
-          shared_by: 'SarahChef',
-          image: '🍝', 
-          likes: 3, 
-          community_icon: '🍝',
-          ingredients: ['2 cups pasta', '1 can tomato sauce', '1 onion, diced', '2 cloves garlic'],
-          instructions: ['Boil pasta until al dente', 'Sauté onion and garlic', 'Add tomato sauce', 'Combine with pasta']
-        },
+      if (__DEV__) {
+        setCommunityRecipes([
+          { 
+            id: 1, 
+            title: 'Grandma\'s Pasta', 
+            community_title: 'Grandma\'s Secret Pasta Recipe',
+            user: 'SarahChef', 
+            shared_by: 'SarahChef',
+            image: '🍝', 
+            likes: 3, 
+            community_icon: '🍝',
+            ingredients: ['2 cups pasta', '1 can tomato sauce', '1 onion, diced', '2 cloves garlic'],
+            instructions: ['Boil pasta until al dente', 'Sauté onion and garlic', 'Add tomato sauce', 'Combine with pasta']
+          },
         { 
           id: 2, 
           title: 'Perfect Tacos', 
@@ -172,7 +173,12 @@ export default function HomeScreen({ navigation, user = null, onLogout = null })
           ingredients: ['1 can coconut milk', '2 tbsp curry paste', '1 lb chicken', 'Jasmine rice'],
           instructions: ['Cook rice', 'Sauté chicken', 'Add coconut milk and curry paste', 'Simmer until tender']
         },
-      ]);
+        ]);
+      } else {
+        // Production: Show empty state or error message
+        setCommunityRecipes([]);
+        console.warn('⚠️ Production build: No community recipes available');
+      }
     } finally {
       setIsLoadingCommunity(false);
     }
@@ -196,15 +202,16 @@ export default function HomeScreen({ navigation, user = null, onLogout = null })
       console.error('Failed to load latest updates:', error);
       
       // Fallback to mock data for development
-      setLatestUpdates([
-        { 
-          id: 'fallback_1', 
-          type: 'content',
-          title: 'Sheet pan formula', 
-          content: 'When you don\'t feel like cooking, throw some protein, a veggie, and your favorite spice on a sheet pan.',
-          category: 'tip',
-          icon: '💡'
-        },
+      if (__DEV__) {
+        setLatestUpdates([
+          { 
+            id: 'fallback_1', 
+            type: 'content',
+            title: 'Sheet pan formula', 
+            content: 'When you don\'t feel like cooking, throw some protein, a veggie, and your favorite spice on a sheet pan.',
+            category: 'tip',
+            icon: '💡'
+          },
         { 
           id: 'fallback_2', 
           type: 'content',
@@ -221,7 +228,12 @@ export default function HomeScreen({ navigation, user = null, onLogout = null })
           category: 'social',
           icon: '👨‍🍳'
         },
-      ]);
+        ]);
+      } else {
+        // Production: Show empty state
+        setLatestUpdates([]);
+        console.warn('⚠️ Production build: No latest updates available');
+      }
     } finally {
       setIsLoadingUpdates(false);
     }
