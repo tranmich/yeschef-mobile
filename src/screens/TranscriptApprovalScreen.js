@@ -42,14 +42,21 @@ const TranscriptApprovalScreen = ({ route, navigation }) => {
 
       if (result.success) {
         // Navigate to recipe review (reuse RecipeImportReview!)
+        // Wrap data in importResult structure expected by RecipeImportReviewScreen
         navigation.navigate('RecipeImportReview', {
-          recipe: result.recipe,
-          recipe_id: result.recipe_id,
-          source: 'voice_recording',
-          metadata: {
-            ...metadata,
+          importResult: {
+            success: true,
+            recipe: result.recipe,
+            recipe_id: result.recipe_id,
+            source: 'voice_recording',
+            isTemporary: false, // Voice recipes are not temporary
             extraction_method: result.extraction_method,
-            confidence: result.confidence
+            confidence: result.confidence,
+            metadata: {
+              ...metadata,
+              extraction_method: result.extraction_method,
+              confidence: result.confidence
+            }
           }
         });
       } else {
