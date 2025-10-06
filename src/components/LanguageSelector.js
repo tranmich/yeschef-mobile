@@ -16,7 +16,7 @@ import {
   View,
   Text,
   TextInput,
-  FlatList,
+  ScrollView,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator
@@ -78,43 +78,6 @@ const LanguageSelector = ({ onSelect, initialLanguage = null }) => {
     }
   };
 
-  const renderLanguageItem = ({ item, index }) => {
-    const isFirst = index === 0;
-    
-    return (
-      <TouchableOpacity
-        style={[
-          styles.suggestionItem,
-          isFirst && styles.suggestionFirst
-        ]}
-        onPress={() => handleSelect(item)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.suggestionContent}>
-          <View style={styles.suggestionHeader}>
-            {isFirst && (
-              <Ionicons name="checkmark" size={16} color="#28a745" style={styles.checkIcon} />
-            )}
-            <Text style={[
-              styles.suggestionName,
-              isFirst && styles.suggestionNameFirst
-            ]}>
-              {item.displayName}
-            </Text>
-          </View>
-          <Text style={styles.suggestionSubtext}>
-            {item.culture} • {item.region}
-          </Text>
-          {item.score && (
-            <Text style={styles.suggestionScore}>
-              Match: {Math.round(item.score / 10)}%
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Recipe Language/Culture:</Text>
@@ -137,14 +100,45 @@ const LanguageSelector = ({ onSelect, initialLanguage = null }) => {
 
       {showSuggestions && suggestions.length > 0 && (
         <View style={styles.suggestionsContainer}>
-          <FlatList
-            data={suggestions}
-            renderItem={renderLanguageItem}
-            keyExtractor={(item) => item.id}
+          <ScrollView
             style={styles.suggestionsList}
             keyboardShouldPersistTaps="handled"
-            maxToRender={10}
-          />
+            nestedScrollEnabled={true}
+          >
+            {suggestions.slice(0, 10).map((item, index) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  styles.suggestionItem,
+                  index === 0 && styles.suggestionFirst
+                ]}
+                onPress={() => handleSelect(item)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.suggestionContent}>
+                  <View style={styles.suggestionHeader}>
+                    {index === 0 && (
+                      <Ionicons name="checkmark" size={16} color="#28a745" style={styles.checkIcon} />
+                    )}
+                    <Text style={[
+                      styles.suggestionName,
+                      index === 0 && styles.suggestionNameFirst
+                    ]}>
+                      {item.displayName}
+                    </Text>
+                  </View>
+                  <Text style={styles.suggestionSubtext}>
+                    {item.culture} • {item.region}
+                  </Text>
+                  {item.score && (
+                    <Text style={styles.suggestionScore}>
+                      Match: {Math.round(item.score / 10)}%
+                    </Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       )}
 
