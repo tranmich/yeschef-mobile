@@ -23,7 +23,8 @@ import {
   Alert,
   ActivityIndicator,
   TextInput,
-  Platform
+  Platform,
+  StatusBar
 } from 'react-native';
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -52,7 +53,6 @@ const VoiceRecipeRecorder = ({ navigation }) => {
   
   // Setup state
   const [selectedLanguage, setSelectedLanguage] = useState(null);
-  const [recordedBy, setRecordedBy] = useState('');
   const [showSetup, setShowSetup] = useState(true);
 
   useEffect(() => {
@@ -290,7 +290,7 @@ const VoiceRecipeRecorder = ({ navigation }) => {
         navigation.navigate('TranscriptApproval', {
           transcript: result.transcript,
           metadata: {
-            recorded_by: recordedBy || 'Family',
+            recorded_by: 'Family', // AI can distinguish speakers automatically
             culture: selectedLanguage.culture,
             language: selectedLanguage.whisperCode,
             duration: totalDuration,
@@ -334,16 +334,6 @@ const VoiceRecipeRecorder = ({ navigation }) => {
             <LanguageSelector
               onSelect={setSelectedLanguage}
               initialLanguage={selectedLanguage}
-            />
-          </View>
-
-          <View style={styles.setupSection}>
-            <Text style={styles.label}>Who's recording? (optional)</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder='e.g., "Grandma", "Mom", "Uncle"'
-              value={recordedBy}
-              onChangeText={setRecordedBy}
             />
           </View>
 
@@ -400,7 +390,35 @@ const VoiceRecipeRecorder = ({ navigation }) => {
           ))}
         </View>
 
-        {/* Segment list */}
+        {/* Recording interface - NOW AT TOP */}
+        {isRecording ? (
+          <View style={styles.recordingContainer}>
+            <Text style={styles.recordingTitle}>🎙️ Recording...</Text>
+            <Text style={styles.currentSegmentLabel}>{SEGMENT_LABELS[currentSegmentIndex]}</Text>
+            <Text style={styles.timer}>
+              {formatDuration(recordingDuration)} / {formatDuration(MAX_SEGMENT_DURATION_MS)}
+            </Text>
+            <View style={styles.waveform}>
+              {/* Simple waveform animation placeholder */}
+              <Text style={styles.waveformText}>🎵</Text>
+            </View>
+            <TouchableOpacity style={styles.stopButton} onPress={stopRecording}>
+              <Ionicons name="square" size={32} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.buttonLabel}>Stop Recording</Text>
+          </View>
+        ) : (
+          <View style={styles.recordingContainer}>
+            <Text style={styles.recordingTitle}>Ready to Record</Text>
+            <Text style={styles.currentSegmentLabel}>{SEGMENT_LABELS[currentSegmentIndex]}</Text>
+            <TouchableOpacity style={styles.recordButton} onPress={startRecording}>
+              <Ionicons name="mic" size={48} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.buttonLabel}>Press to Start</Text>
+          </View>
+        )}
+
+        {/* Segment list - NOW BELOW RECORDING INTERFACE */}
         {segments.length > 0 && (
           <View style={styles.segmentsContainer}>
             <Text style={styles.sectionTitle}>Recorded Segments ({segments.length})</Text>
@@ -439,34 +457,6 @@ const VoiceRecipeRecorder = ({ navigation }) => {
                 </View>
               </View>
             ))}
-          </View>
-        )}
-
-        {/* Recording interface */}
-        {isRecording ? (
-          <View style={styles.recordingContainer}>
-            <Text style={styles.recordingTitle}>🎙️ Recording...</Text>
-            <Text style={styles.currentSegmentLabel}>{SEGMENT_LABELS[currentSegmentIndex]}</Text>
-            <Text style={styles.timer}>
-              {formatDuration(recordingDuration)} / {formatDuration(MAX_SEGMENT_DURATION_MS)}
-            </Text>
-            <View style={styles.waveform}>
-              {/* Simple waveform animation placeholder */}
-              <Text style={styles.waveformText}>🎵</Text>
-            </View>
-            <TouchableOpacity style={styles.stopButton} onPress={stopRecording}>
-              <Ionicons name="square" size={32} color="#fff" />
-            </TouchableOpacity>
-            <Text style={styles.buttonLabel}>Stop Recording</Text>
-          </View>
-        ) : (
-          <View style={styles.recordingContainer}>
-            <Text style={styles.recordingTitle}>Ready to Record</Text>
-            <Text style={styles.currentSegmentLabel}>{SEGMENT_LABELS[currentSegmentIndex]}</Text>
-            <TouchableOpacity style={styles.recordButton} onPress={startRecording}>
-              <Ionicons name="mic" size={48} color="#fff" />
-            </TouchableOpacity>
-            <Text style={styles.buttonLabel}>Press to Start</Text>
           </View>
         )}
       </ScrollView>
@@ -515,7 +505,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : StatusBar.currentHeight + 20,
     paddingBottom: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,

@@ -22,7 +22,8 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
-  Platform
+  Platform,
+  StatusBar
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import YesChefAPI from '../services/YesChefAPI';
@@ -234,7 +235,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : StatusBar.currentHeight + 20,
     paddingBottom: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
