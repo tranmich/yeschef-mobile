@@ -28,6 +28,7 @@ import LoginScreen from './src/screens/LoginScreen';
 // 🎤 Voice Recording (Phase 2 - Oct 6, 2025)
 import VoiceRecipeRecorder from './src/screens/VoiceRecipeRecorder';
 import TranscriptApprovalScreen from './src/screens/TranscriptApprovalScreen';
+import AddRecipeScreen from './src/screens/AddRecipeScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -122,6 +123,21 @@ function RecipeStack() {
           component={RecipeImportReviewScreen}
           options={{ headerShown: false }}
         />
+      </Stack.Navigator>
+    </SimpleErrorBoundary>
+  );
+}
+
+// ➕ NEW: Stack Navigator for Add Recipe (Phase 2 - Oct 6, 2025)
+function AddRecipeStack() {
+  return (
+    <SimpleErrorBoundary>
+      <Stack.Navigator>
+        <Stack.Screen 
+          name="AddRecipeHub" 
+          component={AddRecipeScreen}
+          options={{ headerShown: false }}
+        />
         <Stack.Screen 
           name="VoiceRecipeRecorder" 
           component={VoiceRecipeRecorder}
@@ -130,6 +146,11 @@ function RecipeStack() {
         <Stack.Screen 
           name="TranscriptApproval" 
           component={TranscriptApprovalScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="RecipeImportReview" 
+          component={RecipeImportReviewScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>
@@ -371,6 +392,23 @@ export default function App() {
             tabBarIcon: ({ color, size, focused }) => (
               <Icon 
                 name={focused ? 'recipesTabFilled' : 'recipesTab'} 
+                size={size} 
+                color={color}
+              />
+            ),
+          }}
+        />
+        
+        {/* ➕ NEW - Add Recipe Hub (Phase 2 - Oct 6, 2025) */}
+        <Tab.Screen 
+          name="AddRecipe" 
+          component={AddRecipeStack}
+          options={{
+            title: 'Add Recipe',
+            headerShown: false,
+            tabBarIcon: ({ color, size, focused }) => (
+              <Icon 
+                name={focused ? 'addRecipeFilled' : 'addRecipe'} 
                 size={size} 
                 color={color}
               />

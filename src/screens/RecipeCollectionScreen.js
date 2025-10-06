@@ -1241,27 +1241,6 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
                       </TouchableOpacity>
                     </View>
                   </View>
-
-                  {/* 🎤 Voice Recording Button - Phase 2 Test */}
-                  <TouchableOpacity
-                    style={styles.voiceRecordCard}
-                    onPress={() => {
-                      console.log('🎤 Voice Recording button pressed!');
-                      navigation.navigate('VoiceRecipeRecorder');
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.voiceRecordContent}>
-                      <Ionicons name="mic" size={32} color="#dc2626" />
-                      <View style={styles.voiceRecordText}>
-                        <Text style={styles.voiceRecordTitle}>Record Family Recipe</Text>
-                        <Text style={styles.voiceRecordSubtitle}>
-                          Preserve recipes through voice recording
-                        </Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
-                    </View>
-                  </TouchableOpacity>
                 </>
               )}
 
@@ -1790,25 +1769,6 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
         </View>
       </TouchableWithoutFeedback>
     </SafeAreaView>
-
-    {/* 🎤 Floating Action Button - Voice Recording (Phase 2 - Oct 6, 2025) */}
-    {/* Moved OUTSIDE SafeAreaView to ensure it's visible */}
-    {/* Temporarily showing always for debugging - change back to {selectedCategory && ...} */}
-    {true && (
-      <View style={styles.fabContainer}>
-        <TouchableOpacity
-          style={styles.fabButton}
-          onPress={() => {
-            console.log('🎤 FAB pressed! Navigating to VoiceRecipeRecorder');
-            console.log('   selectedCategory:', selectedCategory);
-            navigation.navigate('VoiceRecipeRecorder');
-          }}
-          activeOpacity={0.9}
-        >
-          <Ionicons name="mic" size={28} color="#fff" />
-        </TouchableOpacity>
-      </View>
-    )}
     
     </ImageBackground>
   );

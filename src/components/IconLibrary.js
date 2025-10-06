@@ -100,6 +100,8 @@ const ICON_MAPPINGS = {
   groceryTabFilled: { family: Ionicons, name: 'basket' },
   recipesTab: { family: Ionicons, name: 'book-outline' },
   recipesTabFilled: { family: Ionicons, name: 'book' },
+  addRecipe: { family: Ionicons, name: 'add-circle-outline' },
+  addRecipeFilled: { family: Ionicons, name: 'add-circle' },
   mealPlanTab: { family: Ionicons, name: 'calendar-outline' },
   mealPlanTabFilled: { family: Ionicons, name: 'calendar' },
   debugTab: { family: Ionicons, name: 'settings-outline' },
