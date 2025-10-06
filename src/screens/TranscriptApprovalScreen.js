@@ -87,7 +87,7 @@ const TranscriptApprovalScreen = ({ route, navigation }) => {
           onPress={() => setIsEditing(!isEditing)} 
           style={styles.editButton}
         >
-          <Ionicons name={isEditing ? "check" : "edit"} size={20} color="#28a745" />
+          <Ionicons name={isEditing ? "checkmark" : "create-outline"} size={20} color="#28a745" />
         </TouchableOpacity>
       </View>
 
@@ -95,7 +95,7 @@ const TranscriptApprovalScreen = ({ route, navigation }) => {
         {/* Confidence indicator */}
         <View style={styles.confidenceContainer}>
           <View style={styles.confidenceHeader}>
-            <Ionicons name="bar-chart-outline-outline" size={20} color={getConfidenceColor(metadata.confidence)} />
+            <Ionicons name="bar-chart-outline" size={20} color={getConfidenceColor(metadata.confidence)} />
             <Text style={styles.confidenceTitle}>Transcription Quality</Text>
           </View>
           <View style={styles.confidenceBar}>
@@ -117,17 +117,17 @@ const TranscriptApprovalScreen = ({ route, navigation }) => {
         {/* Metadata info */}
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
-            <Ionicons name="user" size={16} color="#6b7280" />
+            <Ionicons name="person-outline" size={16} color="#6b7280" />
             <Text style={styles.infoLabel}>Recorded by:</Text>
             <Text style={styles.infoValue}>{metadata.recorded_by}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Ionicons name="globe" size={16} color="#6b7280" />
+            <Ionicons name="globe-outline" size={16} color="#6b7280" />
             <Text style={styles.infoLabel}>Culture:</Text>
             <Text style={styles.infoValue}>{metadata.culture}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Ionicons name="clock" size={16} color="#6b7280" />
+            <Ionicons name="time-outline" size={16} color="#6b7280" />
             <Text style={styles.infoLabel}>Duration:</Text>
             <Text style={styles.infoValue}>
               {Math.round(metadata.duration / 1000)}s
@@ -161,7 +161,7 @@ const TranscriptApprovalScreen = ({ route, navigation }) => {
 
           {isEditing && (
             <View style={styles.editTips}>
-              <Ionicons name="info" size={16} color="#3b82f6" />
+              <Ionicons name="information-circle-outline" size={16} color="#3b82f6" />
               <Text style={styles.editTipsText}>
                 Fix any errors or add missing details. The AI will structure this into a recipe.
               </Text>
@@ -171,7 +171,7 @@ const TranscriptApprovalScreen = ({ route, navigation }) => {
 
         {/* Tips */}
         <View style={styles.tipsCard}>
-          <Ionicons name="lightbulb" size={20} color="#f59e0b" />
+          <Ionicons name="bulb-outline" size={20} color="#f59e0b" />
           <View style={styles.tipsContent}>
             <Text style={styles.tipsTitle}>What happens next?</Text>
             <Text style={styles.tipText}>

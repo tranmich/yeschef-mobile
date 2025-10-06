@@ -362,7 +362,7 @@ const VoiceRecipeRecorder = ({ navigation }) => {
                 index === currentSegmentIndex && isRecording && styles.progressDotActive
               ]}>
                 {index < segments.length && (
-                  <Ionicons name="check" size={12} color="#fff" />
+                  <Ionicons name="checkmark" size={12} color="#fff" />
                 )}
               </View>
               <Text style={styles.progressLabel}>{label}</Text>

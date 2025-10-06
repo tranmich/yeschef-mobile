@@ -21,8 +21,8 @@ import {
   StyleSheet,
   ActivityIndicator
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import YesChefAPI from '../services/YesChefAPI';
-import { Icon } from './IconLibrary';
 
 const LanguageSelector = ({ onSelect, initialLanguage = null }) => {
   const [query, setQuery] = useState('');
@@ -93,7 +93,7 @@ const LanguageSelector = ({ onSelect, initialLanguage = null }) => {
         <View style={styles.suggestionContent}>
           <View style={styles.suggestionHeader}>
             {isFirst && (
-              <Icon name="check" size={16} color="#28a745" style={styles.checkIcon} />
+              <Ionicons name="checkmark" size={16} color="#28a745" style={styles.checkIcon} />
             )}
             <Text style={[
               styles.suggestionName,
@@ -120,7 +120,7 @@ const LanguageSelector = ({ onSelect, initialLanguage = null }) => {
       <Text style={styles.label}>Recipe Language/Culture:</Text>
       
       <View style={styles.inputContainer}>
-        <Icon name="globe" size={20} color="#6b7280" style={styles.inputIcon} />
+        <Ionicons name="globe-outline" size={20} color="#6b7280" style={styles.inputIcon} />
         <TextInput
           style={styles.input}
           placeholder="Type to search (e.g., 'Filipino', 'Mexican', 'Italian')"
@@ -150,7 +150,7 @@ const LanguageSelector = ({ onSelect, initialLanguage = null }) => {
 
       {selected && !showSuggestions && (
         <View style={styles.selectedInfo}>
-          <Icon name="check-circle" size={20} color="#28a745" />
+          <Ionicons name="checkmark-circle" size={20} color="#28a745" />
           <View style={styles.selectedTextContainer}>
             <Text style={styles.infoText}>
               ✓ Selected: {selected.culture} ({selected.whisperCode})
