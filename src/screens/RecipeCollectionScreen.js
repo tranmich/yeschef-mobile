@@ -53,8 +53,7 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
   const [recipes, setRecipes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isImporting, setIsImporting] = useState(false);
-  const [importUrl, setImportUrl] = useState('');
+  // Import functionality moved to AddRecipeScreen
   const [selectedCategory, setSelectedCategory] = useState(null); // null = show category list
   const [categoriesWithCounts, setCategoriesWithCounts] = useState(() => {
     const initialCategories = defaultCategories.map(cat => ({ ...cat, count: 0 }));
@@ -213,44 +212,7 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
     }
   };
 
-  const importRecipeFromUrl = async () => {
-    if (!importUrl.trim()) {
-      Alert.alert('Error', 'Please enter a recipe URL');
-      return;
-    }
-
-    setIsImporting(true);
-    try {
-      // 🆕 NEW APPROACH: Extract recipe data without saving to backend
-      const result = await YesChefAPI.extractRecipeFromUrl(importUrl.trim());
-      if (result.success) {
-        console.log('🔍 EXTRACT SUCCESS: Navigating to review screen');
-        
-        setImportUrl(''); // Clear the URL input
-        setIsImporting(false); // Reset loading state
-        
-        // Navigate to the review screen with extracted (but unsaved) data
-        navigation.navigate('RecipeImportReview', {
-          importResult: {
-            recipe: result.recipe,
-            temp_recipe_id: result.recipe_id, // Temporary ID for deletion if cancelled
-            confidence: result.confidence,
-            extraction_method: result.extraction_method,
-            needs_review: true, // Always needs review since it's not saved yet
-            isTemporary: true // Flag to indicate this is not yet saved
-          }
-        });
-        
-      } else {
-        setIsImporting(false);
-        Alert.alert('Import Failed', result.error || 'Failed to extract recipe from URL');
-      }
-    } catch (error) {
-      setIsImporting(false);
-      console.error('Import error:', error);
-      Alert.alert('Error', 'Network error during import');
-    }
-  };
+  // Import functionality moved to AddRecipeScreen
 
   const openRecipe = (recipe) => {
     navigation.navigate('RecipeDetail', { 
@@ -1212,37 +1174,7 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
             {/* Original search removed - moved outside problematic container */}
 
             <ScrollView style={styles.mainContent}>
-              {/* Recipe import section */}
-              {!selectedCategory && (
-                <>
-                  <View style={styles.importCard}>
-                    <Text style={styles.importTitle}>Import Recipe from URL</Text>
-                    <View style={styles.importInputContainer}>
-                      <TextInput
-                        style={styles.importInput}
-                        value={importUrl}
-                        onChangeText={setImportUrl}
-                        placeholder="Add URL here"
-                        placeholderTextColor="#9ca3af"
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        keyboardType="url"
-                      />
-                      <TouchableOpacity
-                        style={[styles.importButton, isImporting && styles.importButtonDisabled]}
-                        onPress={importRecipeFromUrl}
-                        disabled={isImporting}
-                      >
-                        {isImporting ? (
-                          <ActivityIndicator size="small" color="#ffffff" />
-                        ) : (
-                          <Text style={styles.importButtonText}>Import</Text>
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </>
-              )}
+              {/* Recipe import removed - now in dedicated Add Recipe tab */}
 
               {(() => {
                 return !selectedCategory ? (

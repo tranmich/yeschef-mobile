@@ -94,30 +94,7 @@ const AddRecipeScreen = ({ navigation }) => {
           contentContainerStyle={styles.contentContainer}
           showsVerticalScrollIndicator={false}
         >
-          {/* Voice Recording Card */}
-          <TouchableOpacity
-            style={[styles.methodCard, styles.voiceCard]}
-            onPress={() => navigation.navigate('VoiceRecipeRecorder')}
-            activeOpacity={0.8}
-          >
-            <View style={styles.methodIconContainer}>
-              <Ionicons name="mic" size={48} color="#dc2626" />
-            </View>
-            <View style={styles.methodContent}>
-              <Text style={styles.methodTitle}>🎤 Record Family Recipe</Text>
-              <Text style={styles.methodDescription}>
-                Preserve family recipes through voice recording. Perfect for capturing grandma's cooking secrets!
-              </Text>
-              <View style={styles.methodFeatures}>
-                <Text style={styles.featureText}>• Multi-segment recording</Text>
-                <Text style={styles.featureText}>• 18+ languages supported</Text>
-                <Text style={styles.featureText}>• AI-powered transcription</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={28} color="#dc2626" style={styles.methodArrow} />
-          </TouchableOpacity>
-
-          {/* URL Import Card */}
+          {/* URL Import Card - First */}
           <View style={[styles.methodCard, styles.urlCard]}>
             <View style={styles.methodIconContainer}>
               <Ionicons name="link" size={48} color="#28a745" />
@@ -160,7 +137,30 @@ const AddRecipeScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Camera Import Card (Coming Soon) */}
+          {/* Voice Recording Card - Second */}
+          <TouchableOpacity
+            style={[styles.methodCard, styles.voiceCard]}
+            onPress={() => navigation.navigate('VoiceRecipeRecorder')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.methodIconContainer}>
+              <Ionicons name="mic" size={48} color="#dc2626" />
+            </View>
+            <View style={styles.methodContent}>
+              <Text style={styles.methodTitle}>🎤 Record Family Recipe</Text>
+              <Text style={styles.methodDescription}>
+                Preserve family recipes through voice recording. Perfect for capturing grandma's cooking secrets!
+              </Text>
+              <View style={styles.methodFeatures}>
+                <Text style={styles.featureText}>• Multi-segment recording</Text>
+                <Text style={styles.featureText}>• 18+ languages supported</Text>
+                <Text style={styles.featureText}>• AI-powered transcription</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={28} color="#dc2626" style={styles.methodArrow} />
+          </TouchableOpacity>
+
+          {/* Camera Import Card (Coming Soon) - Third */}
           <TouchableOpacity
             style={[styles.methodCard, styles.cameraCard, styles.comingSoon]}
             activeOpacity={0.6}
