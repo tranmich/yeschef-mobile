@@ -45,6 +45,7 @@ const VoiceRecipeRecorder = ({ navigation }) => {
   const [recording, setRecording] = useState(null);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [playingSegmentId, setPlayingSegmentId] = useState(null);
+  const [currentSound, setCurrentSound] = useState(null); // Store current playing sound
   
   // Processing state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -62,6 +63,9 @@ const VoiceRecipeRecorder = ({ navigation }) => {
     return () => {
       if (recording) {
         recording.stopAndUnloadAsync();
+      }
+      if (currentSound) {
+        currentSound.unloadAsync();
       }
     };
   }, []);
@@ -190,16 +194,42 @@ const VoiceRecipeRecorder = ({ navigation }) => {
 
   const playSegment = async (segment) => {
     try {
+      // If this segment is already playing, pause it
+      if (playingSegmentId === segment.segment_id && currentSound) {
+        const status = await currentSound.getStatusAsync();
+        if (status.isLoaded && status.isPlaying) {
+          await currentSound.pauseAsync();
+          setPlayingSegmentId(null);
+          return;
+        } else if (status.isLoaded && !status.isPlaying) {
+          // Resume if paused
+          await currentSound.playAsync();
+          setPlayingSegmentId(segment.segment_id);
+          return;
+        }
+      }
+
+      // Stop any currently playing sound
+      if (currentSound) {
+        await currentSound.stopAsync();
+        await currentSound.unloadAsync();
+        setCurrentSound(null);
+      }
+
+      // Load and play the new sound
       const { sound } = await Audio.Sound.createAsync(
         { uri: segment.audio_uri },
         { shouldPlay: true }
       );
 
+      setCurrentSound(sound);
       setPlayingSegmentId(segment.segment_id);
 
+      // Set up playback status listener
       sound.setOnPlaybackStatusUpdate((status) => {
         if (status.didJustFinish) {
           setPlayingSegmentId(null);
+          setCurrentSound(null);
           sound.unloadAsync();
         }
       });
