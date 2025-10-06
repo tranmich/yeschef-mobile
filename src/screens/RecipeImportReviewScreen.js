@@ -339,25 +339,21 @@ const RecipeImportReviewScreen = ({ route, navigation }) => {
             { 
               text: 'View Collection', 
               onPress: () => {
-                // Navigate back and trigger refresh
-                navigation.navigate('RecipeCollection', { refresh: true });
-                
-                // 🆕 Additional refresh after a short delay to ensure backend consistency
-                setTimeout(() => {
-                  navigation.setParams({ forceRefresh: Date.now() });
-                }, 1000);
+                // Navigate to Recipes tab (which contains RecipeCollection)
+                navigation.navigate('Recipes', { 
+                  screen: 'RecipeCollection',
+                  params: { refresh: true }
+                });
               }
             },
             {
               text: 'OK',
               onPress: () => {
-                // Navigate back and trigger refresh
-                navigation.navigate('RecipeCollection', { refresh: true });
-                
-                // 🆕 Additional refresh after a short delay to ensure backend consistency
-                setTimeout(() => {
-                  navigation.setParams({ forceRefresh: Date.now() });
-                }, 1000);
+                // Navigate to Recipes tab (which contains RecipeCollection)
+                navigation.navigate('Recipes', { 
+                  screen: 'RecipeCollection',
+                  params: { refresh: true }
+                });
               }
             }
           ]
