@@ -813,8 +813,21 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
       });
     }
     
-    // Standard meal categories - use title-based detection since meal_role doesn't exist
+    // 🔧 FIX: Use actual category field first, then fallback to keyword matching
     return safeRecipes.filter(recipe => {
+      // PRIORITY 1: Check if recipe has explicit category field (from imports/voice recording)
+      if (recipe.category) {
+        // Direct match
+        if (recipe.category === categoryId) {
+          return true;
+        }
+        // Handle plural variations (dessert vs desserts)
+        if (recipe.category === categoryId + 's' || recipe.category + 's' === categoryId) {
+          return true;
+        }
+      }
+      
+      // PRIORITY 2: Fallback to keyword matching for older recipes without category field
       const title = (recipe.title || '').toLowerCase();
       const description = (recipe.description || '').toLowerCase();
       const source = (recipe.source || '').toLowerCase();
