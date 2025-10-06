@@ -1324,6 +1324,159 @@ class YesChefAPI {
       return { success: false, error: 'Network error' };
     }
   }
+
+  // ===================================
+  // 🎤 VOICE RECIPE RECORDING (Phase 2 - Oct 6, 2025)
+  // ===================================
+
+  // Search languages for voice recording
+  async searchLanguages(query = '') {
+    this.log('Searching languages:', query);
+    
+    try {
+      const response = await this.debugFetch(`/api/recipes/voice/languages/search?q=${encodeURIComponent(query)}`, {
+        method: 'GET',
+      });
+
+      const data = await response.json();
+      this.log('Language search response:', data);
+      
+      if (response.ok && data.success) {
+        this.log(`✅ Found ${data.count} languages`);
+        return { 
+          success: true, 
+          languages: data.languages,
+          count: data.count
+        };
+      } else {
+        this.error('Language search failed:', data);
+        return { success: false, error: data.error || 'Language search failed' };
+      }
+    } catch (error) {
+      this.error('Language search error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  // Process voice recording session (multi-segment)
+  async processVoiceSession(sessionData) {
+    this.log('Processing voice session:', sessionData.session_id);
+    
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Authentication required - please login first' };
+    }
+
+    try {
+      // Create FormData for multipart upload
+      const formData = new FormData();
+      
+      // Add metadata as JSON string
+      formData.append('metadata', JSON.stringify({
+        session_id: sessionData.session_id,
+        total_duration_ms: sessionData.total_duration_ms,
+        language_config: sessionData.language_config,
+        segments: sessionData.segments.map((seg, idx) => ({
+          label: seg.label,
+          duration_ms: seg.duration_ms
+        }))
+      }));
+      
+      // Add audio files
+      sessionData.segments.forEach((segment, index) => {
+        // Create blob from audio URI
+        formData.append(`segment_${index}`, {
+          uri: segment.audio_uri,
+          type: 'audio/m4a',
+          name: `segment_${index}.m4a`
+        });
+      });
+      
+      this.log(`Uploading ${sessionData.segments.length} audio segments...`);
+      
+      const response = await this.debugFetch('/api/recipes/voice/session/process', {
+        method: 'POST',
+        headers: {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'multipart/form-data',
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+      this.log('Voice session process response:', data);
+      
+      if (response.ok && data.success) {
+        this.log('✅ Voice session processed successfully!', {
+          transcript_length: data.combined_transcript?.length,
+          confidence: data.confidence,
+          segments: data.segments?.length
+        });
+        return { 
+          success: true, 
+          transcript: data.auto_edited || data.combined_transcript,
+          combined_transcript: data.combined_transcript,
+          confidence: data.confidence,
+          segments: data.segments,
+          language: data.language
+        };
+      } else {
+        this.error('Voice session processing failed:', data);
+        return { success: false, error: data.error || 'Session processing failed' };
+      }
+    } catch (error) {
+      this.error('Voice session processing error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
+  // Generate recipe from approved transcript
+  async generateRecipeFromTranscript(transcript, metadata) {
+    this.log('Generating recipe from transcript');
+    
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Authentication required - please login first' };
+    }
+
+    try {
+      const response = await this.debugFetch('/api/recipes/voice/generate', {
+        method: 'POST',
+        headers: {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transcript,
+          metadata
+        }),
+      });
+
+      const data = await response.json();
+      this.log('Recipe generation response:', data);
+      
+      if (response.ok && data.success) {
+        this.log('✅ Recipe generated from voice!', {
+          title: data.recipe_data?.title,
+          ingredients: data.recipe_data?.ingredients?.length,
+          instructions: data.recipe_data?.instructions?.length,
+          confidence: data.confidence
+        });
+        return { 
+          success: true, 
+          recipe: data.recipe_data,
+          recipe_id: data.recipe_id,
+          confidence: data.confidence,
+          needs_review: data.needs_review,
+          extraction_method: data.extraction_method
+        };
+      } else {
+        this.error('Recipe generation failed:', data);
+        return { success: false, error: data.error || 'Recipe generation failed' };
+      }
+    } catch (error) {
+      this.error('Recipe generation error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
 }
 
 // Export singleton instance

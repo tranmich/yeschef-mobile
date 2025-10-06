@@ -200,53 +200,6 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
           
           // 🎯 Success! Recipe import system is working
           console.log('🎉 Recipe import system operational - showing most recent recipes:');
-          
-          // 🚨 Check for specific missing recipe (2599 from latest logs) 
-          const recipe2599 = result.recipes.find(r => r.id === 2599);
-          if (recipe2599) {
-            console.log('✅ Found recipe 2599:', {
-              id: recipe2599.id,
-              title: recipe2599.title,
-              category: recipe2599.category,
-              created_at: recipe2599.created_at,
-              user_id: recipe2599.user_id,
-              source: recipe2599.source
-            });
-          } else {
-            console.log('❌ Recipe 2599 NOT FOUND in backend response');
-            
-            // Check for ALL BBQ Mushroom Pizza recipes to see what's different
-            const bbqRecipes = result.recipes.filter(r => 
-              r.title && r.title.toLowerCase().includes('bbq mushroom')
-            );
-            console.log('🔍 All BBQ Mushroom recipes found:', bbqRecipes.map(r => ({
-              id: r.id,
-              title: r.title,
-              category: r.category,
-              source: r.source,
-              user_id: r.user_id
-            })));
-            
-            // Check if any recipe with similar title exists
-            const similarRecipes = result.recipes.filter(r => 
-              r.title && r.title.toLowerCase().includes('bbq mushroom pizza test')
-            );
-            if (similarRecipes.length > 0) {
-              console.log('🔍 Found similar recipes:', similarRecipes.map(r => ({
-                id: r.id,
-                title: r.title,
-                category: r.category
-              })));
-            } else {
-              console.log('❌ No recipes with "BBQ Mushroom Pizza Test" found at all');
-              
-              // Check total count vs expected
-              console.log('📊 Recipe count analysis:', {
-                backend_count: result.recipes.length,
-                expected_with_new_recipe: 23, // Should be 23 if recipe 2597 was included
-              });
-            }
-          }
         }
       } else {
         console.log('❌ RECIPE DEBUG: Failed to load recipes:', result.error);
@@ -1807,6 +1760,20 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
       </View>
     </TouchableWithoutFeedback>
   </Modal>
+
+      {/* 🎤 Floating Action Button - Voice Recording (Phase 2 - Oct 6, 2025) */}
+      {selectedCategory && (
+        <View style={styles.fabContainer}>
+          <TouchableOpacity
+            style={styles.fabButton}
+            onPress={() => navigation.navigate('VoiceRecipeRecorder')}
+            activeOpacity={0.9}
+          >
+            <Icon name="mic" size={28} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
+
         </View>
       </TouchableWithoutFeedback>
     </SafeAreaView>
@@ -2539,4 +2506,26 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
+
+  // 🎤 Floating Action Button (Voice Recording - Phase 2)
+  fabContainer: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    zIndex: 9999,
+  },
+  fabButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#dc2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
 });
+

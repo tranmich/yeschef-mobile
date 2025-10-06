@@ -25,6 +25,9 @@ import UserCommunityPostsScreen from './src/screens/UserCommunityPostsScreen';
 // DebugScreen removed
 import DragTestScreen from './src/screens/DragTestScreen';
 import LoginScreen from './src/screens/LoginScreen';
+// 🎤 Voice Recording (Phase 2 - Oct 6, 2025)
+import VoiceRecipeRecorder from './src/screens/VoiceRecipeRecorder';
+import TranscriptApprovalScreen from './src/screens/TranscriptApprovalScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -117,6 +120,16 @@ function RecipeStack() {
         <Stack.Screen 
           name="RecipeImportReview" 
           component={RecipeImportReviewScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="VoiceRecipeRecorder" 
+          component={VoiceRecipeRecorder}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="TranscriptApproval" 
+          component={TranscriptApprovalScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>

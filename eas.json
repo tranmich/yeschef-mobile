@@ -11,6 +11,12 @@
     "preview": {
       "distribution": "internal"
     },
+    "production-test": {
+      "distribution": "internal",
+      "env": {
+        "NODE_ENV": "production"
+      }
+    },
     "production": {
       "autoIncrement": true
     }
