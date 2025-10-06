@@ -24,7 +24,7 @@ import {
   Alert,
   Platform
 } from 'react-native';
-import { Icon } from '../components/IconLibrary';
+import { Ionicons } from '@expo/vector-icons';
 import YesChefAPI from '../services/YesChefAPI';
 
 const TranscriptApprovalScreen = ({ route, navigation }) => {
@@ -80,14 +80,14 @@ const TranscriptApprovalScreen = ({ route, navigation }) => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color="#1f2937" />
+          <Ionicons name="arrow-back" size={24} color="#1f2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Review Transcript</Text>
         <TouchableOpacity 
           onPress={() => setIsEditing(!isEditing)} 
           style={styles.editButton}
         >
-          <Icon name={isEditing ? "check" : "edit"} size={20} color="#28a745" />
+          <Ionicons name={isEditing ? "check" : "edit"} size={20} color="#28a745" />
         </TouchableOpacity>
       </View>
 
@@ -95,7 +95,7 @@ const TranscriptApprovalScreen = ({ route, navigation }) => {
         {/* Confidence indicator */}
         <View style={styles.confidenceContainer}>
           <View style={styles.confidenceHeader}>
-            <Icon name="bar-chart" size={20} color={getConfidenceColor(metadata.confidence)} />
+            <Ionicons name="bar-chart-outline-outline" size={20} color={getConfidenceColor(metadata.confidence)} />
             <Text style={styles.confidenceTitle}>Transcription Quality</Text>
           </View>
           <View style={styles.confidenceBar}>
@@ -117,17 +117,17 @@ const TranscriptApprovalScreen = ({ route, navigation }) => {
         {/* Metadata info */}
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
-            <Icon name="user" size={16} color="#6b7280" />
+            <Ionicons name="user" size={16} color="#6b7280" />
             <Text style={styles.infoLabel}>Recorded by:</Text>
             <Text style={styles.infoValue}>{metadata.recorded_by}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Icon name="globe" size={16} color="#6b7280" />
+            <Ionicons name="globe" size={16} color="#6b7280" />
             <Text style={styles.infoLabel}>Culture:</Text>
             <Text style={styles.infoValue}>{metadata.culture}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Icon name="clock" size={16} color="#6b7280" />
+            <Ionicons name="clock" size={16} color="#6b7280" />
             <Text style={styles.infoLabel}>Duration:</Text>
             <Text style={styles.infoValue}>
               {Math.round(metadata.duration / 1000)}s
@@ -161,7 +161,7 @@ const TranscriptApprovalScreen = ({ route, navigation }) => {
 
           {isEditing && (
             <View style={styles.editTips}>
-              <Icon name="info" size={16} color="#3b82f6" />
+              <Ionicons name="info" size={16} color="#3b82f6" />
               <Text style={styles.editTipsText}>
                 Fix any errors or add missing details. The AI will structure this into a recipe.
               </Text>
@@ -171,7 +171,7 @@ const TranscriptApprovalScreen = ({ route, navigation }) => {
 
         {/* Tips */}
         <View style={styles.tipsCard}>
-          <Icon name="lightbulb" size={20} color="#f59e0b" />
+          <Ionicons name="lightbulb" size={20} color="#f59e0b" />
           <View style={styles.tipsContent}>
             <Text style={styles.tipsTitle}>What happens next?</Text>
             <Text style={styles.tipText}>
@@ -208,7 +208,7 @@ const TranscriptApprovalScreen = ({ route, navigation }) => {
           ) : (
             <>
               <Text style={styles.generateButtonText}>Generate Recipe</Text>
-              <Icon name="arrow-right" size={20} color="#fff" />
+              <Ionicons name="arrow-forward" size={20} color="#fff" />
             </>
           )}
         </TouchableOpacity>

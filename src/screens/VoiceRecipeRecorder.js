@@ -27,7 +27,7 @@ import {
 } from 'react-native';
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Icon } from '../components/IconLibrary';
+import { Ionicons } from '@expo/vector-icons';
 import LanguageSelector from '../components/LanguageSelector';
 import YesChefAPI from '../services/YesChefAPI';
 
@@ -291,7 +291,7 @@ const VoiceRecipeRecorder = ({ navigation }) => {
       <ScrollView style={styles.container} contentContainerStyle={styles.setupContainer}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Icon name="arrow-left" size={24} color="#1f2937" />
+            <Ionicons name="arrow-back" size={24} color="#1f2937" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>🎤 Record Family Recipe</Text>
         </View>
@@ -318,7 +318,7 @@ const VoiceRecipeRecorder = ({ navigation }) => {
           </View>
 
           <View style={styles.setupTips}>
-            <Icon name="lightbulb" size={20} color="#f59e0b" />
+            <Ionicons name="bulb-outline" size={20} color="#f59e0b" />
             <View style={styles.tipsContent}>
               <Text style={styles.tipsTitle}>Tips for great recordings:</Text>
               <Text style={styles.tipText}>• Record in parts (ingredients → prep → cooking)</Text>
@@ -343,11 +343,11 @@ const VoiceRecipeRecorder = ({ navigation }) => {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color="#1f2937" />
+          <Ionicons name="arrow-back" size={24} color="#1f2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Recording Session</Text>
         <TouchableOpacity onPress={() => setShowSetup(true)} style={styles.settingsButton}>
-          <Icon name="settings" size={20} color="#6b7280" />
+          <Ionicons name="settings" size={20} color="#6b7280" />
         </TouchableOpacity>
       </View>
 
@@ -362,7 +362,7 @@ const VoiceRecipeRecorder = ({ navigation }) => {
                 index === currentSegmentIndex && isRecording && styles.progressDotActive
               ]}>
                 {index < segments.length && (
-                  <Icon name="check" size={12} color="#fff" />
+                  <Ionicons name="check" size={12} color="#fff" />
                 )}
               </View>
               <Text style={styles.progressLabel}>{label}</Text>
@@ -388,7 +388,7 @@ const VoiceRecipeRecorder = ({ navigation }) => {
                     onPress={() => playSegment(segment)}
                     style={styles.segmentActionButton}
                   >
-                    <Icon 
+                    <Ionicons 
                       name={playingSegmentId === segment.segment_id ? "pause" : "play"} 
                       size={16} 
                       color="#28a745" 
@@ -401,7 +401,7 @@ const VoiceRecipeRecorder = ({ navigation }) => {
                     onPress={() => deleteSegment(segment.segment_id)}
                     style={styles.segmentActionButton}
                   >
-                    <Icon name="trash" size={16} color="#dc2626" />
+                    <Ionicons name="trash" size={16} color="#dc2626" />
                     <Text style={[styles.segmentActionText, { color: '#dc2626' }]}>
                       Delete
                     </Text>
@@ -425,7 +425,7 @@ const VoiceRecipeRecorder = ({ navigation }) => {
               <Text style={styles.waveformText}>🎵</Text>
             </View>
             <TouchableOpacity style={styles.stopButton} onPress={stopRecording}>
-              <Icon name="square" size={32} color="#fff" />
+              <Ionicons name="square" size={32} color="#fff" />
             </TouchableOpacity>
             <Text style={styles.buttonLabel}>Stop Recording</Text>
           </View>
@@ -434,7 +434,7 @@ const VoiceRecipeRecorder = ({ navigation }) => {
             <Text style={styles.recordingTitle}>Ready to Record</Text>
             <Text style={styles.currentSegmentLabel}>{SEGMENT_LABELS[currentSegmentIndex]}</Text>
             <TouchableOpacity style={styles.recordButton} onPress={startRecording}>
-              <Icon name="mic" size={48} color="#fff" />
+              <Ionicons name="mic" size={48} color="#fff" />
             </TouchableOpacity>
             <Text style={styles.buttonLabel}>Press to Start</Text>
           </View>
@@ -463,7 +463,7 @@ const VoiceRecipeRecorder = ({ navigation }) => {
           ) : (
             <>
               <Text style={styles.processButtonText}>Process & Continue</Text>
-              <Icon name="arrow-right" size={20} color="#fff" />
+              <Ionicons name="arrow-forward" size={20} color="#fff" />
             </>
           )}
         </TouchableOpacity>

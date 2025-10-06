@@ -1077,6 +1077,9 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
 
   // Main content render
 
+  // Debug: Log FAB visibility condition
+  console.log('🔍 RecipeCollection render - selectedCategory:', selectedCategory, 'FAB should show:', !!selectedCategory);
+
   // Main component render
   return (
     <ImageBackground 
@@ -1211,32 +1214,55 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
             <ScrollView style={styles.mainContent}>
               {/* Recipe import section */}
               {!selectedCategory && (
-                <View style={styles.importCard}>
-                  <Text style={styles.importTitle}>Import Recipe from URL</Text>
-                  <View style={styles.importInputContainer}>
-                    <TextInput
-                      style={styles.importInput}
-                      value={importUrl}
-                      onChangeText={setImportUrl}
-                      placeholder="Add URL here"
-                      placeholderTextColor="#9ca3af"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="url"
-                    />
-                    <TouchableOpacity
-                      style={[styles.importButton, isImporting && styles.importButtonDisabled]}
-                      onPress={importRecipeFromUrl}
-                      disabled={isImporting}
-                    >
-                      {isImporting ? (
-                        <ActivityIndicator size="small" color="#ffffff" />
-                      ) : (
-                        <Text style={styles.importButtonText}>Import</Text>
-                      )}
-                    </TouchableOpacity>
+                <>
+                  <View style={styles.importCard}>
+                    <Text style={styles.importTitle}>Import Recipe from URL</Text>
+                    <View style={styles.importInputContainer}>
+                      <TextInput
+                        style={styles.importInput}
+                        value={importUrl}
+                        onChangeText={setImportUrl}
+                        placeholder="Add URL here"
+                        placeholderTextColor="#9ca3af"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="url"
+                      />
+                      <TouchableOpacity
+                        style={[styles.importButton, isImporting && styles.importButtonDisabled]}
+                        onPress={importRecipeFromUrl}
+                        disabled={isImporting}
+                      >
+                        {isImporting ? (
+                          <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                          <Text style={styles.importButtonText}>Import</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
+
+                  {/* 🎤 Voice Recording Button - Phase 2 Test */}
+                  <TouchableOpacity
+                    style={styles.voiceRecordCard}
+                    onPress={() => {
+                      console.log('🎤 Voice Recording button pressed!');
+                      navigation.navigate('VoiceRecipeRecorder');
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.voiceRecordContent}>
+                      <Ionicons name="mic" size={32} color="#dc2626" />
+                      <View style={styles.voiceRecordText}>
+                        <Text style={styles.voiceRecordTitle}>Record Family Recipe</Text>
+                        <Text style={styles.voiceRecordSubtitle}>
+                          Preserve recipes through voice recording
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
+                    </View>
+                  </TouchableOpacity>
+                </>
               )}
 
               {(() => {
@@ -1761,22 +1787,28 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
     </TouchableWithoutFeedback>
   </Modal>
 
-      {/* 🎤 Floating Action Button - Voice Recording (Phase 2 - Oct 6, 2025) */}
-      {selectedCategory && (
-        <View style={styles.fabContainer}>
-          <TouchableOpacity
-            style={styles.fabButton}
-            onPress={() => navigation.navigate('VoiceRecipeRecorder')}
-            activeOpacity={0.9}
-          >
-            <Icon name="mic" size={28} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      )}
-
         </View>
       </TouchableWithoutFeedback>
     </SafeAreaView>
+
+    {/* 🎤 Floating Action Button - Voice Recording (Phase 2 - Oct 6, 2025) */}
+    {/* Moved OUTSIDE SafeAreaView to ensure it's visible */}
+    {/* Temporarily showing always for debugging - change back to {selectedCategory && ...} */}
+    {true && (
+      <View style={styles.fabContainer}>
+        <TouchableOpacity
+          style={styles.fabButton}
+          onPress={() => {
+            console.log('🎤 FAB pressed! Navigating to VoiceRecipeRecorder');
+            console.log('   selectedCategory:', selectedCategory);
+            navigation.navigate('VoiceRecipeRecorder');
+          }}
+          activeOpacity={0.9}
+        >
+          <Ionicons name="mic" size={28} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    )}
     
     </ImageBackground>
   );
@@ -2526,6 +2558,42 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+
+  // 🎤 Voice Recording Card (Phase 2 - In Import Section)
+  voiceRecordCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#dc2626',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  voiceRecordContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  voiceRecordText: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  voiceRecordTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#dc2626',
+    marginBottom: 4,
+    fontFamily: 'Nunito-ExtraBold',
+  },
+  voiceRecordSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontFamily: 'Nunito-Regular',
   },
 });
 
