@@ -29,6 +29,8 @@ import LoginScreen from './src/screens/LoginScreen';
 import VoiceRecipeRecorder from './src/screens/VoiceRecipeRecorder';
 import TranscriptApprovalScreen from './src/screens/TranscriptApprovalScreen';
 import AddRecipeScreen from './src/screens/AddRecipeScreen';
+// 📷 OCR/Camera Scanning (Phase 3 - Oct 7, 2025)
+import CameraRecipeScanner from './src/screens/CameraRecipeScanner';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -146,6 +148,11 @@ function AddRecipeStack() {
         <Stack.Screen 
           name="TranscriptApproval" 
           component={TranscriptApprovalScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="CameraRecipeScanner" 
+          component={CameraRecipeScanner}
           options={{ headerShown: false }}
         />
         <Stack.Screen 

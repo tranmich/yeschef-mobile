@@ -1477,6 +1477,70 @@ class YesChefAPI {
       return { success: false, error: 'Network error - check connection' };
     }
   }
+
+  // 📷 Process OCR images (camera/gallery photos)
+  async processOCRImages(photos) {
+    this.log('Processing OCR images:', photos.length);
+    
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Authentication required - please login first' };
+    }
+
+    try {
+      // Create FormData for multipart upload
+      const formData = new FormData();
+      
+      // Add metadata
+      formData.append('metadata', JSON.stringify({
+        photo_count: photos.length,
+        timestamp: new Date().toISOString()
+      }));
+      
+      // Add image files
+      photos.forEach((photo, index) => {
+        formData.append(`image_${index}`, {
+          uri: photo.uri,
+          type: 'image/jpeg',
+          name: `recipe_page_${index + 1}.jpg`
+        });
+      });
+      
+      this.log(`📸 Uploading ${photos.length} photos for OCR processing...`);
+      
+      const response = await this.debugFetch('/api/recipes/import/ocr', {
+        method: 'POST',
+        headers: {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'multipart/form-data',
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+      this.log('OCR processing response:', data);
+      
+      if (response.ok && data.success) {
+        this.log('✅ OCR images processed successfully!', {
+          recipe_title: data.recipe?.title,
+          confidence: data.confidence,
+          extraction_method: data.extraction_method
+        });
+        return { 
+          success: true, 
+          recipe: data.recipe,
+          recipe_id: data.recipe_id,
+          confidence: data.confidence,
+          extraction_method: data.extraction_method
+        };
+      } else {
+        this.error('OCR processing failed:', data);
+        return { success: false, error: data.error || 'OCR processing failed' };
+      }
+    } catch (error) {
+      this.error('OCR processing error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
 }
 
 // Export singleton instance

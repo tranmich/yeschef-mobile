@@ -162,17 +162,14 @@ const AddRecipeScreen = ({ navigation }) => {
 
           {/* Camera Import Card (Coming Soon) - Third */}
           <TouchableOpacity
-            style={[styles.methodCard, styles.cameraCard, styles.comingSoon]}
-            activeOpacity={0.6}
-            onPress={() => Alert.alert('Coming Soon', 'Camera import will be available soon!')}
+            style={[styles.methodCard, styles.cameraCard]}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('CameraRecipeScanner')}
           >
             <View style={styles.methodIconContainer}>
-              <Ionicons name="camera" size={48} color="#6b7280" />
+              <Ionicons name="camera" size={48} color="#6366f1" />
             </View>
             <View style={styles.methodContent}>
-              <View style={styles.comingSoonBadge}>
-                <Text style={styles.comingSoonText}>COMING SOON</Text>
-              </View>
               <Text style={styles.methodTitle}>📷 Scan Recipe Card</Text>
               <Text style={styles.methodDescription}>
                 Take a photo of recipe cards, cookbook pages, or handwritten recipes.
@@ -183,7 +180,7 @@ const AddRecipeScreen = ({ navigation }) => {
                 <Text style={styles.featureText}>• Multi-page scanning</Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={28} color="#9ca3af" style={styles.methodArrow} />
+            <Ionicons name="chevron-forward" size={28} color="#6366f1" style={styles.methodArrow} />
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
@@ -246,10 +243,7 @@ const styles = StyleSheet.create({
     borderColor: '#28a745',
   },
   cameraCard: {
-    borderColor: '#d1d5db',
-  },
-  comingSoon: {
-    opacity: 0.6,
+    borderColor: '#6366f1',
   },
   methodIconContainer: {
     marginBottom: 16,

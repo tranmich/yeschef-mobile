@@ -22,14 +22,25 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yeschef.mobile"
+      "bundleIdentifier": "com.yeschef.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Take photos of recipe cards and cookbook pages to import recipes",
+        "NSPhotoLibraryUsageDescription": "Select recipe photos from your library to import recipes",
+        "NSMicrophoneUsageDescription": "Record family recipes through voice"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.yeschef.mobile"
+      "package": "com.yeschef.mobile",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
