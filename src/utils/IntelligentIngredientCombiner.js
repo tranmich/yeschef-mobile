@@ -211,9 +211,9 @@ class IntelligentIngredientCombiner {
    * Extract quantity and unit from ingredient text
    */
   extractQuantity(text) {
-    // Match patterns: "2 cups", "1/2 tsp", "3.5 lbs", "1-2 cloves"
+    // Match patterns: "2 cups", "1/2 tsp", "3.5 lbs", "1-2 cloves", "6 eggs", "6 large eggs"
     const patterns = [
-      /(\d+\.?\d*)\s*([a-zA-Z]+)/,           // "2 cups"
+      /(\d+\.?\d*)\s*([a-zA-Z]+)/,           // "2 cups" or "6 eggs"
       /(\d+\/\d+)\s*([a-zA-Z]+)/,            // "1/2 cup"
       /(\d+)-(\d+)\s*([a-zA-Z]+)/,           // "1-2 cloves"
       /(\d+\.?\d*)/                           // Just number
@@ -240,11 +240,47 @@ class IntelligentIngredientCombiner {
           unit = match[2] || '';
         }
         
-        return { amount, unit: unit.toLowerCase() };
+        // Normalize the unit (handles adjectives, ingredient names, etc.)
+        unit = this.normalizeUnit(unit.toLowerCase(), text.toLowerCase());
+        return { amount, unit };
       }
     }
     
-    return { amount: 1, unit: 'whole' };
+    // No quantity found, return 1 whole
+    return { amount: 1, unit: '' };
+  }
+  
+  /**
+   * Normalize units for consistent combining
+   * Treats 'whole', 'count', 'piece', or the ingredient name itself as empty unit (count)
+   */
+  normalizeUnit(unit, fullText = '') {
+    if (!unit) return '';
+    
+    const lower = unit.toLowerCase();
+    
+    // These are all "count" units - normalize to empty string
+    const countUnits = ['whole', 'count', 'piece', 'pieces', 'item', 'items'];
+    if (countUnits.includes(lower)) {
+      return '';
+    }
+    
+    // Common adjectives that aren't units
+    const adjectives = ['large', 'medium', 'small', 'fresh', 'dried', 'frozen', 
+                        'raw', 'cooked', 'ripe', 'organic', 'free-range'];
+    if (adjectives.includes(lower)) {
+      return ''; // Skip adjectives, they're not units
+    }
+    
+    // If the unit matches a known ingredient name, it's actually a count
+    // e.g., "6 eggs" → unit='eggs', which should be treated as a count
+    for (const [family, variations] of Object.entries(this.ingredientFamilies)) {
+      if (variations.includes(lower) || family === lower) {
+        return ''; // It's the ingredient itself, not a unit
+      }
+    }
+    
+    return lower;
   }
 
   /**
@@ -365,9 +401,13 @@ class IntelligentIngredientCombiner {
         ? amount.toString() 
         : amount.toFixed(1);
       
-      name = unit && unit !== 'whole'
-        ? `${formattedAmount} ${unit} ${family}`
-        : `${formattedAmount} ${family}`;
+      // If unit is empty or 'whole', it's a count - just show number + ingredient
+      if (!unit || unit === 'whole' || unit === '') {
+        name = `${formattedAmount} ${family}`;
+      } else {
+        // Has a real unit (cups, lbs, etc.)
+        name = `${formattedAmount} ${unit} ${family}`;
+      }
     } else {
       name = family;
     }
