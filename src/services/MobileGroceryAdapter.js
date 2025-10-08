@@ -3,9 +3,19 @@
  * 
  * Compatibility layer between complex web grocery lists and simple mobile interface
  * Allows mobile app to work with backend data while preserving web features
+ * 
+ * NOW WITH INTELLIGENT COMBINING! 🧠
  */
 
+import IntelligentIngredientCombiner from '../utils/IntelligentIngredientCombiner';
+
 class MobileGroceryAdapter {
+  
+  // Initialize the combiner (can be configured per user)
+  static combiner = new IntelligentIngredientCombiner({
+    debug: false, // Set to true for debugging
+    aggressive: true // Aggressive combining by default
+  });
   
   /**
    * Convert complex backend grocery list to simple mobile format
@@ -107,7 +117,13 @@ class MobileGroceryAdapter {
     }
 
     console.log(`✅ Converted ${mobileItems.length} items to mobile format`);
-    return mobileItems;
+    
+    // 🧠 NEW: Automatically combine similar ingredients
+    console.log('🧠 Applying intelligent ingredient combining...');
+    const combinedItems = this.combiner.combineItems(mobileItems);
+    console.log(`✨ Combined ${mobileItems.length} → ${combinedItems.length} items`);
+    
+    return combinedItems;
   }
 
   /**
@@ -335,6 +351,79 @@ class MobileGroceryAdapter {
       removedItems,
       preservedWebFeatures: !!originalBackendData?.list_data?.grocery_list
     };
+  }
+
+  /**
+   * 🧠 COMBINING CONTROL METHODS
+   */
+
+  /**
+   * Enable/disable automatic combining
+   * @param {boolean} enabled - Whether combining is enabled
+   */
+  static setCombiningEnabled(enabled) {
+    if (enabled) {
+      this.combiner = new IntelligentIngredientCombiner({
+        debug: false,
+        aggressive: true
+      });
+      console.log('✅ Ingredient combining ENABLED');
+    } else {
+      this.combiner = null;
+      console.log('❌ Ingredient combining DISABLED');
+    }
+  }
+
+  /**
+   * Check if combining is currently enabled
+   */
+  static isCombiningEnabled() {
+    return this.combiner !== null;
+  }
+
+  /**
+   * Set combining aggressiveness
+   * @param {boolean} aggressive - True for aggressive, false for conservative
+   */
+  static setCombiningMode(aggressive) {
+    if (this.combiner) {
+      this.combiner.aggressive = aggressive;
+      console.log(`🧠 Combining mode set to: ${aggressive ? 'AGGRESSIVE' : 'CONSERVATIVE'}`);
+    }
+  }
+
+  /**
+   * Manually combine a list of items (for testing or manual trigger)
+   * @param {Array} items - Items to combine
+   * @returns {Array} - Combined items
+   */
+  static manualCombine(items) {
+    if (!this.combiner) {
+      console.log('⚠️ Combining is disabled, returning items as-is');
+      return items;
+    }
+    return this.combiner.combineItems(items);
+  }
+
+  /**
+   * "Uncombine" items - restore original items from combined ones
+   * @param {Array} items - Items (possibly combined)
+   * @returns {Array} - Uncombined items
+   */
+  static uncombineItems(items) {
+    const uncombined = [];
+    
+    items.forEach(item => {
+      if (item._combined && item._originalItems) {
+        // This is a combined item, restore originals
+        uncombined.push(...item._originalItems);
+      } else {
+        // Regular item, keep as-is
+        uncombined.push(item);
+      }
+    });
+    
+    return uncombined;
   }
 }
 
