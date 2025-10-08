@@ -118,12 +118,74 @@ class MobileGroceryAdapter {
 
     console.log(`✅ Converted ${mobileItems.length} items to mobile format`);
     
-    // 🧠 NEW: Automatically combine similar ingredients
-    console.log('🧠 Applying intelligent ingredient combining...');
-    const combinedItems = this.combiner.combineItems(mobileItems);
-    console.log(`✨ Combined ${mobileItems.length} → ${combinedItems.length} items`);
+    // ⚡ TIER 1: JavaScript combining (ALWAYS - instant)
+    console.log('⚡ Tier 1: Quick combine (JavaScript)...');
+    const quickCombined = this.combiner.combineItems(mobileItems);
+    console.log(`✨ JavaScript combined: ${mobileItems.length} → ${quickCombined.length} items`);
     
-    return combinedItems;
+    // 🧠 TIER 2: spaCy enhancement (background, if online)
+    // Don't await - return quick results immediately
+    this.enhanceWithSpaCy(quickCombined).catch(err => {
+      console.log('📴 Offline or spaCy unavailable - using JavaScript results');
+    });
+    
+    return quickCombined;
+  }
+
+  /**
+   * 🧠 TIER 2: Enhance with spaCy (background, optional)
+   * Silently improves combining when backend is available
+   */
+  static async enhanceWithSpaCy(items) {
+    try {
+      // Quick timeout - don't wait long
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 1000); // 1 second max
+      
+      console.log('🧠 Tier 2: Attempting spaCy enhancement...');
+      
+      const response = await fetch('http://localhost:5001/api/grocery/enhance-combining', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ items }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeout);
+      
+      if (response.ok) {
+        const result = await response.json();
+        
+        if (result.improvements > 0) {
+          console.log(`✨ spaCy found ${result.improvements} more improvements!`);
+          
+          // Notify listeners that items were enhanced
+          if (this.onEnhanced) {
+            this.onEnhanced(result.enhanced_items, result.improvements);
+          }
+          
+          return result;
+        } else {
+          console.log('✅ JavaScript combining was perfect, no spaCy improvements needed');
+        }
+      }
+    } catch (error) {
+      // Offline, timeout, or error - silently fail
+      // User already has good JavaScript results
+      if (error.name !== 'AbortError') {
+        console.log('📴 spaCy enhancement unavailable:', error.message);
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Register a callback for when spaCy enhances items
+   */
+  static onEnhancementComplete(callback) {
+    this.onEnhanced = callback;
   }
 
   /**
