@@ -5,9 +5,9 @@ import * as SecureStore from 'expo-secure-store';
 
 class YesChefAPI {
   constructor() {
-    // � PRODUCTION: Use live Railway deployment URL
-    this.baseURL = 'https://yeschefapp-production.up.railway.app';
-    // this.baseURL = 'http://192.168.1.72:5000'; // Local development
+    // 🔧 DEVELOPMENT: Use local backend for testing new features
+    // this.baseURL = 'https://yeschefapp-production.up.railway.app';
+    this.baseURL = 'http://192.168.1.72:5000'; // Local development
     
     this.token = null;
     this.user = null;
@@ -1511,10 +1511,21 @@ class YesChefAPI {
         method: 'POST',
         headers: {
           ...this.getAuthHeaders(),
-          'Content-Type': 'multipart/form-data',
+          // Note: Don't set Content-Type for FormData - browser sets it with boundary
         },
         body: formData,
       });
+
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        this.error('Non-JSON response from server:', text.substring(0, 500));
+        return { 
+          success: false, 
+          error: 'Server error - received HTML instead of JSON. Check backend logs.'
+        };
+      }
 
       const data = await response.json();
       this.log('OCR processing response:', data);
@@ -1538,7 +1549,10 @@ class YesChefAPI {
       }
     } catch (error) {
       this.error('OCR processing error:', error);
-      return { success: false, error: 'Network error - check connection' };
+      return { 
+        success: false, 
+        error: `OCR error: ${error.message || 'Network error - check connection'}`
+      };
     }
   }
 }

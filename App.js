@@ -6,7 +6,7 @@ import { StyleSheet, Text, View, ActivityIndicator, ScrollView, TouchableOpacity
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import YesChefAPI from './src/services/YesChefAPI';
 import SimpleErrorBoundary from './src/components/SimpleErrorBoundary';
-import DevConsole from './src/components/DevConsole';
+// DevConsole removed - not used in production (was only in MinimalApp.js for debugging)
 import { Icon, IconButton } from './src/components/IconLibrary';
 import { ThemedText, typography, loadFonts } from './src/components/Typography';
 import { PremiumProvider } from './src/contexts/PremiumContext';

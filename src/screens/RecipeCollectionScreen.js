@@ -414,18 +414,27 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
         {
           text: 'Remove',
           style: 'default', // Changed from 'destructive' to be less scary
-          onPress: () => {
-            // Add to hidden recipes set
+          onPress: async () => {
+            // Immediate UI update for responsiveness
             setHiddenRecipeIds(prev => new Set([...prev, recipe.id]));
-            
-            // Also remove from current recipes list for immediate UI update
             setRecipes(prevRecipes => prevRecipes.filter(r => r.id !== recipe.id));
-            
-            // Close the modal
             setShowBottomSheet(null);
-            
-            // Show light mint toast instead of heavy alert
             showToastNotification('Removed ✓');
+            
+            // Then delete from backend (fire and forget for offline support)
+            console.log('🗑️ Deleting recipe from database:', recipe.id);
+            try {
+              const result = await YesChefAPI.deleteRecipe(recipe.id);
+              if (result.success) {
+                console.log('✅ Recipe deleted from database successfully');
+              } else {
+                console.error('❌ Failed to delete recipe:', result.error);
+                // Don't show error to user - they already saw "Removed" toast
+              }
+            } catch (error) {
+              console.error('❌ Error deleting recipe:', error);
+              // Silently fail for offline support
+            }
           }
         }
       ]
