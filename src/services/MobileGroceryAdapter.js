@@ -21,7 +21,7 @@ class MobileGroceryAdapter {
    * Convert complex backend grocery list to simple mobile format
    * Extracts just the ingredient names while preserving references
    */
-  static backendToMobile(backendListData) {
+  static async backendToMobile(backendListData) {
     // console.log('🔄 DEBUG: Converting backend to mobile format:', JSON.stringify(backendListData, null, 2));
     
     if (!backendListData || !backendListData.list_data) {
@@ -118,18 +118,65 @@ class MobileGroceryAdapter {
 
     console.log(`✅ Converted ${mobileItems.length} items to mobile format`);
     
-    // ⚡ TIER 1: JavaScript combining (ALWAYS - instant)
-    console.log('⚡ Tier 1: Quick combine (JavaScript)...');
-    const quickCombined = this.combiner.combineItems(mobileItems);
-    console.log(`✨ JavaScript combined: ${mobileItems.length} → ${quickCombined.length} items`);
+    // 🧠 TIER 1: spaCy metadata extraction (FIRST - for quality)
+    console.log('🧠 Tier 1: Extracting semantic metadata with spaCy...');
+    const spacyMetadata = await this.getSpaCyMetadata(mobileItems).catch(() => null);
     
-    // 🧠 TIER 2: spaCy enhancement (background, if online)
-    // Don't await - return quick results immediately
-    this.enhanceWithSpaCy(quickCombined).catch(err => {
-      console.log('📴 Offline or spaCy unavailable - using JavaScript results');
-    });
+    if (spacyMetadata) {
+      console.log(`✨ spaCy metadata received for ${Object.keys(spacyMetadata).length} items`);
+    } else {
+      console.log('📴 spaCy unavailable, JavaScript will use fallback logic');
+    }
     
-    return quickCombined;
+    // ⚡ TIER 2: JavaScript combining (SECOND - informed by spaCy)
+    console.log('⚡ Tier 2: Combining with JavaScript (using spaCy metadata)...');
+    const combined = this.combiner.combineItems(mobileItems, spacyMetadata);
+    console.log(`✅ Combined: ${mobileItems.length} → ${combined.length} items`);
+    
+    return combined;
+  }
+
+  /**
+   * 🧠 TIER 1: Get spaCy metadata (runs FIRST)
+   * Extracts semantic intelligence for JavaScript to use
+   */
+  static async getSpaCyMetadata(items) {
+    try {
+      // Longer timeout since this is critical for quality
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000); // 3 seconds max
+      
+      console.log('🧠 Calling spaCy for semantic analysis...');
+      
+      const response = await fetch('http://localhost:5001/api/grocery/extract-metadata', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ items }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeout);
+      
+      if (response.ok) {
+        const result = await response.json();
+        
+        if (result.success && result.metadata) {
+          return result.metadata;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      // Offline, timeout, or error - JavaScript will handle it
+      if (error.name === 'AbortError') {
+        console.log('⏱️ spaCy timeout - using JavaScript fallback');
+      } else {
+        console.log('📴 spaCy unavailable:', error.message);
+      }
+      return null;
+    }
   }
 
   /**

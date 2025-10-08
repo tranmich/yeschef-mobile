@@ -33,12 +33,22 @@ class IntelligentIngredientCombiner {
   /**
    * Main entry point - combines grocery items intelligently
    * @param {Array} items - Array of grocery items {id, name, checked, ...}
+   * @param {Object} spacyMetadata - Optional spaCy metadata for intelligent combining
    * @returns {Array} - Combined items
    */
-  combineItems(items) {
+  combineItems(items, spacyMetadata = null) {
     if (!items || items.length === 0) return [];
     
-    this.log('🧠 Starting intelligent combining...', { itemCount: items.length });
+    this.spacyMetadata = spacyMetadata; // Store for use in grouping
+    
+    this.log('🧠 Starting intelligent combining...', { 
+      itemCount: items.length,
+      hasSpaCyData: !!spacyMetadata 
+    });
+    
+    if (spacyMetadata) {
+      this.log('✨ Using spaCy metadata for enhanced combining');
+    }
     
     // Step 1: Group items by base ingredient
     const groups = this.groupByIngredient(items);
@@ -54,19 +64,39 @@ class IntelligentIngredientCombiner {
 
   /**
    * Group items by their base ingredient family
+   * Uses spaCy metadata if available for better grouping
    */
   groupByIngredient(items) {
     const groups = new Map();
     
     items.forEach(item => {
-      const base = this.findBaseIngredient(item.name);
+      let base;
+      let shouldSeparate = false;
+      
+      // Check if we have spaCy metadata for this item
+      if (this.spacyMetadata && this.spacyMetadata[item.id]) {
+        const metadata = this.spacyMetadata[item.id];
+        base = metadata.core_ingredient;
+        shouldSeparate = metadata.should_separate;
+        
+        // If spaCy says to keep separate (different quality), add quality to key
+        if (shouldSeparate && metadata.qualities && metadata.qualities.length > 0) {
+          base = `${base}_${metadata.qualities.join('_')}`;
+          this.log(`  🔍 spaCy: Keeping "${item.name}" separate (quality: ${metadata.qualities.join(', ')})`);
+        } else {
+          this.log(`  ✨ spaCy: "${item.name}" → "${base}"`);
+        }
+      } else {
+        // Fallback to JavaScript detection
+        base = this.findBaseIngredient(item.name);
+        this.log(`  📌 JavaScript: "${item.name}" → "${base}"`);
+      }
       
       if (!groups.has(base)) {
         groups.set(base, []);
       }
       
       groups.get(base).push(item);
-      this.log(`  📌 "${item.name}" → family: "${base}"`);
     });
     
     return groups;
