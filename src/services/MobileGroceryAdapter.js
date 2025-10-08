@@ -118,12 +118,37 @@ class MobileGroceryAdapter {
 
     console.log(`✅ Converted ${mobileItems.length} items to mobile format`);
     
+    // 🔍 DETAILED DEBUG: Log all items before combining
+    console.log('\n📥 ===== ITEMS BEFORE COMBINING =====');
+    console.log(`Total items: ${mobileItems.length}`);
+    mobileItems.forEach((item, index) => {
+      console.log(`${index + 1}. "${item.name}" (id: ${item.id})`);
+    });
+    console.log('=====================================\n');
+    
     // 🧠 TIER 1: spaCy metadata extraction (FIRST - for quality)
     console.log('🧠 Tier 1: Extracting semantic metadata with spaCy...');
     const spacyMetadata = await this.getSpaCyMetadata(mobileItems).catch(() => null);
     
     if (spacyMetadata) {
       console.log(`✨ spaCy metadata received for ${Object.keys(spacyMetadata).length} items`);
+      
+      // 🔍 DETAILED DEBUG: Log spaCy decisions
+      console.log('\n🧠 ===== SPACY METADATA =====');
+      Object.entries(spacyMetadata).forEach(([itemId, meta]) => {
+        const item = mobileItems.find(i => i.id === itemId);
+        if (item) {
+          console.log(`\n"${item.name}":`);
+          console.log(`  Core: ${meta.core_ingredient}`);
+          console.log(`  Qualities: ${meta.qualities?.length ? meta.qualities.join(', ') : 'none'}`);
+          console.log(`  Sizes: ${meta.sizes?.length ? meta.sizes.join(', ') : 'none'}`);
+          console.log(`  Should Separate: ${meta.should_separate ? 'YES' : 'NO'}`);
+          if (meta.similar_items?.length) {
+            console.log(`  Similar to: ${meta.similar_items.map(s => s.name).join(', ')}`);
+          }
+        }
+      });
+      console.log('============================\n');
     } else {
       console.log('📴 spaCy unavailable, JavaScript will use fallback logic');
     }
@@ -131,6 +156,19 @@ class MobileGroceryAdapter {
     // ⚡ TIER 2: JavaScript combining (SECOND - informed by spaCy)
     console.log('⚡ Tier 2: Combining with JavaScript (using spaCy metadata)...');
     const combined = this.combiner.combineItems(mobileItems, spacyMetadata);
+    
+    // 🔍 DETAILED DEBUG: Log combining results
+    console.log('\n📤 ===== ITEMS AFTER COMBINING =====');
+    console.log(`Total items: ${combined.length} (reduced from ${mobileItems.length})`);
+    console.log(`Reduction: ${mobileItems.length - combined.length} items combined`);
+    combined.forEach((item, index) => {
+      console.log(`${index + 1}. "${item.name}" (id: ${item.id})`);
+      if (item._combinedFrom) {
+        console.log(`   ↳ Combined from: ${item._combinedFrom.length} items`);
+      }
+    });
+    console.log('====================================\n');
+    
     console.log(`✅ Combined: ${mobileItems.length} → ${combined.length} items`);
     
     return combined;

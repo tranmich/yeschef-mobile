@@ -13,8 +13,9 @@
 
 class IntelligentIngredientCombiner {
   constructor(options = {}) {
-    this.debug = options.debug || false;
-    this.aggressive = options.aggressive !== false; // Default to aggressive
+    // Configuration
+    this.debug = options.debug !== undefined ? options.debug : true; // Enable debug by default
+    this.aggressive = options.aggressive !== undefined ? options.aggressive : true;
     
     // Initialize ingredient families (top 100 ingredients)
     this.ingredientFamilies = this.loadIngredientFamilies();
@@ -163,16 +164,29 @@ class IntelligentIngredientCombiner {
   mergeGroups(groups) {
     const combined = [];
     
+    this.log('\n🔄 ===== MERGING GROUPS =====');
+    this.log(`Total groups to merge: ${groups.size}`);
+    
     groups.forEach((items, family) => {
+      this.log(`\n📦 Group: "${family}" (${items.length} items)`);
+      items.forEach(item => {
+        this.log(`   - "${item.name}"`);
+      });
+      
       if (items.length === 1) {
         // Single item, keep as-is
+        this.log(`   ✓ Single item, keeping as-is`);
         combined.push(items[0]);
       } else {
         // Multiple items, combine them
+        this.log(`   🔨 Combining ${items.length} items...`);
         const merged = this.combineMultipleItems(family, items);
+        this.log(`   ✅ Result: "${merged.name}"`);
         combined.push(merged);
       }
     });
+    
+    this.log('\n============================\n');
     
     return combined;
   }
@@ -181,16 +195,27 @@ class IntelligentIngredientCombiner {
    * Combine multiple items of the same ingredient family
    */
   combineMultipleItems(family, items) {
-    this.log(`🔄 Combining ${items.length} items for "${family}":`, 
-      items.map(i => i.name));
+    this.log(`\n� ===== COMBINING ITEMS =====`);
+    this.log(`Family: "${family}"`);
+    this.log(`Items to combine: ${items.length}`);
+    items.forEach((item, i) => {
+      this.log(`  ${i + 1}. "${item.name}"`);
+    });
     
     // Extract all quantities and units
-    const quantities = items.map(item => this.extractQuantity(item.name));
+    const quantities = items.map(item => {
+      const qty = this.extractQuantity(item.name);
+      this.log(`  Quantity extracted from "${item.name}":`, qty);
+      return qty;
+    });
     
     // Extract all preparation methods
     const preparations = new Set();
     items.forEach(item => {
       const preps = this.extractPreparations(item.name);
+      if (preps.length > 0) {
+        this.log(`  Preparations from "${item.name}": ${preps.join(', ')}`);
+      }
       preps.forEach(p => preparations.add(p));
     });
     
@@ -198,11 +223,16 @@ class IntelligentIngredientCombiner {
     const qualities = new Set();
     items.forEach(item => {
       const quals = this.extractQualities(item.name);
+      if (quals.length > 0) {
+        this.log(`  Qualities from "${item.name}": ${quals.join(', ')}`);
+      }
       quals.forEach(q => qualities.add(q));
     });
     
     // Combine quantities (convert to common unit if possible)
+    this.log(`\n  🧮 Combining quantities...`);
     const combinedQuantity = this.combineQuantities(family, quantities);
+    this.log(`  Combined quantity:`, combinedQuantity);
     
     // Build display name
     let displayName = this.buildDisplayName(
@@ -211,6 +241,9 @@ class IntelligentIngredientCombiner {
       Array.from(preparations),
       Array.from(qualities)
     );
+    
+    this.log(`  📝 Final display name: "${displayName}"`);
+    this.log(`============================\n`);
     
     // Preserve metadata
     const sections = new Set();
@@ -350,15 +383,25 @@ class IntelligentIngredientCombiner {
    * Combine quantities using unit conversions
    */
   combineQuantities(family, quantities) {
-    if (!quantities || quantities.length === 0) return null;
+    this.log(`    🧮 combineQuantities called:`, { family, quantities });
+    
+    if (!quantities || quantities.length === 0) {
+      this.log(`    ⚠️ No quantities to combine`);
+      return null;
+    }
     
     // Get conversion table for this ingredient family
     const conversions = this.unitConversions[family];
     
     if (!conversions) {
       // No conversions available, try to add same units
-      return this.combineSimpleQuantities(quantities);
+      this.log(`    📊 No conversions for "${family}", using simple combine`);
+      const result = this.combineSimpleQuantities(quantities);
+      this.log(`    ✓ Simple combine result:`, result);
+      return result;
     }
+    
+    this.log(`    📊 Using conversions for "${family}"`);
     
     // Convert all to base unit
     let totalInBaseUnit = 0;
@@ -367,31 +410,44 @@ class IntelligentIngredientCombiner {
     quantities.forEach(({ amount, unit }) => {
       const conversionFactor = conversions[unit] || 1;
       totalInBaseUnit += amount * conversionFactor;
+      this.log(`    ↳ ${amount} ${unit} × ${conversionFactor} = ${amount * conversionFactor} ${baseUnit}`);
     });
     
+    this.log(`    📊 Total in base unit: ${totalInBaseUnit} ${baseUnit}`);
+    
     // Convert back to best display unit
-    return this.selectBestUnit(family, totalInBaseUnit, conversions);
+    const result = this.selectBestUnit(family, totalInBaseUnit, conversions);
+    this.log(`    ✓ Final result:`, result);
+    return result;
   }
 
   /**
    * Combine quantities with same unit
    */
   combineSimpleQuantities(quantities) {
+    this.log(`      🔢 combineSimpleQuantities:`, quantities);
+    
     // Group by unit
     const byUnit = {};
     
     quantities.forEach(({ amount, unit }) => {
+      this.log(`        Processing: ${amount} ${unit}`);
       if (!byUnit[unit]) byUnit[unit] = 0;
       byUnit[unit] += amount;
     });
     
+    this.log(`      Grouped by unit:`, byUnit);
+    
     // If only one unit, return combined
     const units = Object.keys(byUnit);
     if (units.length === 1) {
-      return { amount: byUnit[units[0]], unit: units[0] };
+      const result = { amount: byUnit[units[0]], unit: units[0] };
+      this.log(`      ✓ Single unit result:`, result);
+      return result;
     }
     
     // Multiple units, can't combine
+    this.log(`      ⚠️ Multiple different units, can't combine:`, units);
     return null;
   }
 
