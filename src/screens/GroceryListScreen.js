@@ -190,8 +190,8 @@ export default function GroceryListScreen({ route, navigation }) {
         const backendList = listResult.list;
         console.log('📋 Backend list loaded:', backendList.list_name);
         
-        // Convert backend data to mobile format
-        const mobileItems = MobileGroceryAdapter.backendToMobile(backendList);
+        // Convert backend data to mobile format (now async with spaCy)
+        const mobileItems = await MobileGroceryAdapter.backendToMobile(backendList);
         console.log(`✅ Converted to ${mobileItems.length} mobile items`);
         
         setGroceryItems(mobileItems);
@@ -200,7 +200,7 @@ export default function GroceryListScreen({ route, navigation }) {
         setCurrentBackendList(backendList);
         
         // Get conversion summary for user info
-        const summary = MobileGroceryAdapter.getConversionSummary(mobileItems, backendList);
+        const summary = await MobileGroceryAdapter.getConversionSummary(mobileItems, backendList);
         console.log('📊 Conversion summary:', summary);
         
       } else {

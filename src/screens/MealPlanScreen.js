@@ -753,12 +753,12 @@ function MealPlanScreen({ navigation, route }) {
       if (response.success && response.grocery_list) {
         console.log('✅ Grocery list generated successfully');
         
-        // Convert backend format to mobile format using existing adapter
-        const mobileItems = MobileGroceryAdapter.backendToMobile({
+        // Convert backend format to mobile format using existing adapter (now async with spaCy)
+        const mobileItems = await MobileGroceryAdapter.backendToMobile({
           list_data: response
         });
 
-        console.log('📱 Converted to mobile format:', mobileItems.length, 'items');
+        console.log('📱 Converted to mobile format:', mobileItems?.length, 'items');
         
         // Store the generated list for the grocery screen to access
         global.tempGeneratedGroceryList = {

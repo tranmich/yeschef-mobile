@@ -449,8 +449,9 @@ class MobileGroceryAdapter {
   /**
    * Get a user-friendly summary of what the conversion did
    */
-  static getConversionSummary(mobileItems, originalBackendData) {
-    const existingItems = originalBackendData ? this.backendToMobile(originalBackendData).length : 0;
+  static async getConversionSummary(mobileItems, originalBackendData) {
+    const existingItemsArray = originalBackendData ? await this.backendToMobile(originalBackendData) : [];
+    const existingItems = existingItemsArray.length;
     const newItems = mobileItems.filter(item => !item._backendRef).length;
     const removedItems = Math.max(0, existingItems - mobileItems.length + newItems);
 
