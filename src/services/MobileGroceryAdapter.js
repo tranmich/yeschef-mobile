@@ -181,9 +181,8 @@ class MobileGroceryAdapter {
    */
   static async getSpaCyMetadata(items) {
     try {
-      // Get the API instance to use its baseURL
-      const api = new YesChefAPI();
-      const baseURL = api.baseURL;
+      // YesChefAPI is exported as a singleton instance, not a class
+      const baseURL = YesChefAPI.baseURL;
       
       // Longer timeout since this is critical for quality
       const controller = new AbortController();
