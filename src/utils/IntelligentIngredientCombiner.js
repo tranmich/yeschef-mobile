@@ -119,12 +119,34 @@ class IntelligentIngredientCombiner {
     }
     
     // Fallback: extract main noun (last meaningful word)
-    const words = lower
-      .replace(/[^\w\s]/g, ' ') // Remove punctuation
-      .split(/\s+/)
-      .filter(w => w.length > 2 && !this.isQuantityWord(w));
+    // Step 1: Remove parenthetical content
+    const withoutParens = lower.replace(/\([^)]*\)/g, '').trim();
     
-    return words[words.length - 1] || text;
+    // Step 2: Remove quantity patterns (numbers, fractions, measurements)
+    const withoutQuantity = withoutParens
+      .replace(/^\d+\.?\d*\s*/g, '')  // Remove leading numbers
+      .replace(/^\d+\/\d+\s*/g, '')   // Remove fractions
+      .replace(/^(cup|tbsp|tsp|oz|lb|pound|tablespoon|teaspoon|ounce)s?\s+/gi, ''); // Remove leading units
+    
+    // Step 3: Split into words, filter out descriptors and quantity words
+    const descriptorWords = ['finely', 'chopped', 'minced', 'diced', 'sliced', 'grated', 
+                             'crushed', 'fresh', 'dried', 'canned', 'frozen', 'jarred',
+                             'large', 'small', 'medium', 'whole', 'ground', 'boneless',
+                             'bone-in', 'scrubbed', 'well', 'needed', 'taste', 'serving',
+                             'optional', 'garnish', 'as', 'for', 'to', 'of', 'and', 'or'];
+    
+    const words = withoutQuantity
+      .replace(/[^\w\s-]/g, ' ') // Remove punctuation except hyphens
+      .split(/\s+/)
+      .filter(w => w.length > 2 && 
+                   !this.isQuantityWord(w) && 
+                   !descriptorWords.includes(w));
+    
+    // Return the last meaningful word (usually the noun)
+    const baseWord = words[words.length - 1] || text;
+    
+    this.log(`    🔍 findBaseIngredient("${text}") → "${baseWord}"`);
+    return baseWord;
   }
 
   /**
@@ -274,6 +296,11 @@ class IntelligentIngredientCombiner {
    * Extract quantity and unit from ingredient text
    */
   extractQuantity(text) {
+    // Check for "as needed" or "to taste" - these are uncountable
+    if (/(as needed|to taste|optional|garnish|for serving)/i.test(text)) {
+      return { amount: null, unit: 'as needed' };
+    }
+    
     // Match patterns: "2 cups", "1/2 tsp", "3.5 lbs", "1-2 cloves", "6 eggs", "6 large eggs"
     const patterns = [
       /(\d+\.?\d*)\s*([a-zA-Z]+)/,           // "2 cups" or "6 eggs"
@@ -307,6 +334,11 @@ class IntelligentIngredientCombiner {
         unit = this.normalizeUnit(unit.toLowerCase(), text.toLowerCase());
         return { amount, unit };
       }
+    }
+    
+    // No quantity found - if it says "as needed", don't assign a count
+    if (/(as needed|to taste|optional)/i.test(text)) {
+      return { amount: null, unit: 'as needed' };
     }
     
     // No quantity found, return 1 whole
@@ -427,10 +459,25 @@ class IntelligentIngredientCombiner {
   combineSimpleQuantities(quantities) {
     this.log(`      🔢 combineSimpleQuantities:`, quantities);
     
+    // Check if all items are "as needed"
+    const allAsNeeded = quantities.every(q => q.unit === 'as needed' || q.amount === null);
+    if (allAsNeeded) {
+      this.log(`      ✓ All items are 'as needed', returning null`);
+      return { amount: null, unit: 'as needed' };
+    }
+    
+    // Filter out "as needed" items from combining
+    const countableQuantities = quantities.filter(q => q.amount !== null && q.unit !== 'as needed');
+    
+    if (countableQuantities.length === 0) {
+      this.log(`      ⚠️ No countable quantities`);
+      return { amount: null, unit: 'as needed' };
+    }
+    
     // Group by unit
     const byUnit = {};
     
-    quantities.forEach(({ amount, unit }) => {
+    countableQuantities.forEach(({ amount, unit }) => {
       this.log(`        Processing: ${amount} ${unit}`);
       if (!byUnit[unit]) byUnit[unit] = 0;
       byUnit[unit] += amount;
@@ -479,7 +526,7 @@ class IntelligentIngredientCombiner {
     let name = '';
     
     // Add quantity if available
-    if (quantity) {
+    if (quantity && quantity.amount !== null) {
       const { amount, unit } = quantity;
       
       // Format amount nicely
@@ -494,9 +541,16 @@ class IntelligentIngredientCombiner {
         // Has a real unit (cups, lbs, etc.)
         name = `${formattedAmount} ${unit} ${family}`;
       }
+    } else if (quantity && quantity.unit === 'as needed') {
+      // "As needed" items - just show the name
+      name = family;
     } else {
+      // No quantity info
       name = family;
     }
+    
+    // Capitalize first letter
+    name = name.charAt(0).toUpperCase() + name.slice(1);
     
     // Add preparation notes
     const notes = [];

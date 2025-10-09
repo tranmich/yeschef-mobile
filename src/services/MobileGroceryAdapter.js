@@ -8,6 +8,7 @@
  */
 
 import IntelligentIngredientCombiner from '../utils/IntelligentIngredientCombiner';
+import YesChefAPI from './YesChefAPI';
 
 class MobileGroceryAdapter {
   
@@ -180,13 +181,18 @@ class MobileGroceryAdapter {
    */
   static async getSpaCyMetadata(items) {
     try {
+      // Get the API instance to use its baseURL
+      const api = new YesChefAPI();
+      const baseURL = api.baseURL;
+      
       // Longer timeout since this is critical for quality
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 3000); // 3 seconds max
       
       console.log('🧠 Calling spaCy for semantic analysis...');
+      console.log(`🔗 Using backend URL: ${baseURL}/api/grocery/extract-metadata`);
       
-      const response = await fetch('http://localhost:5001/api/grocery/extract-metadata', {
+      const response = await fetch(`${baseURL}/api/grocery/extract-metadata`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -205,6 +211,7 @@ class MobileGroceryAdapter {
         }
       }
       
+      console.log('⚠️ spaCy response not OK:', response.status, response.statusText);
       return null;
     } catch (error) {
       // Offline, timeout, or error - JavaScript will handle it
