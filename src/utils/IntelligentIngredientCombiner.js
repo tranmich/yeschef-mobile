@@ -78,19 +78,28 @@ class IntelligentIngredientCombiner {
     // Build Groq decision map for quick lookup
     const groqShouldCombine = new Map(); // Map<item_name, Set<other_items_to_combine_with>>
     const groqShouldSeparate = new Set(); // Set of items that should stay separate
+    const groqGroupNames = new Map(); // Map<group_key, suggested_name>
     
     if (this.groqAnalysis) {
       // Process Groq's combining recommendations
       if (this.groqAnalysis.groups) {
-        this.groqAnalysis.groups.forEach(group => {
+        this.groqAnalysis.groups.forEach((group, groupIndex) => {
+          const groupKey = `groq_group_${groupIndex}`;
+          
+          // Store the suggested name for this group
+          groqGroupNames.set(groupKey, group.combined_name || group.items[0]);
+          
           group.items.forEach(itemName => {
             if (!groqShouldCombine.has(itemName)) {
-              groqShouldCombine.set(itemName, new Set());
+              groqShouldCombine.set(itemName, {
+                groupKey: groupKey,
+                partners: new Set()
+              });
             }
             // Add all other items in this group as combine partners
             group.items.forEach(otherItem => {
               if (otherItem !== itemName) {
-                groqShouldCombine.get(itemName).add(otherItem);
+                groqShouldCombine.get(itemName).partners.add(otherItem);
               }
             });
           });
@@ -121,11 +130,16 @@ class IntelligentIngredientCombiner {
         }
         // Check if Groq says to combine this with others
         else if (groqShouldCombine.has(item.name)) {
-          // Use a consistent key for all items in this group
-          const combineWith = Array.from(groqShouldCombine.get(item.name));
-          base = `groq_group_${[item.name, ...combineWith].sort().join('_')}`;
+          // Use the group key from Groq
+          const groupInfo = groqShouldCombine.get(item.name);
+          base = groupInfo.groupKey;
           source = 'groq-combine';
-          this.log(`  🤖 Groq: "${item.name}" can combine with: ${combineWith.join(', ')}`);
+          
+          // Store the suggested name on the item
+          item._groqSuggestedName = groqGroupNames.get(groupInfo.groupKey);
+          
+          const partners = Array.from(groupInfo.partners);
+          this.log(`  🤖 Groq: "${item.name}" → group "${groqGroupNames.get(groupInfo.groupKey)}" with: ${partners.join(', ')}`);
         }
       }
       
@@ -318,13 +332,33 @@ class IntelligentIngredientCombiner {
     const combinedQuantity = this.combineQuantities(family, quantities);
     this.log(`  Combined quantity:`, combinedQuantity);
     
-    // Build display name
-    let displayName = this.buildDisplayName(
-      family, 
-      combinedQuantity, 
-      Array.from(preparations),
-      Array.from(qualities)
-    );
+    // Check if Groq suggested a name for this group
+    let displayName;
+    const groqSuggestedName = items[0]._groqSuggestedName;
+    
+    if (groqSuggestedName && family.startsWith('groq_group_')) {
+      // Use Groq's suggested name with our combined quantity
+      this.log(`  🤖 Using Groq suggested name: "${groqSuggestedName}"`);
+      
+      if (combinedQuantity && combinedQuantity.amount) {
+        displayName = `${combinedQuantity.amount}${combinedQuantity.unit ? ' ' + combinedQuantity.unit : ''} ${groqSuggestedName}`;
+      } else {
+        displayName = groqSuggestedName;
+      }
+      
+      // Add qualities if any
+      if (qualities.size > 0) {
+        displayName += ` (${Array.from(qualities).join('; ')})`;
+      }
+    } else {
+      // Build display name normally
+      displayName = this.buildDisplayName(
+        family, 
+        combinedQuantity, 
+        Array.from(preparations),
+        Array.from(qualities)
+      );
+    }
     
     this.log(`  📝 Final display name: "${displayName}"`);
     this.log(`============================\n`);
