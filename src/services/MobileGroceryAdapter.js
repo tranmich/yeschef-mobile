@@ -127,8 +127,39 @@ class MobileGroceryAdapter {
     });
     console.log('=====================================\n');
     
-    // 🧠 TIER 1: spaCy metadata extraction (FIRST - for quality)
-    console.log('🧠 Tier 1: Extracting semantic metadata with spaCy...');
+    // � TIER 1: Groq LLM analysis (FIRST - for highest quality)
+    console.log('🤖 Tier 1: Analyzing with Groq LLM for intelligent combining...');
+    const groqAnalysis = await this.getGroqAnalysis(mobileItems).catch(() => null);
+    
+    if (groqAnalysis) {
+      console.log(`✨ Groq analysis received!`);
+      
+      // 🔍 DETAILED DEBUG: Log Groq decisions
+      console.log('\n🤖 ===== GROQ LLM DECISIONS =====');
+      
+      if (groqAnalysis.groups) {
+        console.log(`\n📦 Items to COMBINE (${groqAnalysis.groups.length} groups):`);
+        groqAnalysis.groups.forEach((group, i) => {
+          console.log(`\nGroup ${i + 1}: ${group.combined_name}`);
+          console.log(`  Items: ${group.items.join(', ')}`);
+          console.log(`  Reason: ${group.reasoning}`);
+        });
+      }
+      
+      if (groqAnalysis.separate) {
+        console.log(`\n🚫 Items to keep SEPARATE (${groqAnalysis.separate.length} items):`);
+        groqAnalysis.separate.forEach((sep) => {
+          console.log(`  - ${sep.item}`);
+          console.log(`    Reason: ${sep.reasoning}`);
+        });
+      }
+      console.log('================================\n');
+    } else {
+      console.log('📴 Groq unavailable, falling back to spaCy + JavaScript');
+    }
+    
+    // �🧠 TIER 2: spaCy metadata extraction (SECOND - for structural analysis)
+    console.log('🧠 Tier 2: Extracting semantic metadata with spaCy...');
     const spacyMetadata = await this.getSpaCyMetadata(mobileItems).catch(() => null);
     
     if (spacyMetadata) {
@@ -154,9 +185,9 @@ class MobileGroceryAdapter {
       console.log('📴 spaCy unavailable, JavaScript will use fallback logic');
     }
     
-    // ⚡ TIER 2: JavaScript combining (SECOND - informed by spaCy)
-    console.log('⚡ Tier 2: Combining with JavaScript (using spaCy metadata)...');
-    const combined = this.combiner.combineItems(mobileItems, spacyMetadata);
+    // ⚡ TIER 3: JavaScript combining (THIRD - informed by Groq + spaCy)
+    console.log('⚡ Tier 3: Combining with JavaScript (using Groq + spaCy guidance)...');
+    const combined = this.combiner.combineItems(mobileItems, spacyMetadata, groqAnalysis);
     
     // 🔍 DETAILED DEBUG: Log combining results
     console.log('\n📤 ===== ITEMS AFTER COMBINING =====');
@@ -176,7 +207,55 @@ class MobileGroceryAdapter {
   }
 
   /**
-   * 🧠 TIER 1: Get spaCy metadata (runs FIRST)
+   * � TIER 1: Get Groq LLM analysis (runs FIRST)
+   * Gets intelligent combining decisions from Groq
+   */
+  static async getGroqAnalysis(items) {
+    try {
+      const baseURL = YesChefAPI.baseURL;
+      
+      // Timeout for LLM call
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000); // 5 seconds max
+      
+      console.log('🤖 Calling Groq LLM for intelligent analysis...');
+      console.log(`🔗 Using backend URL: ${baseURL}/api/grocery/groq-analyze`);
+      
+      const response = await fetch(`${baseURL}/api/grocery/groq-analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ items }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeout);
+      
+      if (response.ok) {
+        const result = await response.json();
+        
+        if (result.success && result.analysis) {
+          console.log('✅ Groq analysis successful!');
+          return result.analysis;
+        }
+      }
+      
+      console.log('⚠️ Groq response not OK:', response.status, response.statusText);
+      return null;
+    } catch (error) {
+      // Offline, timeout, or error - fall back to spaCy + JavaScript
+      if (error.name === 'AbortError') {
+        console.log('⏱️ Groq timeout - using spaCy fallback');
+      } else {
+        console.log('📴 Groq unavailable:', error.message);
+      }
+      return null;
+    }
+  }
+
+  /**
+   * 🧠 TIER 2: Get spaCy metadata (runs SECOND)
    * Extracts semantic intelligence for JavaScript to use
    */
   static async getSpaCyMetadata(items) {

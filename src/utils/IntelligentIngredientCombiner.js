@@ -35,19 +35,24 @@ class IntelligentIngredientCombiner {
    * Main entry point - combines grocery items intelligently
    * @param {Array} items - Array of grocery items {id, name, checked, ...}
    * @param {Object} spacyMetadata - Optional spaCy metadata for intelligent combining
+   * @param {Object} groqAnalysis - Optional Groq LLM analysis for highest quality combining
    * @returns {Array} - Combined items
    */
-  combineItems(items, spacyMetadata = null) {
+  combineItems(items, spacyMetadata = null, groqAnalysis = null) {
     if (!items || items.length === 0) return [];
     
     this.spacyMetadata = spacyMetadata; // Store for use in grouping
+    this.groqAnalysis = groqAnalysis; // Store Groq analysis
     
     this.log('🧠 Starting intelligent combining...', { 
       itemCount: items.length,
-      hasSpaCyData: !!spacyMetadata 
+      hasSpaCyData: !!spacyMetadata,
+      hasGroqData: !!groqAnalysis 
     });
     
-    if (spacyMetadata) {
+    if (groqAnalysis) {
+      this.log('🤖 Using Groq LLM analysis for highest quality combining');
+    } else if (spacyMetadata) {
       this.log('✨ Using spaCy metadata for enhanced combining');
     }
     
@@ -65,33 +70,90 @@ class IntelligentIngredientCombiner {
 
   /**
    * Group items by their base ingredient family
-   * Uses spaCy metadata if available for better grouping
+   * Uses Groq LLM analysis first, then spaCy metadata if available
    */
   groupByIngredient(items) {
     const groups = new Map();
     
+    // Build Groq decision map for quick lookup
+    const groqShouldCombine = new Map(); // Map<item_name, Set<other_items_to_combine_with>>
+    const groqShouldSeparate = new Set(); // Set of items that should stay separate
+    
+    if (this.groqAnalysis) {
+      // Process Groq's combining recommendations
+      if (this.groqAnalysis.groups) {
+        this.groqAnalysis.groups.forEach(group => {
+          group.items.forEach(itemName => {
+            if (!groqShouldCombine.has(itemName)) {
+              groqShouldCombine.set(itemName, new Set());
+            }
+            // Add all other items in this group as combine partners
+            group.items.forEach(otherItem => {
+              if (otherItem !== itemName) {
+                groqShouldCombine.get(itemName).add(otherItem);
+              }
+            });
+          });
+        });
+      }
+      
+      // Process items that should stay separate
+      if (this.groqAnalysis.separate) {
+        this.groqAnalysis.separate.forEach(sep => {
+          groqShouldSeparate.add(sep.item);
+        });
+      }
+    }
+    
     items.forEach(item => {
       let base;
       let shouldSeparate = false;
+      let source = 'javascript'; // Track which system made the decision
       
-      // Check if we have spaCy metadata for this item
-      if (this.spacyMetadata && this.spacyMetadata[item.id]) {
+      // PRIORITY 1: Check Groq LLM decisions (highest quality)
+      if (this.groqAnalysis) {
+        // Check if Groq says to keep this separate
+        if (groqShouldSeparate.has(item.name)) {
+          base = `groq_separate_${item.name}`;
+          shouldSeparate = true;
+          source = 'groq-separate';
+          this.log(`  🤖 Groq: Keeping "${item.name}" separate`);
+        }
+        // Check if Groq says to combine this with others
+        else if (groqShouldCombine.has(item.name)) {
+          // Use a consistent key for all items in this group
+          const combineWith = Array.from(groqShouldCombine.get(item.name));
+          base = `groq_group_${[item.name, ...combineWith].sort().join('_')}`;
+          source = 'groq-combine';
+          this.log(`  🤖 Groq: "${item.name}" can combine with: ${combineWith.join(', ')}`);
+        }
+      }
+      
+      // PRIORITY 2: Check spaCy metadata (if Groq didn't decide)
+      if (!base && this.spacyMetadata && this.spacyMetadata[item.id]) {
         const metadata = this.spacyMetadata[item.id];
         base = metadata.core_ingredient;
         shouldSeparate = metadata.should_separate;
+        source = 'spacy';
         
         // If spaCy says to keep separate (different quality), add quality to key
         if (shouldSeparate && metadata.qualities && metadata.qualities.length > 0) {
           base = `${base}_${metadata.qualities.join('_')}`;
-          this.log(`  🔍 spaCy: Keeping "${item.name}" separate (quality: ${metadata.qualities.join(', ')})`);
+          this.log(`  ✨ spaCy: Keeping "${item.name}" separate (quality: ${metadata.qualities.join(', ')})`);
         } else {
           this.log(`  ✨ spaCy: "${item.name}" → "${base}"`);
         }
-      } else {
-        // Fallback to JavaScript detection
+      }
+      
+      // PRIORITY 3: Fallback to JavaScript detection
+      if (!base) {
         base = this.findBaseIngredient(item.name);
+        source = 'javascript';
         this.log(`  📌 JavaScript: "${item.name}" → "${base}"`);
       }
+      
+      // Store decision source for debugging
+      item._decisionSource = source;
       
       if (!groups.has(base)) {
         groups.set(base, []);
