@@ -79,9 +79,10 @@ class IntelligentIngredientCombiner {
     const groqShouldCombine = new Map(); // Map<item_name, Set<other_items_to_combine_with>>
     const groqShouldSeparate = new Set(); // Set of items that should stay separate
     const groqGroupNames = new Map(); // Map<group_key, suggested_name>
+    const itemsInGroups = new Set(); // Track which items are already in groups
     
     if (this.groqAnalysis) {
-      // Process Groq's combining recommendations
+      // FIRST: Process Groq's combining recommendations (PRIORITY!)
       if (this.groqAnalysis.groups) {
         this.groqAnalysis.groups.forEach((group, groupIndex) => {
           const groupKey = `groq_group_${groupIndex}`;
@@ -90,6 +91,9 @@ class IntelligentIngredientCombiner {
           groqGroupNames.set(groupKey, group.combined_name || group.items[0]);
           
           group.items.forEach(itemName => {
+            // Track that this item is in a group
+            itemsInGroups.add(itemName);
+            
             if (!groqShouldCombine.has(itemName)) {
               groqShouldCombine.set(itemName, {
                 groupKey: groupKey,
@@ -106,10 +110,16 @@ class IntelligentIngredientCombiner {
         });
       }
       
-      // Process items that should stay separate
+      // SECOND: Process items that should stay separate
+      // BUT: Ignore items that are already in groups (groups take priority!)
       if (this.groqAnalysis.separate) {
         this.groqAnalysis.separate.forEach(sep => {
-          groqShouldSeparate.add(sep.item);
+          // Only add to separate list if NOT already in a group
+          if (!itemsInGroups.has(sep.item)) {
+            groqShouldSeparate.add(sep.item);
+          } else {
+            this.log(`  ⚠️ Groq: Ignoring contradictory "separate" decision for "${sep.item}" (already in a group)`);
+          }
         });
       }
     }
@@ -121,25 +131,50 @@ class IntelligentIngredientCombiner {
       
       // PRIORITY 1: Check Groq LLM decisions (highest quality)
       if (this.groqAnalysis) {
-        // Check if Groq says to keep this separate
-        if (groqShouldSeparate.has(item.name)) {
-          base = `groq_separate_${item.name}`;
-          shouldSeparate = true;
-          source = 'groq-separate';
-          this.log(`  🤖 Groq: Keeping "${item.name}" separate`);
+        // Try to match this item with Groq's decisions
+        // Groq might have the item without quantities, so we need fuzzy matching
+        const itemNameClean = this.cleanNameForMatching(item.name);
+        
+        let groqMatch = null;
+        
+        // Check if item matches any Groq group (exact or fuzzy match)
+        for (const [groqName, groupInfo] of groqShouldCombine.entries()) {
+          const groqNameClean = this.cleanNameForMatching(groqName);
+          if (itemNameClean === groqNameClean || item.name.includes(groqName) || groqName.includes(itemNameClean)) {
+            groqMatch = { type: 'combine', info: groupInfo, matchedName: groqName };
+            break;
+          }
         }
-        // Check if Groq says to combine this with others
-        else if (groqShouldCombine.has(item.name)) {
-          // Use the group key from Groq
-          const groupInfo = groqShouldCombine.get(item.name);
-          base = groupInfo.groupKey;
-          source = 'groq-combine';
-          
-          // Store the suggested name on the item
-          item._groqSuggestedName = groqGroupNames.get(groupInfo.groupKey);
-          
-          const partners = Array.from(groupInfo.partners);
-          this.log(`  🤖 Groq: "${item.name}" → group "${groqGroupNames.get(groupInfo.groupKey)}" with: ${partners.join(', ')}`);
+        
+        // If not in combine list, check separate list
+        if (!groqMatch) {
+          for (const groqName of groqShouldSeparate) {
+            const groqNameClean = this.cleanNameForMatching(groqName);
+            if (itemNameClean === groqNameClean || item.name.includes(groqName) || groqName.includes(itemNameClean)) {
+              groqMatch = { type: 'separate', matchedName: groqName };
+              break;
+            }
+          }
+        }
+        
+        // Apply Groq decision
+        if (groqMatch) {
+          if (groqMatch.type === 'separate') {
+            base = `groq_separate_${item.name}`;
+            shouldSeparate = true;
+            source = 'groq-separate';
+            this.log(`  🤖 Groq: Keeping "${item.name}" separate`);
+          } else {
+            // Use the group key from Groq
+            base = groqMatch.info.groupKey;
+            source = 'groq-combine';
+            
+            // Store the suggested name on the item
+            item._groqSuggestedName = groqGroupNames.get(groqMatch.info.groupKey);
+            
+            const partners = Array.from(groqMatch.info.partners);
+            this.log(`  🤖 Groq: "${item.name}" → group "${item._groqSuggestedName}" (matched via "${groqMatch.matchedName}")`);
+          }
         }
       }
       
@@ -239,6 +274,18 @@ class IntelligentIngredientCombiner {
     if (variation.includes(text)) return true;
     
     return false;
+  }
+
+  /**
+   * Clean name for matching (remove quantities, parentheses, etc.)
+   */
+  cleanNameForMatching(name) {
+    return name
+      .toLowerCase()
+      .replace(/^\d+\.?\d*\s*(cup|cups|tablespoon|tablespoons|tbsp|tsp|teaspoon|teaspoons|ounce|ounces|oz|pound|pounds|lb|lbs|gram|grams|g|kg|clove|cloves|large|medium|small)\s*/i, '')
+      .replace(/\(.*?\)/g, '') // Remove parentheses
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   /**
