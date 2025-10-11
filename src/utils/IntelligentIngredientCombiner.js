@@ -449,7 +449,35 @@ class IntelligentIngredientCombiner {
       return { amount: null, unit: 'as needed' };
     }
     
-    // Match patterns: "2 cups", "1/2 tsp", "3.5 lbs", "1-2 cloves", "6 eggs", "6 large eggs"
+    // Match patterns with SPECIFIC units first (to avoid matching ingredient names)
+    // Matches: "2 cups", "1/2 tsp", "3.5 lbs", "1-2 cloves", "2 sprigs"
+    const specificUnitPattern = /(\d+(?:\.\d+)?(?:\/\d+)?|\d+-\d+)\s*(cup|cups|tablespoon|tablespoons|tbsp|tsp|teaspoon|teaspoons|ounce|ounces|oz|pound|pounds|lb|lbs|gram|grams|g|kg|clove|cloves|sprig|sprigs|leaf|leaves|bunch|bunches|stalk|stalks|head|heads)\b/i;
+    
+    const specificMatch = text.match(specificUnitPattern);
+    if (specificMatch) {
+      let amount;
+      const amountStr = specificMatch[1];
+      let unit = specificMatch[2];
+      
+      if (amountStr.includes('-')) {
+        // Range like "1-2"
+        const [min, max] = amountStr.split('-').map(Number);
+        amount = (min + max) / 2;
+      } else if (amountStr.includes('/')) {
+        // Fraction like "1/2"
+        const [num, den] = amountStr.split('/').map(Number);
+        amount = num / den;
+      } else {
+        // Regular number
+        amount = parseFloat(amountStr);
+      }
+      
+      // Normalize the unit
+      unit = this.normalizeUnit(unit.toLowerCase(), text.toLowerCase());
+      return { amount, unit };
+    }
+    
+    // Fallback: Match general patterns for items like "6 eggs", "6 large eggs"
     const patterns = [
       /(\d+\.?\d*)\s*([a-zA-Z]+)/,           // "2 cups" or "6 eggs"
       /(\d+\/\d+)\s*([a-zA-Z]+)/,            // "1/2 cup"
