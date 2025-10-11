@@ -44,25 +44,22 @@ class IntelligentIngredientCombiner {
     this.spacyMetadata = spacyMetadata; // Store for use in grouping
     this.groqAnalysis = groqAnalysis; // Store Groq analysis
     
-    this.log('🧠 Starting intelligent combining...', { 
-      itemCount: items.length,
-      hasSpaCyData: !!spacyMetadata,
-      hasGroqData: !!groqAnalysis 
-    });
+    console.log('\n🧠 ===== TIER 2: JAVASCRIPT COMBINING =====');
+    console.log(`📊 Input: ${items.length} items`);
+    console.log(`🤖 Using Groq guidance: ${!!groqAnalysis}`);
     
-    if (groqAnalysis) {
-      this.log('🤖 Using Groq LLM analysis for highest quality combining');
-    } else if (spacyMetadata) {
-      this.log('✨ Using spaCy metadata for enhanced combining');
+    if (groqAnalysis && groqAnalysis.groups) {
+      console.log(`📦 Groq provided ${groqAnalysis.groups.length} groups to combine\n`);
     }
     
     // Step 1: Group items by base ingredient
     const groups = this.groupByIngredient(items);
-    this.log('📊 Grouped into families:', { groupCount: groups.size });
+    console.log(`\n📊 After grouping: ${groups.size} groups`);
     
     // Step 2: Combine within each group
     const combined = this.mergeGroups(groups);
-    this.log('✅ Combined result:', { finalCount: combined.length });
+    console.log(`\n✅ After combining: ${combined.length} items (reduced by ${items.length - combined.length})`);
+    console.log('=========================================\n');
     
     // Step 3: Sort for optimal shopping order
     return this.sortForShopping(combined);
@@ -385,17 +382,20 @@ class IntelligentIngredientCombiner {
     
     if (groqSuggestedName && family.startsWith('groq_group_')) {
       // Use Groq's suggested name with our combined quantity
-      this.log(`  🤖 Using Groq suggested name: "${groqSuggestedName}"`);
-      this.log(`  🤖 Combined quantity:`, combinedQuantity);
+      console.log(`\n  🤖 GROQ GROUP: "${groqSuggestedName}"`);
+      console.log(`     Items in group: ${items.length}`);
+      items.forEach(item => console.log(`       - "${item.name}"`));
+      console.log(`     Extracted quantities:`, quantities);
+      console.log(`     Combined quantity:`, combinedQuantity);
       
       if (combinedQuantity && combinedQuantity.amount !== null && combinedQuantity.amount !== undefined) {
         // Format the quantity
         const quantityStr = this.formatQuantity(combinedQuantity.amount);
         displayName = `${quantityStr}${combinedQuantity.unit ? ' ' + combinedQuantity.unit : ''} ${groqSuggestedName}`;
-        this.log(`  🤖 Built name with quantity: "${displayName}"`);
+        console.log(`     ✅ Final name: "${displayName}"\n`);
       } else {
         displayName = groqSuggestedName;
-        this.log(`  🤖 No quantity, using name only: "${displayName}"`);
+        console.log(`     ⚠️ No quantity! Using name only: "${displayName}"\n`);
       }
       
       // Add qualities if any
@@ -501,6 +501,31 @@ class IntelligentIngredientCombiner {
     if (!unit) return '';
     
     const lower = unit.toLowerCase();
+    
+    // Normalize plural/singular forms to singular
+    const unitNormalization = {
+      'cups': 'cup',
+      'tablespoons': 'tablespoon',
+      'teaspoons': 'teaspoon',
+      'ounces': 'ounce',
+      'pounds': 'pound',
+      'grams': 'gram',
+      'cloves': 'clove',
+      'sprigs': 'sprig',
+      'leaves': 'leaf',
+      'tbsp': 'tablespoon',
+      'tsp': 'teaspoon',
+      'oz': 'ounce',
+      'lb': 'pound',
+      'lbs': 'pound',
+      'g': 'gram',
+      'kg': 'kilogram'
+    };
+    
+    // Check if we have a normalized form
+    if (unitNormalization[lower]) {
+      return unitNormalization[lower];
+    }
     
     // These are all "count" units - normalize to empty string
     const countUnits = ['whole', 'count', 'piece', 'pieces', 'item', 'items'];
