@@ -339,11 +339,16 @@ class IntelligentIngredientCombiner {
     if (groqSuggestedName && family.startsWith('groq_group_')) {
       // Use Groq's suggested name with our combined quantity
       this.log(`  🤖 Using Groq suggested name: "${groqSuggestedName}"`);
+      this.log(`  🤖 Combined quantity:`, combinedQuantity);
       
-      if (combinedQuantity && combinedQuantity.amount) {
-        displayName = `${combinedQuantity.amount}${combinedQuantity.unit ? ' ' + combinedQuantity.unit : ''} ${groqSuggestedName}`;
+      if (combinedQuantity && combinedQuantity.amount !== null && combinedQuantity.amount !== undefined) {
+        // Format the quantity
+        const quantityStr = this.formatQuantity(combinedQuantity.amount);
+        displayName = `${quantityStr}${combinedQuantity.unit ? ' ' + combinedQuantity.unit : ''} ${groqSuggestedName}`;
+        this.log(`  🤖 Built name with quantity: "${displayName}"`);
       } else {
         displayName = groqSuggestedName;
+        this.log(`  🤖 No quantity, using name only: "${displayName}"`);
       }
       
       // Add qualities if any
