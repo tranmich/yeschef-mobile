@@ -668,6 +668,40 @@ class IntelligentIngredientCombiner {
   }
 
   /**
+   * Format a quantity number for display
+   */
+  formatQuantity(amount) {
+    if (amount === null || amount === undefined) return '';
+    
+    // Check if it's a whole number
+    if (Number.isInteger(amount)) {
+      return amount.toString();
+    }
+    
+    // Check if it's close to a common fraction
+    const fractions = {
+      0.25: '¼',
+      0.33: '⅓',
+      0.5: '½',
+      0.66: '⅔',
+      0.75: '¾'
+    };
+    
+    const whole = Math.floor(amount);
+    const decimal = amount - whole;
+    
+    // Check if decimal part matches a common fraction
+    for (const [value, symbol] of Object.entries(fractions)) {
+      if (Math.abs(decimal - value) < 0.05) {
+        return whole > 0 ? `${whole}${symbol}` : symbol;
+      }
+    }
+    
+    // Otherwise, format to 1 decimal place if needed
+    return amount.toFixed(amount % 1 === 0 ? 0 : 1);
+  }
+
+  /**
    * Build readable display name
    */
   buildDisplayName(family, quantity, preparations, qualities) {
