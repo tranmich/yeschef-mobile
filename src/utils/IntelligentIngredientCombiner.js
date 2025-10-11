@@ -444,6 +444,17 @@ class IntelligentIngredientCombiner {
    * Extract quantity and unit from ingredient text
    */
   extractQuantity(text) {
+    // Check for "juice/zest of X" patterns first (e.g., "Juice of 1 lemon")
+    const juicePattern = /(juice|zest)\s+of\s+(\d+(?:\.\d+)?)\s+(lemon|lemons|lime|limes|orange|oranges)/i;
+    const juiceMatch = text.match(juicePattern);
+    if (juiceMatch) {
+      const amount = parseFloat(juiceMatch[2]);
+      let unit = juiceMatch[3].toLowerCase();
+      // Normalize plural to singular
+      if (unit.endsWith('s')) unit = unit.slice(0, -1);
+      return { amount, unit };
+    }
+    
     // Check for "as needed" or "to taste" - these are uncountable
     if (/(as needed|to taste|optional|garnish|for serving)/i.test(text)) {
       return { amount: null, unit: 'as needed' };
@@ -690,9 +701,28 @@ class IntelligentIngredientCombiner {
       return result;
     }
     
-    // Multiple units, can't combine
-    this.log(`      ⚠️ Multiple different units, can't combine:`, units);
-    return null;
+    // Multiple units - pick the primary one (largest amount or most common unit)
+    this.log(`      ⚠️ Multiple different units:`, units);
+    
+    // Find the unit with the largest amount
+    let primaryUnit = units[0];
+    let primaryAmount = byUnit[units[0]];
+    
+    for (const unit of units) {
+      if (byUnit[unit] > primaryAmount) {
+        primaryUnit = unit;
+        primaryAmount = byUnit[unit];
+      }
+    }
+    
+    this.log(`      ℹ️ Using primary unit: ${primaryAmount} ${primaryUnit} (ignoring other units)`);
+    
+    // Return the primary unit with a note that there are variations
+    return { 
+      amount: primaryAmount, 
+      unit: primaryUnit,
+      _hasMixedUnits: true  // Flag for display logic
+    };
   }
 
   /**
@@ -943,6 +973,35 @@ class IntelligentIngredientCombiner {
         'cups': 16,
         'stick': 8,        // 1 stick = 8 tbsp
         'sticks': 8
+      },
+      'lemon': {
+        baseUnit: 'tablespoon',
+        'lemon': 3,        // 1 lemon ≈ 3 tbsp juice
+        'tablespoon': 1,
+        'tbsp': 1,
+        'tablespoons': 1,
+        'teaspoon': 0.33,
+        'tsp': 0.33
+      },
+      'lime': {
+        baseUnit: 'tablespoon',
+        'lime': 2,         // 1 lime ≈ 2 tbsp juice
+        'tablespoon': 1,
+        'tbsp': 1,
+        'tablespoons': 1,
+        'teaspoon': 0.33,
+        'tsp': 0.33
+      },
+      'orange': {
+        baseUnit: 'tablespoon',
+        'orange': 4,       // 1 orange ≈ 4 tbsp juice
+        'tablespoon': 1,
+        'tbsp': 1,
+        'tablespoons': 1,
+        'teaspoon': 0.33,
+        'tsp': 0.33,
+        'cup': 16,
+        'cups': 16
       },
       // Add more as needed...
     };
