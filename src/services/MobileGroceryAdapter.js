@@ -155,39 +155,12 @@ class MobileGroceryAdapter {
       }
       console.log('================================\n');
     } else {
-      console.log('📴 Groq unavailable, falling back to spaCy + JavaScript');
+      console.log('📴 Groq unavailable, using JavaScript fallback');
     }
     
-    // �🧠 TIER 2: spaCy metadata extraction (SECOND - for structural analysis)
-    console.log('🧠 Tier 2: Extracting semantic metadata with spaCy...');
-    const spacyMetadata = await this.getSpaCyMetadata(mobileItems).catch(() => null);
-    
-    if (spacyMetadata) {
-      console.log(`✨ spaCy metadata received for ${Object.keys(spacyMetadata).length} items`);
-      
-      // 🔍 DETAILED DEBUG: Log spaCy decisions
-      console.log('\n🧠 ===== SPACY METADATA =====');
-      Object.entries(spacyMetadata).forEach(([itemId, meta]) => {
-        const item = mobileItems.find(i => i.id === itemId);
-        if (item) {
-          console.log(`\n"${item.name}":`);
-          console.log(`  Core: ${meta.core_ingredient}`);
-          console.log(`  Qualities: ${meta.qualities?.length ? meta.qualities.join(', ') : 'none'}`);
-          console.log(`  Sizes: ${meta.sizes?.length ? meta.sizes.join(', ') : 'none'}`);
-          console.log(`  Should Separate: ${meta.should_separate ? 'YES' : 'NO'}`);
-          if (meta.similar_items?.length) {
-            console.log(`  Similar to: ${meta.similar_items.map(s => s.name).join(', ')}`);
-          }
-        }
-      });
-      console.log('============================\n');
-    } else {
-      console.log('📴 spaCy unavailable, JavaScript will use fallback logic');
-    }
-    
-    // ⚡ TIER 3: JavaScript combining (THIRD - informed by Groq + spaCy)
-    console.log('⚡ Tier 3: Combining with JavaScript (using Groq + spaCy guidance)...');
-    const combined = this.combiner.combineItems(mobileItems, spacyMetadata, groqAnalysis);
+    // ⚡ TIER 2: JavaScript combining (informed by Groq)
+    console.log('⚡ Tier 2: Combining with JavaScript (using Groq guidance)...');
+    const combined = this.combiner.combineItems(mobileItems, null, groqAnalysis);
     
     // 🔍 DETAILED DEBUG: Log combining results
     console.log('\n📤 ===== ITEMS AFTER COMBINING =====');
