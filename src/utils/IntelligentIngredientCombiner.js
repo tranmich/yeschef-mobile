@@ -281,6 +281,7 @@ class IntelligentIngredientCombiner {
       .toLowerCase()
       .replace(/^\d+\.?\d*\s*(cup|cups|tablespoon|tablespoons|tbsp|tsp|teaspoon|teaspoons|ounce|ounces|oz|pound|pounds|lb|lbs|gram|grams|g|kg|clove|cloves|large|medium|small)\s*/i, '')
       .replace(/\(.*?\)/g, '') // Remove parentheses
+      .replace(/\s+and\s+/gi, ' & ') // Normalize "and" to "&"
       .replace(/\s+/g, ' ')
       .trim();
   }
@@ -389,10 +390,32 @@ class IntelligentIngredientCombiner {
       console.log(`     Combined quantity:`, combinedQuantity);
       
       if (combinedQuantity && combinedQuantity.amount !== null && combinedQuantity.amount !== undefined) {
-        // Format the quantity
-        const quantityStr = this.formatQuantity(combinedQuantity.amount);
-        displayName = `${quantityStr}${combinedQuantity.unit ? ' ' + combinedQuantity.unit : ''} ${groqSuggestedName}`;
-        console.log(`     ✅ Final name: "${displayName}"\n`);
+        // Check if we have citrus mixed with measurements (e.g., "1 lemon" + "1 tbsp")
+        if (combinedQuantity._hasMixedUnits) {
+          // Check if one of the original quantities is citrus
+          const citrusUnits = ['lemon', 'lime', 'orange'];
+          const citrusQty = quantities.find(q => citrusUnits.includes(q.unit));
+          const measurementQty = quantities.find(q => q.unit && !citrusUnits.includes(q.unit) && q.unit !== 'as needed');
+          
+          if (citrusQty && measurementQty) {
+            // Show whole fruit + extra measurement
+            const fruitCount = citrusQty.amount;
+            const extraAmount = this.formatQuantity(measurementQty.amount);
+            const fruitName = fruitCount === 1 ? citrusQty.unit : citrusQty.unit + 's';
+            displayName = `${fruitCount} ${fruitName} + ${extraAmount} ${measurementQty.unit} ${groqSuggestedName}`;
+            console.log(`     ✅ Final name (with citrus): "${displayName}"\n`);
+          } else {
+            // Regular mixed units - just show primary
+            const quantityStr = this.formatQuantity(combinedQuantity.amount);
+            displayName = `${quantityStr}${combinedQuantity.unit ? ' ' + combinedQuantity.unit : ''} ${groqSuggestedName}`;
+            console.log(`     ✅ Final name (mixed units): "${displayName}"\n`);
+          }
+        } else {
+          // Format the quantity normally
+          const quantityStr = this.formatQuantity(combinedQuantity.amount);
+          displayName = `${quantityStr}${combinedQuantity.unit ? ' ' + combinedQuantity.unit : ''} ${groqSuggestedName}`;
+          console.log(`     ✅ Final name: "${displayName}"\n`);
+        }
       } else {
         displayName = groqSuggestedName;
         console.log(`     ⚠️ No quantity! Using name only: "${displayName}"\n`);
