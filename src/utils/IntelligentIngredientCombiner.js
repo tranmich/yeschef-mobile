@@ -449,9 +449,9 @@ class IntelligentIngredientCombiner {
       return { amount: null, unit: 'as needed' };
     }
     
-    // Match patterns with SPECIFIC units first (to avoid matching ingredient names)
-    // Matches: "2 cups", "1/2 tsp", "3.5 lbs", "1-2 cloves", "2 sprigs"
-    const specificUnitPattern = /(\d+(?:\.\d+)?(?:\/\d+)?|\d+-\d+)\s*(cup|cups|tablespoon|tablespoons|tbsp|tsp|teaspoon|teaspoons|ounce|ounces|oz|pound|pounds|lb|lbs|gram|grams|g|kg|clove|cloves|sprig|sprigs|leaf|leaves|bunch|bunches|stalk|stalks|head|heads)\b/i;
+    // Match patterns with SPECIFIC units, allowing words between number and unit
+    // Matches: "2 cups", "2 Parsley Sprigs", "1/2 tsp", "3.5 lbs"
+    const specificUnitPattern = /(\d+(?:\.\d+)?(?:\/\d+)?|\d+-\d+)\s+(?:\w+\s+)*(cup|cups|tablespoon|tablespoons|tbsp|tsp|teaspoon|teaspoons|ounce|ounces|oz|pound|pounds|lb|lbs|gram|grams|g|kg|clove|cloves|sprig|sprigs|leaf|leaves|bunch|bunches|stalk|stalks|head|heads)\b/i;
     
     const specificMatch = text.match(specificUnitPattern);
     if (specificMatch) {
