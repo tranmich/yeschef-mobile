@@ -607,20 +607,16 @@ class IntelligentIngredientCombiner {
   combineSimpleQuantities(quantities) {
     this.log(`      🔢 combineSimpleQuantities:`, quantities);
     
-    // Check if all items are "as needed"
-    const allAsNeeded = quantities.every(q => q.unit === 'as needed' || q.amount === null);
-    if (allAsNeeded) {
-      this.log(`      ✓ All items are 'as needed', returning null`);
-      return { amount: null, unit: 'as needed' };
-    }
-    
-    // Filter out "as needed" items from combining
+    // Filter out "as needed" items - we'll combine the countable ones
     const countableQuantities = quantities.filter(q => q.amount !== null && q.unit !== 'as needed');
     
+    // Check if all items are "as needed"
     if (countableQuantities.length === 0) {
-      this.log(`      ⚠️ No countable quantities`);
+      this.log(`      ⚠️ All items are 'as needed', returning null`);
       return { amount: null, unit: 'as needed' };
     }
+    
+    this.log(`      ℹ️ Found ${countableQuantities.length} countable items (ignoring ${quantities.length - countableQuantities.length} 'as needed' items)`);
     
     // Group by unit
     const byUnit = {};
