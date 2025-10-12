@@ -5,13 +5,23 @@ import * as SecureStore from 'expo-secure-store';
 
 class YesChefAPI {
   constructor() {
-    // 🔧 DEVELOPMENT: Use local backend for testing new features
-    // this.baseURL = 'https://yeschefapp-production.up.railway.app';
-    this.baseURL = 'http://192.168.1.72:5000'; // Local development
+    // 🔧 AUTO-DETECT: Use Railway in production, local in development
+    const isDevelopment = __DEV__; // React Native's built-in development flag
+    
+    if (isDevelopment) {
+      // Development: Use local backend
+      this.baseURL = 'http://192.168.1.72:5000';
+      this.debugMode = true;
+      console.log('🔧 YesChefAPI: Using LOCAL backend (development mode)');
+    } else {
+      // Production: Use Railway
+      this.baseURL = 'https://yeschefapp-production.up.railway.app';
+      this.debugMode = false;
+      console.log('🚀 YesChefAPI: Using RAILWAY backend (production mode)');
+    }
     
     this.token = null;
     this.user = null;
-    this.debugMode = true; // Enable detailed logging
   }
 
   // Debug logging helper
