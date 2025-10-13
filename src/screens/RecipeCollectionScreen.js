@@ -1470,7 +1470,13 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
                       
                       <ScrollView style={styles.collectionList} showsVerticalScrollIndicator={false}>
                         {categoriesWithCounts
-                          .filter(cat => cat.id !== 'all' && cat.id !== 'recent-imports')
+                          .filter(cat => 
+                            cat.id !== 'all' && 
+                            cat.id !== 'recent-imports' && 
+                            cat.id !== 'favorites' && 
+                            cat.id !== 'quick' && 
+                            cat.id !== 'one-pot'
+                          )
                           .map(category => (
                             <TouchableOpacity
                               key={category.id}
