@@ -96,9 +96,6 @@ const AddRecipeScreen = ({ navigation }) => {
         >
           {/* URL Import Card - First */}
           <View style={[styles.methodCard, styles.urlCard]}>
-            <View style={styles.methodIconContainer}>
-              <Ionicons name="link" size={48} color="#28a745" />
-            </View>
             <View style={styles.methodContent}>
               <Text style={styles.methodTitle}>🔗 Import from URL</Text>
               <Text style={styles.methodDescription}>
@@ -137,9 +134,6 @@ const AddRecipeScreen = ({ navigation }) => {
             onPress={() => navigation.navigate('VoiceRecipeRecorder')}
             activeOpacity={0.8}
           >
-            <View style={styles.methodIconContainer}>
-              <Ionicons name="mic" size={48} color="#dc2626" />
-            </View>
             <View style={styles.methodContent}>
               <Text style={styles.methodTitle}>🎤 Record Family Recipe</Text>
               <Text style={styles.methodDescription}>
@@ -155,9 +149,6 @@ const AddRecipeScreen = ({ navigation }) => {
             activeOpacity={0.8}
             onPress={() => navigation.navigate('CameraRecipeScanner')}
           >
-            <View style={styles.methodIconContainer}>
-              <Ionicons name="camera" size={48} color="#6366f1" />
-            </View>
             <View style={styles.methodContent}>
               <Text style={styles.methodTitle}>📷 Scan Recipe Card</Text>
               <Text style={styles.methodDescription}>
@@ -229,9 +220,6 @@ const styles = StyleSheet.create({
   cameraCard: {
     borderColor: '#6366f1',
   },
-  methodIconContainer: {
-    marginBottom: 16,
-  },
   methodContent: {
     flex: 1,
   },
@@ -249,33 +237,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontFamily: 'Nunito-Regular',
   },
-  methodFeatures: {
-    marginTop: 8,
-  },
-  featureText: {
-    fontSize: 14,
-    color: '#374151',
-    marginBottom: 6,
-    fontFamily: 'Nunito-Regular',
-  },
   methodArrow: {
     position: 'absolute',
     top: 20,
     right: 20,
-  },
-  comingSoonBadge: {
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
-  },
-  comingSoonText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#6b7280',
-    fontFamily: 'Nunito-Bold',
   },
   urlInputContainer: {
     flexDirection: 'row',
