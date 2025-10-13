@@ -836,9 +836,12 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
         if (recipe.category === categoryId + 's' || recipe.category + 's' === categoryId) {
           return true;
         }
+        // If recipe has explicit category but doesn't match, exclude it
+        // (Don't fall through to keyword matching)
+        return false;
       }
       
-      // PRIORITY 2: Fallback to keyword matching for older recipes without category field
+      // PRIORITY 2: Fallback to keyword matching ONLY for older recipes without category field
       const title = (recipe.title || '').toLowerCase();
       const description = (recipe.description || '').toLowerCase();
       const source = (recipe.source || '').toLowerCase();
