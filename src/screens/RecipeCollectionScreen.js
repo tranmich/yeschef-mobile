@@ -1485,16 +1485,9 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
                                     );
                                     
                                     if (result.success) {
-                                      setRecipes(prevRecipes => 
-                                        prevRecipes.map(r => 
-                                          r.id === selectedRecipeForMove.id 
-                                            ? { ...r, category: category.id }
-                                            : r
-                                        )
-                                      );
-                                      
+                                      // Just reload recipes from backend (don't update state manually)
                                       showToastNotification('Moved ✓');
-                                      loadRecipes();
+                                      loadRecipes(); // This will fetch the updated recipe in its new category
                                     } else {
                                       Alert.alert('Error', 'Failed to move recipe');
                                     }
