@@ -654,6 +654,38 @@ class YesChefAPI {
     }
   }
 
+  async updateRecipeCategory(recipeId, categoryId) {
+    this.log('Updating recipe category:', { recipeId, categoryId });
+    
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Authentication required - please login' };
+    }
+
+    try {
+      const response = await this.debugFetch(`/api/recipes/${recipeId}/category`, {
+        method: 'PUT',
+        headers: {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ category: categoryId }),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        this.log('✅ Recipe category updated successfully');
+        return { success: true, recipe: data.recipe };
+      } else {
+        this.error('Update category failed:', data);
+        return { success: false, error: data.error || 'Update failed' };
+      }
+    } catch (error) {
+      this.error('Update recipe category error:', error);
+      return { success: false, error: 'Network error - check connection' };
+    }
+  }
+
   // Grocery List Methods - Authenticated Only
   async getGroceryLists() {
     this.log('Getting grocery lists...');
