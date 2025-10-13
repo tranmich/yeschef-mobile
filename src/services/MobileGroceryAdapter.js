@@ -145,14 +145,6 @@ class MobileGroceryAdapter {
           console.log(`  Reason: ${group.reasoning}`);
         });
       }
-      
-      if (groqAnalysis.separate) {
-        console.log(`\n🚫 Items to keep SEPARATE (${groqAnalysis.separate.length} items):`);
-        groqAnalysis.separate.forEach((sep) => {
-          console.log(`  - ${sep.item}`);
-          console.log(`    Reason: ${sep.reasoning}`);
-        });
-      }
       console.log('================================\n');
     } else {
       console.log('📴 Groq unavailable, using JavaScript fallback');
