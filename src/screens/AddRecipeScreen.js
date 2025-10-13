@@ -102,7 +102,7 @@ const AddRecipeScreen = ({ navigation }) => {
             <View style={styles.methodContent}>
               <Text style={styles.methodTitle}>🔗 Import from URL</Text>
               <Text style={styles.methodDescription}>
-                Import recipes from YouTube, websites, and online recipe sources.
+                Paste a link from YouTube or any recipe website.
               </Text>
               
               <View style={styles.urlInputContainer}>
@@ -128,12 +128,6 @@ const AddRecipeScreen = ({ navigation }) => {
                   )}
                 </TouchableOpacity>
               </View>
-
-              <View style={styles.methodFeatures}>
-                <Text style={styles.featureText}>• YouTube videos</Text>
-                <Text style={styles.featureText}>• Recipe websites</Text>
-                <Text style={styles.featureText}>• AI extraction</Text>
-              </View>
             </View>
           </View>
 
@@ -149,13 +143,8 @@ const AddRecipeScreen = ({ navigation }) => {
             <View style={styles.methodContent}>
               <Text style={styles.methodTitle}>🎤 Record Family Recipe</Text>
               <Text style={styles.methodDescription}>
-                Preserve family recipes through voice recording. Perfect for capturing grandma's cooking secrets!
+                Preserve family recipes through voice recording.
               </Text>
-              <View style={styles.methodFeatures}>
-                <Text style={styles.featureText}>• Multi-segment recording</Text>
-                <Text style={styles.featureText}>• 18+ languages supported</Text>
-                <Text style={styles.featureText}>• AI-powered transcription</Text>
-              </View>
             </View>
             <Ionicons name="chevron-forward" size={28} color="#dc2626" style={styles.methodArrow} />
           </TouchableOpacity>
@@ -172,13 +161,8 @@ const AddRecipeScreen = ({ navigation }) => {
             <View style={styles.methodContent}>
               <Text style={styles.methodTitle}>📷 Scan Recipe Card</Text>
               <Text style={styles.methodDescription}>
-                Take a photo of recipe cards, cookbook pages, or handwritten recipes.
+                Take a photo of recipe cards or cookbook pages.
               </Text>
-              <View style={styles.methodFeatures}>
-                <Text style={styles.featureText}>• OCR text recognition</Text>
-                <Text style={styles.featureText}>• Handwriting support</Text>
-                <Text style={styles.featureText}>• Multi-page scanning</Text>
-              </View>
             </View>
             <Ionicons name="chevron-forward" size={28} color="#6366f1" style={styles.methodArrow} />
           </TouchableOpacity>
