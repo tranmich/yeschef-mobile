@@ -74,6 +74,8 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
   const [showDaySelection, setShowDaySelection] = useState(false);
   const [availableDays, setAvailableDays] = useState([]);
   const [selectedRecipeForDay, setSelectedRecipeForDay] = useState(null);
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [selectedRecipeForMove, setSelectedRecipeForMove] = useState(null);
 
   // Load hidden recipe IDs from AsyncStorage on mount
   useEffect(() => {
@@ -1387,9 +1389,14 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
               recipe={displayRecipes.find(r => r.id === showBottomSheet)}
               onAddToMealPlan={(recipe) => handleAddToMealPlan(recipe)}
               onShare={(recipe) => handleShareRecipe(recipe)}
+              onMove={(recipe) => {
+                setSelectedRecipeForMove(recipe);
+                setShowMoveModal(true);
+              }}
               onDelete={(recipe) => handleDeleteRecipe(recipe)}
               showShare={true}
               showAddToMealPlan={true}
+              showMove={true}
               showDelete={true}
             />
 
@@ -1436,6 +1443,88 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
                 }
               }}
             />
+
+            {/* 📁 Move to Collection Modal */}
+            <Modal
+              visible={showMoveModal}
+              transparent={true}
+              animationType="slide"
+              onRequestClose={() => setShowMoveModal(false)}
+            >
+              <TouchableWithoutFeedback onPress={() => setShowMoveModal(false)}>
+                <View style={styles.bottomSheetOverlay}>
+                  <TouchableWithoutFeedback onPress={() => {}}>
+                    <View style={styles.bottomSheet}>
+                      <View style={styles.bottomSheetHandle} />
+                      
+                      <Text style={styles.bottomSheetTitle}>
+                        Move to Collection
+                      </Text>
+                      
+                      <Text style={styles.moveModalSubtitle}>
+                        {selectedRecipeForMove?.title}
+                      </Text>
+                      
+                      <ScrollView style={styles.collectionList} showsVerticalScrollIndicator={false}>
+                        {categoriesWithCounts
+                          .filter(cat => cat.id !== 'all' && cat.id !== 'recent-imports')
+                          .map(category => (
+                            <TouchableOpacity
+                              key={category.id}
+                              style={[
+                                styles.collectionItem,
+                                selectedRecipeForMove?.category === category.id && styles.collectionItemCurrent
+                              ]}
+                              onPress={() => {
+                                setShowMoveModal(false);
+                                setTimeout(async () => {
+                                  try {
+                                    const result = await YesChefAPI.updateRecipeCategory(
+                                      selectedRecipeForMove.id,
+                                      category.id
+                                    );
+                                    
+                                    if (result.success) {
+                                      setRecipes(prevRecipes => 
+                                        prevRecipes.map(r => 
+                                          r.id === selectedRecipeForMove.id 
+                                            ? { ...r, category: category.id }
+                                            : r
+                                        )
+                                      );
+                                      
+                                      showToastNotification('Moved ✓');
+                                      loadRecipes();
+                                    } else {
+                                      Alert.alert('Error', 'Failed to move recipe');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error moving recipe:', error);
+                                    Alert.alert('Error', 'An error occurred');
+                                  }
+                                }, 300);
+                              }}
+                            >
+                              <Text style={styles.collectionIcon}>{category.icon}</Text>
+                              <Text style={styles.collectionName}>{category.name}</Text>
+                              {selectedRecipeForMove?.category === category.id && (
+                                <Text style={styles.currentBadge}>Current</Text>
+                              )}
+                            </TouchableOpacity>
+                          ))}
+                      </ScrollView>
+                      
+                      <TouchableOpacity
+                        style={[styles.bottomSheetButton, styles.cancelButton]}
+                        onPress={() => setShowMoveModal(false)}
+                      >
+                        <Text style={styles.bottomSheetButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableWithoutFeedback>
+                </View>
+              </TouchableWithoutFeedback>
+            </Modal>
           </View>
         </TouchableWithoutFeedback>
       </SafeAreaView>
@@ -2508,6 +2597,49 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     fontFamily: 'Nunito-Regular',
+  },
+  
+  // 📁 Move to Collection Modal Styles
+  moveModalSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontFamily: 'Nunito-Regular',
+  },
+  collectionList: {
+    maxHeight: 400,
+    marginBottom: 16,
+  },
+  collectionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginVertical: 4,
+    backgroundColor: '#f9fafb',
+  },
+  collectionItemCurrent: {
+    backgroundColor: '#e6fffa',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  collectionIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  collectionName: {
+    flex: 1,
+    fontSize: 16,
+    color: '#374151',
+    fontFamily: 'Nunito-Regular',
+  },
+  currentBadge: {
+    fontSize: 12,
+    color: '#059669',
+    fontWeight: '600',
+    fontFamily: 'Nunito-Bold',
   },
 });
 

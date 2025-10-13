@@ -23,9 +23,11 @@ const RecipeOptionsModal = ({
   recipe,
   onAddToMealPlan,
   onShare,
+  onMove,
   onDelete,
   showShare = true,
   showAddToMealPlan = true,
+  showMove = true,
   showDelete = true
 }) => {
   
@@ -37,6 +39,11 @@ const RecipeOptionsModal = ({
   const handleShare = () => {
     onClose();
     onShare && onShare(recipe);
+  };
+
+  const handleMove = () => {
+    onClose();
+    onMove && onMove(recipe);
   };
 
   const handleDelete = () => {
@@ -78,6 +85,17 @@ const RecipeOptionsModal = ({
                 >
                   <Icon name="share" size={20} color="#374151" style={styles.bottomSheetButtonIcon} />
                   <Text style={styles.bottomSheetButtonText}>Share Recipe</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Move to Collection */}
+              {showMove && (
+                <TouchableOpacity
+                  style={styles.bottomSheetButton}
+                  onPress={handleMove}
+                >
+                  <Icon name="folder" size={20} color="#374151" style={styles.bottomSheetButtonIcon} />
+                  <Text style={styles.bottomSheetButtonText}>Move to Collection</Text>
                 </TouchableOpacity>
               )}
 
