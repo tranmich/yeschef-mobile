@@ -1283,34 +1283,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9fafb',
   },
   
-  // Fullscreen Modal Styles (for options menu)
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-    paddingBottom: 34, // Safe area for home indicator
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontFamily: 'Nunito-ExtraBold',
-    color: '#1f2937',
-  },
-  
   // Load List Modal Styles (old modal for loading lists)
   loadModalOverlay: {
     flex: 1,
