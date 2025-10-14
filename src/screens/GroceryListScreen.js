@@ -1363,6 +1363,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '80%',
+    minHeight: 300,  // Ensure minimum visible height
     paddingBottom: 34, // Safe area for home indicator
   },
   modalHeader: {
