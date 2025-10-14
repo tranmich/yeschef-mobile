@@ -1282,15 +1282,44 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#f9fafb',
   },
-  // Modal styles
+  
+  // Fullscreen Modal Styles (for options menu)
   modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    paddingBottom: 34, // Safe area for home indicator
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontFamily: 'Nunito-ExtraBold',
+    color: '#1f2937',
+  },
+  
+  // Load List Modal Styles (old modal for loading lists)
+  loadModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
-  modalContent: {
+  loadModalContent: {
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 0,
@@ -1301,19 +1330,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 8,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
   },
   closeButton: {
     width: 32,
@@ -1394,6 +1410,8 @@ const styles = StyleSheet.create({
   modalContent: {
     flex: 1,
     paddingHorizontal: 8,
+    paddingTop: 12,
+    paddingBottom: 20,
   },
   modalMenuItem: {
     flexDirection: 'row',
