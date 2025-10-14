@@ -896,48 +896,49 @@ export default function GroceryListScreen({ route, navigation }) {
         onRequestClose={() => setShowLoadModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.modalContainer}>
             {/* Header with X button */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Load Grocery List</Text>
               <TouchableOpacity
-                style={styles.closeButton}
                 onPress={() => {
                   console.log('🚫 Load cancelled by user');
                   setShowLoadModal(false);
                 }}
               >
-                <Text style={styles.closeButtonText}>✕</Text>
+                <Icon name="close" size={24} color="#6b7280" />
               </TouchableOpacity>
             </View>
             
-            <Text style={styles.modalSubtitle}>
-              Choose a list to load (current changes will be lost):
-            </Text>
-            
-            {/* List of available lists */}
-            <ScrollView style={styles.listContainer}>
-              {availableLists.map((list, index) => (
-                <TouchableOpacity
-                  key={list.id}
-                  style={[
-                    styles.listItem,
-                    index === availableLists.length - 1 && styles.lastListItem
-                  ]}
-                  onPress={() => {
-                    setShowLoadModal(false);
-                    loadGroceryListById(list.id);
-                  }}
-                >
-                  <Text style={styles.listName}>
-                    {list.list_name || `List ${list.id}`}
-                  </Text>
-                  <Text style={styles.listInfo}>
-                    {list.item_count || 0} items
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <View style={styles.loadModalScrollArea}>
+              <Text style={styles.modalSubtitle}>
+                Choose a list to load (current changes will be lost):
+              </Text>
+              
+              {/* List of available lists */}
+              <ScrollView style={styles.loadListContainer} showsVerticalScrollIndicator={false}>
+                {availableLists.map((list, index) => (
+                  <TouchableOpacity
+                    key={list.id}
+                    style={styles.modalMenuItem}
+                    onPress={() => {
+                      setShowLoadModal(false);
+                      loadGroceryListById(list.id);
+                    }}
+                  >
+                    <Icon name="folder" size={20} color="#1E40AF" style={{marginRight: 12}} />
+                    <View style={{flex: 1}}>
+                      <Text style={styles.modalMenuText}>
+                        {list.list_name || `List ${list.id}`}
+                      </Text>
+                      <Text style={styles.listInfo}>
+                        {list.item_count || 0} items
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
           </View>
         </View>
       </Modal>
@@ -950,49 +951,50 @@ export default function GroceryListScreen({ route, navigation }) {
         onRequestClose={() => setShowInviteModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.modalContainer}>
             {/* Header with X button */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Invite Household</Text>
               <TouchableOpacity
-                style={styles.closeButton}
                 onPress={() => setShowInviteModal(false)}
               >
-                <Text style={styles.closeButtonText}>✕</Text>
+                <Icon name="close" size={24} color="#6b7280" />
               </TouchableOpacity>
             </View>
             
-            <Text style={styles.modalSubtitle}>
-              Invite a household to collaborate on "{listTitle}":
-            </Text>
-            
-            {/* List of available households */}
-            <ScrollView style={styles.listContainer}>
-              {households.length > 0 ? (
-                households.map((household, index) => (
-                  <TouchableOpacity
-                    key={household.id}
-                    style={[
-                      styles.listItem,
-                      index === households.length - 1 && styles.lastListItem
-                    ]}
-                    onPress={() => handleInviteHousehold(household)}
-                  >
-                    <Text style={styles.listName}>
-                      {household.name}
-                    </Text>
-                    <Text style={styles.listInfo}>
-                      {household.members || 0} members
-                    </Text>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>No households found</Text>
-                  <Text style={styles.emptySubtext}>Create a household first to invite members</Text>
-                </View>
-              )}
-            </ScrollView>
+            <View style={styles.loadModalScrollArea}>
+              <Text style={styles.modalSubtitle}>
+                Invite a household to collaborate on "{listTitle}":
+              </Text>
+              
+              {/* List of available households */}
+              <ScrollView style={styles.loadListContainer} showsVerticalScrollIndicator={false}>
+                {households.length > 0 ? (
+                  households.map((household) => (
+                    <TouchableOpacity
+                      key={household.id}
+                      style={styles.modalMenuItem}
+                      onPress={() => handleInviteHousehold(household)}
+                    >
+                      <Text style={{ fontSize: 22, color: "#7C3AED", marginRight: 12 }}>👥</Text>
+                      <View style={{flex: 1}}>
+                        <Text style={styles.modalMenuText}>
+                          {household.name}
+                        </Text>
+                        <Text style={styles.listInfo}>
+                          {household.members || 0} members
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyText}>No households found</Text>
+                    <Text style={styles.emptySubtext}>Create a household first to invite members</Text>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1413,6 +1415,37 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito-Regular',
     color: '#dc2626',
     flex: 1,
+  },
+  
+  // Load/Invite Modal Specific Styles
+  loadModalScrollArea: {
+    flex: 1,
+    paddingTop: 8,
+  },
+  loadListContainer: {
+    flex: 1,
+    paddingHorizontal: 8,
+  },
+  listInfo: {
+    fontSize: 13,
+    color: '#9ca3af',
+    marginTop: 2,
+  },
+  emptyState: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    fontFamily: 'Nunito-Regular',
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    fontFamily: 'Nunito-Regular',
+    color: '#9ca3af',
+    textAlign: 'center',
   },
   
   // Toast Notification Styles
