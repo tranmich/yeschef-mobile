@@ -2123,6 +2123,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     backgroundColor: '#ffffff',
+    width: '100%',  // ✅ Full width edge-to-edge
     borderTopLeftRadius: 0,  // Full width - no rounded corners
     borderTopRightRadius: 0,  // Full width - no rounded corners
     height: '90%',  // Fill most of screen (under status bar)
