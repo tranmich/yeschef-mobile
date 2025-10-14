@@ -1362,8 +1362,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%',
-    minHeight: 300,  // Ensure minimum visible height
+    height: '90%',  // Fill most of screen (under status bar)
     paddingBottom: 34, // Safe area for home indicator
   },
   modalHeader: {
