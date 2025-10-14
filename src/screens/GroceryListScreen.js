@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -14,6 +14,7 @@ import {
   ScrollView,
   ImageBackground,
   StatusBar,
+  Animated,
 } from 'react-native';
 import { Icon, IconButton } from '../components/IconLibrary';
 import { ThemedText, typography } from '../components/Typography';
@@ -70,6 +71,35 @@ export default function GroceryListScreen({ route, navigation }) {
   const [availableLists, setAvailableLists] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
+  
+  // Toast notification state
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('Saved ✓');
+  const toastAnimation = useRef(new Animated.Value(0)).current;
+
+  // Show toast notification
+  const showToastNotification = (message = 'Saved ✓') => {
+    setToastMessage(message);
+    setShowToast(true);
+    
+    // Gentle fade in
+    Animated.timing(toastAnimation, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+
+    // Auto dismiss after 2.5 seconds
+    setTimeout(() => {
+      Animated.timing(toastAnimation, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => {
+        setShowToast(false);
+      });
+    }, 2500);
+  };
 
   // Initialize grocery list
   useEffect(() => {
@@ -325,6 +355,9 @@ export default function GroceryListScreen({ route, navigation }) {
         console.log(`✅ SAVE SUCCESS: List saved successfully`);
         console.log(`📋 RESULT:`, result);
         setLastSaved(new Date());
+        
+        // Show toast notification
+        showToastNotification('Saved ✓');
         
         // If it was a new list, update our current backend reference
         if (!currentBackendList && result.list) {
@@ -654,103 +687,119 @@ export default function GroceryListScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Options Menu Dropdown */}
-      {showOptionsMenu && (
-        <View style={styles.optionsMenu}>
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => {
-              setShowOptionsMenu(false);
-              saveToBackend();
-            }}
-          >
-            <Icon name="save" size={18} color="#22C55E" style={{marginRight: 12}} />
-            <Text style={styles.menuText}>Save Now</Text>
-            {isSaving && <ActivityIndicator size="small" color="#22C55E" />}
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => {
-              setShowOptionsMenu(false);
-              showLoadListDialog();
-            }}
-          >
-            <Icon name="folder" size={18} color="#1E40AF" style={{marginRight: 12}} />
-            <Text style={styles.menuText}>Load List</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => {
-              setShowOptionsMenu(false);
-              createNewList();
-            }}
-          >
-            <Icon name="add" size={18} color="#E7993F" style={{marginRight: 12}} />
-            <Text style={styles.menuText}>New List</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.menuDivider} />
-          
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => {
-              setShowOptionsMenu(false);
-              handleInviteToGroceryList();
-            }}
-          >
-            <Text style={{ fontSize: 18, color: "#7C3AED", marginRight: 12 }}>👥</Text>
-            <Text style={styles.menuText}>Invite</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.menuItem, styles.deleteMenuItem]}
-            onPress={() => {
-              setShowOptionsMenu(false);
-              deleteCurrentList();
-            }}
-          >
-            <Icon name="delete" size={18} color="#DC313F" style={{marginRight: 12}} />
-            <Text style={styles.deleteText}>Delete List</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.menuDivider} />
-          
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => {
-              setShowOptionsMenu(false);
-              initializeGroceryList();
-            }}
-          >
-            <Icon name="refresh" size={18} color="#1E40AF" style={{marginRight: 12}} />
-            <Text style={styles.menuText}>Refresh</Text>
-          </TouchableOpacity>
+      {/* Options Menu Modal - Fullscreen */}
+      <Modal
+        visible={showOptionsMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowOptionsMenu(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>List Options</Text>
+              <TouchableOpacity onPress={() => setShowOptionsMenu(false)}>
+                <Icon name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+              <TouchableOpacity 
+                style={styles.modalMenuItem}
+                onPress={() => {
+                  setShowOptionsMenu(false);
+                  saveToBackend();
+                }}
+              >
+                <Icon name="save" size={22} color="#22C55E" style={{marginRight: 16}} />
+                <Text style={styles.modalMenuText}>Save Now</Text>
+                {isSaving && <ActivityIndicator size="small" color="#22C55E" style={{marginLeft: 'auto'}} />}
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.modalMenuItem}
+                onPress={() => {
+                  setShowOptionsMenu(false);
+                  showLoadListDialog();
+                }}
+              >
+                <Icon name="folder" size={22} color="#1E40AF" style={{marginRight: 16}} />
+                <Text style={styles.modalMenuText}>Load List</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.modalMenuItem}
+                onPress={() => {
+                  setShowOptionsMenu(false);
+                  createNewList();
+                }}
+              >
+                <Icon name="add" size={22} color="#E7993F" style={{marginRight: 16}} />
+                <Text style={styles.modalMenuText}>New List</Text>
+              </TouchableOpacity>
+              
+              <View style={styles.modalDivider} />
+              
+              <TouchableOpacity 
+                style={styles.modalMenuItem}
+                onPress={() => {
+                  setShowOptionsMenu(false);
+                  handleInviteToGroceryList();
+                }}
+              >
+                <Text style={{ fontSize: 22, color: "#7C3AED", marginRight: 16 }}>👥</Text>
+                <Text style={styles.modalMenuText}>Invite Friends</Text>
+              </TouchableOpacity>
+              
+              <View style={styles.modalDivider} />
+              
+              <TouchableOpacity 
+                style={[styles.modalMenuItem, styles.modalDeleteMenuItem]}
+                onPress={() => {
+                  setShowOptionsMenu(false);
+                  deleteCurrentList();
+                }}
+              >
+                <Icon name="delete" size={22} color="#DC313F" style={{marginRight: 16}} />
+                <Text style={styles.modalDeleteText}>Delete List</Text>
+              </TouchableOpacity>
+              
+              <View style={styles.modalDivider} />
+              
+              <TouchableOpacity 
+                style={styles.modalMenuItem}
+                onPress={() => {
+                  setShowOptionsMenu(false);
+                  initializeGroceryList();
+                }}
+              >
+                <Icon name="refresh" size={22} color="#1E40AF" style={{marginRight: 16}} />
+                <Text style={styles.modalMenuText}>Refresh List</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
         </View>
-      )}
+      </Modal>
 
-      {/* 📊 Card 1.5: Sync Status Indicator */}
-      <View style={styles.syncCard}>
-        {isSaving ? (
-          <View style={styles.syncIndicator}>
-            <ActivityIndicator size="small" color="#3b82f6" />
-            <Text style={styles.syncText}>Saving...</Text>
-          </View>
-        ) : lastSaved ? (
-          <View style={styles.syncIndicator}>
-            <Text style={styles.syncText}>✅ Saved {lastSaved.toLocaleTimeString()}</Text>
-          </View>
-        ) : currentBackendList ? (
-          <View style={styles.syncIndicator}>
-            <Text style={styles.syncText}>📋 {currentBackendList.list_name}</Text>
-          </View>
-        ) : (
-          <View style={styles.syncIndicator}>
-            <Text style={styles.syncText}>📱 Local list</Text>
-          </View>
-        )}
-      </View>
+      {/* Toast Notification */}
+      {showToast && (
+        <Animated.View 
+          style={[
+            styles.toast,
+            {
+              opacity: toastAnimation,
+              transform: [{
+                translateY: toastAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [20, 0],
+                }),
+              }],
+            }
+          ]}
+        >
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </Animated.View>
+      )}
 
       {/* ➕ Card 2: Add Item Section */}
       <View style={styles.addCard}>
@@ -1100,55 +1149,6 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontWeight: 'bold',
   },
-  optionsMenu: {
-    position: 'absolute',
-    top: 130,
-    right: 25,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-    zIndex: 1000,
-    minWidth: 160,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  menuIcon: {
-    fontSize: 16,
-    marginRight: 12,
-  },
-  menuText: {
-    fontSize: 16,
-    fontFamily: 'Nunito-Regular',
-    color: '#374151',
-    flex: 1,
-  },
-  menuDivider: {
-    height: 1,
-    backgroundColor: '#e5e7eb',
-    marginVertical: 4,
-  },
-  deleteMenuItem: {
-    backgroundColor: '#fef2f2', // Light red background
-  },
-  deleteIcon: {
-    fontSize: 16,
-    marginRight: 12,
-  },
-  deleteText: {
-    fontSize: 16,
-    color: '#dc2626', // Red text
-    flex: 1,
-    fontWeight: '500',
-  },
   itemCount: {
     fontSize: 14,
     fontFamily: 'Nunito-Regular',
@@ -1362,5 +1362,95 @@ const styles = StyleSheet.create({
   listInfo: {
     fontSize: 14,
     color: '#6b7280',
+  },
+  
+  // Fullscreen Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    paddingBottom: 34, // Safe area for home indicator
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontFamily: 'Nunito-ExtraBold',
+    color: '#1f2937',
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 8,
+  },
+  modalMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    backgroundColor: '#f9fafb',
+    marginHorizontal: 12,
+    marginVertical: 4,
+    borderRadius: 12,
+  },
+  modalMenuText: {
+    fontSize: 17,
+    fontFamily: 'Nunito-Regular',
+    color: '#374151',
+    flex: 1,
+  },
+  modalDivider: {
+    height: 8,
+    marginVertical: 8,
+  },
+  modalDeleteMenuItem: {
+    backgroundColor: '#fef2f2',
+  },
+  modalDeleteText: {
+    fontSize: 17,
+    fontFamily: 'Nunito-Regular',
+    color: '#dc2626',
+    flex: 1,
+  },
+  
+  // Toast Notification Styles
+  toast: {
+    position: 'absolute',
+    bottom: 100,
+    left: 20,
+    right: 20,
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  toastText: {
+    backgroundColor: '#e6fffa',
+    color: '#1f2937',
+    fontSize: 15,
+    fontWeight: '500',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    textAlign: 'center',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+    fontFamily: 'Nunito-Regular',
   },
 });
