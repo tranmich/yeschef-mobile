@@ -2124,10 +2124,10 @@ const styles = StyleSheet.create({
   modalContainer: {
     backgroundColor: '#ffffff',
     width: '100%',  // ✅ Full width edge-to-edge
-    borderTopLeftRadius: 0,  // Full width - no rounded corners
-    borderTopRightRadius: 0,  // Full width - no rounded corners
+    borderTopLeftRadius: 20,  // Match GroceryListScreen rounded corners
+    borderTopRightRadius: 20,  // Match GroceryListScreen rounded corners
     height: '90%',  // Fill most of screen (under status bar)
-    paddingBottom: 34, // Safe area for home indicator
+    paddingBottom: 0, // ✅ Flush with bottom - no gap
   },
   modalHeader: {
     flexDirection: 'row',
