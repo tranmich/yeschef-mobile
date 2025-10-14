@@ -2123,8 +2123,8 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 0,  // Full width - no rounded corners
+    borderTopRightRadius: 0,  // Full width - no rounded corners
     height: '90%',  // Fill most of screen (under status bar)
     paddingBottom: 34, // Safe area for home indicator
   },
