@@ -2147,7 +2147,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 8,
     paddingTop: 12,
-    paddingBottom: 20,
+    paddingBottom: 0, // ✅ No bottom padding - flush with screen
   },
   modalMenuItem: {
     flexDirection: 'row',
