@@ -1348,73 +1348,104 @@ function MealPlanScreen({ navigation, route }) {
               style={styles.localDataStatus}
             />
 
-      {/* Options Menu Dropdown */}
-      {showOptionsMenu && (
-        <View style={styles.optionsMenu}>
-          <TouchableOpacity style={styles.menuItem} onPress={() => { setShowOptionsMenu(false); handleSave(); }}>
-            <Icon name="save" size={18} color="#22C55E" style={{marginRight: 12}} />
-            <Text style={styles.menuText}>Save</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem} onPress={() => { setShowOptionsMenu(false); handleLoad(); }}>
-            <Icon name="folder" size={18} color="#1E40AF" style={{marginRight: 12}} />
-            <Text style={styles.menuText}>Load</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.menuDivider} />
-          
-          <TouchableOpacity style={styles.menuItem} onPress={() => { setShowOptionsMenu(false); handleNew(); }}>
-            <Icon name="add" size={18} color="#E7993F" style={{marginRight: 12}} />
-            <Text style={styles.menuText}>New List</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem} onPress={() => { setShowOptionsMenu(false); handleAddDay(); }}>
-            <Icon name="add" size={18} color="#7C3AED" style={{marginRight: 12}} />
-            <Text style={styles.menuText}>Add Day</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.menuDivider} />
-          
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => { 
-              setShowOptionsMenu(false); 
-              handleInviteToMealPlan();
-            }}
-          >
-            <Text style={{ fontSize: 18, color: "#7C3AED", marginRight: 12 }}>👥</Text>
-            <Text style={styles.menuText}>Invite</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={[styles.menuItem, styles.makeListMenuItem]} onPress={() => { setShowOptionsMenu(false); handleConvertToGroceryList(); }}>
-            <Icon name="list" size={18} color="#059669" style={{marginRight: 12}} />
-            <Text style={[styles.menuText, styles.makeListText]}>Make List</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[
-              styles.menuItem, 
-              styles.deleteMenuItem,
-              !currentPlanId && styles.disabledMenuItem // Disable if no plan loaded
-            ]} 
-            onPress={() => { 
-              setShowOptionsMenu(false); 
-              if (currentPlanId) handleDelete(); 
-            }}
-            disabled={!currentPlanId}
-          >
-            <Icon 
-              name="delete" 
-              size={18} 
-              color={currentPlanId ? "#DC313F" : "#9ca3af"} 
-              style={{marginRight: 12}} 
-            />
-            <Text style={[styles.deleteText, !currentPlanId && styles.disabledText]}>
-              {currentPlanId ? 'Delete' : 'No Plan'}
-            </Text>
-          </TouchableOpacity>
+      {/* Options Menu Modal - Fullscreen */}
+      <Modal
+        visible={showOptionsMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowOptionsMenu(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Meal Plan Options</Text>
+              <TouchableOpacity onPress={() => setShowOptionsMenu(false)}>
+                <Icon name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+              <TouchableOpacity 
+                style={styles.modalMenuItem}
+                onPress={() => { setShowOptionsMenu(false); handleSave(); }}
+              >
+                <Icon name="save" size={22} color="#22C55E" style={{marginRight: 16}} />
+                <Text style={styles.modalMenuText}>Save Plan</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.modalMenuItem}
+                onPress={() => { setShowOptionsMenu(false); handleLoad(); }}
+              >
+                <Icon name="folder" size={22} color="#1E40AF" style={{marginRight: 16}} />
+                <Text style={styles.modalMenuText}>Load Plan</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.modalMenuItem}
+                onPress={() => { setShowOptionsMenu(false); handleNew(); }}
+              >
+                <Icon name="add" size={22} color="#E7993F" style={{marginRight: 16}} />
+                <Text style={styles.modalMenuText}>New Plan</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.modalMenuItem}
+                onPress={() => { setShowOptionsMenu(false); handleAddDay(); }}
+              >
+                <Icon name="add" size={22} color="#7C3AED" style={{marginRight: 16}} />
+                <Text style={styles.modalMenuText}>Add Day</Text>
+              </TouchableOpacity>
+              
+              <View style={styles.modalDivider} />
+              
+              <TouchableOpacity 
+                style={styles.modalMenuItem}
+                onPress={() => { 
+                  setShowOptionsMenu(false); 
+                  handleInviteToMealPlan();
+                }}
+              >
+                <Text style={{ fontSize: 22, color: "#7C3AED", marginRight: 16 }}>👥</Text>
+                <Text style={styles.modalMenuText}>Invite Friends</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalMenuItem, {backgroundColor: '#f0fdf4'}]}
+                onPress={() => { setShowOptionsMenu(false); handleConvertToGroceryList(); }}
+              >
+                <Icon name="list" size={22} color="#059669" style={{marginRight: 16}} />
+                <Text style={[styles.modalMenuText, {color: '#059669'}]}>Make Grocery List</Text>
+              </TouchableOpacity>
+              
+              <View style={styles.modalDivider} />
+              
+              <TouchableOpacity 
+                style={[
+                  styles.modalMenuItem,
+                  styles.modalDeleteMenuItem,
+                  !currentPlanId && {opacity: 0.5}
+                ]} 
+                onPress={() => { 
+                  setShowOptionsMenu(false); 
+                  if (currentPlanId) handleDelete(); 
+                }}
+                disabled={!currentPlanId}
+              >
+                <Icon 
+                  name="delete" 
+                  size={22} 
+                  color={currentPlanId ? "#DC313F" : "#9ca3af"} 
+                  style={{marginRight: 16}} 
+                />
+                <Text style={[styles.modalDeleteText, !currentPlanId && {color: '#9ca3af'}]}>
+                  {currentPlanId ? 'Delete Plan' : 'No Plan Loaded'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
         </View>
-      )}
+      </Modal>
 
       {/* Main content area with days */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -1534,46 +1565,55 @@ function MealPlanScreen({ navigation, route }) {
       </ScrollView>
 
       {/* Load Plans Modal */}
-      {showLoadModal && (
+      <Modal
+        visible={showLoadModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowLoadModal(false)}
+      >
         <View style={styles.modalOverlay}>
-          <View style={styles.modal}>
+          <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>📂 Select Meal Plan</Text>
-              <TouchableOpacity 
-                style={styles.modalCloseButton}
-                onPress={() => setShowLoadModal(false)}
-              >
-                <Text style={styles.modalCloseText}>❌</Text>
+              <Text style={styles.modalTitle}>Load Meal Plan</Text>
+              <TouchableOpacity onPress={() => setShowLoadModal(false)}>
+                <Icon name="close" size={24} color="#6b7280" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalContent}>
-              {availablePlans.length > 0 ? (
-                availablePlans.map(plan => (
-                  <TouchableOpacity
-                    key={plan.id}
-                    style={styles.planItem}
-                    onPress={async () => {
-                      setShowLoadModal(false);
-                      await loadSpecificPlan(plan.id);
-                    }}
-                  >
-                    <View style={styles.planInfo}>
-                      <Text style={styles.planName}>{plan.plan_name}</Text>
-                      <Text style={styles.planDate}>{plan.week_start_date}</Text>
-                    </View>
-                    <Text style={styles.planLoadIcon}>📂</Text>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <View style={styles.emptyPlans}>
-                  <Text style={styles.emptyPlansText}>No meal plans found</Text>
-                </View>
-              )}
-            </ScrollView>
+            <View style={styles.loadModalScrollArea}>
+              <Text style={styles.modalSubtitle}>
+                Choose a plan to load (current changes will be lost):
+              </Text>
+              
+              <ScrollView style={styles.loadListContainer} showsVerticalScrollIndicator={false}>
+                {availablePlans.length > 0 ? (
+                  availablePlans.map(plan => (
+                    <TouchableOpacity
+                      key={plan.id}
+                      style={styles.modalMenuItem}
+                      onPress={async () => {
+                        setShowLoadModal(false);
+                        await loadSpecificPlan(plan.id);
+                      }}
+                    >
+                      <Icon name="folder" size={20} color="#1E40AF" style={{marginRight: 12}} />
+                      <View style={{flex: 1}}>
+                        <Text style={styles.modalMenuText}>{plan.plan_name}</Text>
+                        <Text style={styles.listInfo}>{plan.week_start_date}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyText}>No meal plans found</Text>
+                    <Text style={styles.emptySubtext}>Create a new plan to get started</Text>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
           </View>
         </View>
-      )}
+      </Modal>
           {/* 🚫 REMOVED: CrossContainerDragProvider closing tag */}
         </View>
       </TouchableWithoutFeedback>
@@ -1588,43 +1628,42 @@ function MealPlanScreen({ navigation, route }) {
         onRequestClose={() => setShowInviteModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modal}>
+          <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>👥 Invite Household</Text>
-              <TouchableOpacity 
-                style={styles.modalCloseButton}
-                onPress={() => setShowInviteModal(false)}
-              >
-                <Text style={styles.modalCloseText}>❌</Text>
+              <Text style={styles.modalTitle}>Invite Household</Text>
+              <TouchableOpacity onPress={() => setShowInviteModal(false)}>
+                <Icon name="close" size={24} color="#6b7280" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalContent}>
+            <View style={styles.loadModalScrollArea}>
               <Text style={styles.modalSubtitle}>
                 Invite a household to collaborate on "{mealPlanTitle}":
               </Text>
               
-              {households.length > 0 ? (
-                households.map(household => (
-                  <TouchableOpacity
-                    key={household.id}
-                    style={styles.planItem}
-                    onPress={() => handleInviteHousehold(household)}
-                  >
-                    <View style={styles.planInfo}>
-                      <Text style={styles.planName}>{household.name}</Text>
-                      <Text style={styles.planDate}>{household.members || 0} members</Text>
-                    </View>
-                    <Text style={styles.planLoadIcon}>👥</Text>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <View style={styles.emptyPlans}>
-                  <Text style={styles.emptyPlansText}>No households found</Text>
-                  <Text style={styles.emptyPlansText}>Create a household first to invite members</Text>
-                </View>
-              )}
-            </ScrollView>
+              <ScrollView style={styles.loadListContainer} showsVerticalScrollIndicator={false}>
+                {households.length > 0 ? (
+                  households.map(household => (
+                    <TouchableOpacity
+                      key={household.id}
+                      style={styles.modalMenuItem}
+                      onPress={() => handleInviteHousehold(household)}
+                    >
+                      <Text style={{ fontSize: 22, color: "#7C3AED", marginRight: 12 }}>👥</Text>
+                      <View style={{flex: 1}}>
+                        <Text style={styles.modalMenuText}>{household.name}</Text>
+                        <Text style={styles.listInfo}>{household.members || 0} members</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyText}>No households found</Text>
+                    <Text style={styles.emptySubtext}>Create a household first to invite members</Text>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1828,69 +1867,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#374151',
     fontWeight: 'bold',
-  },
-  optionsMenu: {
-    position: 'absolute',
-    top: 80,
-    right: 25,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-    zIndex: 1000,
-    minWidth: 160,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  menuIcon: {
-    fontSize: 16,
-    marginRight: 12,
-  },
-  menuText: {
-    fontSize: 16,
-    fontFamily: 'Nunito-Regular',
-    color: '#374151',
-    flex: 1,
-  },
-  menuDivider: {
-    height: 1,
-    backgroundColor: '#e5e7eb',
-    marginVertical: 4,
-  },
-  makeListMenuItem: {
-    backgroundColor: '#f0fdf4', // Mint green background
-  },
-  makeListText: {
-    color: '#059669', // Darker green text
-    fontWeight: '600',
-  },
-  deleteMenuItem: {
-    backgroundColor: '#fef2f2', // Light red background
-  },
-  deleteIcon: {
-    fontSize: 16,
-    marginRight: 12,
-  },
-  deleteText: {
-    fontSize: 16,
-    color: '#dc2626',
-    flex: 1,
-    fontWeight: '500',
-  },
-  disabledMenuItem: {
-    backgroundColor: '#f3f4f6',
-    opacity: 0.6,
-  },
-  disabledText: {
-    color: '#9ca3af',
   },
   infoBar: {
     paddingHorizontal: 20,
@@ -2138,94 +2114,108 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginRight: 8,
   },
-  // Load Modal Styles
+  
+  // Fullscreen Modal Styles (matching GroceryListScreen)
   modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
+    justifyContent: 'flex-end',
   },
-  modal: {
+  modalContainer: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    width: '90%',
-    maxHeight: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 16,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    height: '90%',  // Fill most of screen (under status bar)
+    paddingBottom: 34, // Safe area for home indicator
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  modalSubtitle: {
-    fontSize: 16,
-    color: '#6b7280',
-    marginBottom: 16,
-    paddingHorizontal: 20,
-  },
-  modalCloseButton: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalCloseText: {
-    fontSize: 18,
+    fontSize: 22,
+    fontFamily: 'Nunito-ExtraBold',
+    color: '#1f2937',
   },
   modalContent: {
-    maxHeight: 400,
+    flex: 1,
+    paddingHorizontal: 8,
+    paddingTop: 12,
+    paddingBottom: 20,
   },
-  planItem: {
+  modalMenuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    backgroundColor: '#f9fafb',
+    marginHorizontal: 12,
+    marginVertical: 4,
+    borderRadius: 12,
   },
-  planInfo: {
+  modalMenuText: {
+    fontSize: 17,
+    fontFamily: 'Nunito-Regular',
+    color: '#374151',
     flex: 1,
   },
-  planName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
+  modalDivider: {
+    height: 8,
+    marginVertical: 8,
   },
-  planDate: {
+  modalDeleteMenuItem: {
+    backgroundColor: '#fef2f2',
+  },
+  modalDeleteText: {
+    fontSize: 17,
+    fontFamily: 'Nunito-Regular',
+    color: '#dc2626',
+    flex: 1,
+  },
+  
+  // Load/Invite Modal Specific Styles
+  loadModalScrollArea: {
+    flex: 1,
+    paddingTop: 8,
+  },
+  loadListContainer: {
+    flex: 1,
+    paddingHorizontal: 8,
+  },
+  modalSubtitle: {
     fontSize: 14,
     color: '#6b7280',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
-  planLoadIcon: {
-    fontSize: 20,
-    marginLeft: 12,
+  listInfo: {
+    fontSize: 13,
+    color: '#9ca3af',
+    marginTop: 2,
   },
-  emptyPlans: {
-    padding: 32,
+  emptyState: {
+    padding: 40,
     alignItems: 'center',
   },
-  emptyPlansText: {
+  emptyText: {
     fontSize: 16,
+    fontFamily: 'Nunito-Regular',
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    fontFamily: 'Nunito-Regular',
     color: '#9ca3af',
     textAlign: 'center',
   },
+  
   // Recipe Card Styles - Clean text-only layout like grocery list with drag support
   recipeCard: {
     flexDirection: 'row',
