@@ -478,8 +478,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logo: {
-    width: 100,
-    height: 100,
+    width: 200,  // ✅ 2x larger (was 100)
+    height: 200, // ✅ 2x larger (was 100)
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
