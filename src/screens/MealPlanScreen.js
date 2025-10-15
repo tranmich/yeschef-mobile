@@ -2130,8 +2130,9 @@ const styles = StyleSheet.create({
     width: '100%',  // ✅ Full width edge-to-edge
     borderTopLeftRadius: 20,  // Match GroceryListScreen rounded corners
     borderTopRightRadius: 20,  // Match GroceryListScreen rounded corners
-    height: '90%',  // Fill most of screen (under status bar)
+    height: '100%',  // ✅ Full height - truly flush with bottom
     paddingBottom: 0, // ✅ Flush with bottom - no gap
+    marginBottom: 0, // ✅ No bottom margin
   },
   modalHeader: {
     flexDirection: 'row',
