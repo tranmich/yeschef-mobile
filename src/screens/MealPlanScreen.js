@@ -1364,7 +1364,11 @@ function MealPlanScreen({ navigation, route }) {
               </TouchableOpacity>
             </View>
             
-            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+              style={styles.modalContent} 
+              contentContainerStyle={{ paddingBottom: 0 }}
+              showsVerticalScrollIndicator={false}
+            >
               <TouchableOpacity 
                 style={styles.modalMenuItem}
                 onPress={() => { setShowOptionsMenu(false); handleSave(); }}
