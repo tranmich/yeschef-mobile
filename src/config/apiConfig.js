@@ -19,7 +19,7 @@ const USE_RAILWAY_IN_DEV = true; // Set to true to test Railway v2 API in dev mo
 export const API_CONFIG = {
   // Set to true to use v2 API (3x faster!)
   // Set to false to use old API (fallback)
-  USE_V2_API: false, // Start with false for safety!
+  USE_V2_API: true, // ✅ ENABLED! Whole app now uses v2! 🚀
   
   // Production URLs (Railway)
   PRODUCTION_V1_URL: 'https://yeschefapp-production.up.railway.app/api',
