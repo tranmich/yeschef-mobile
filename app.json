@@ -26,7 +26,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Take photos of recipe cards and cookbook pages to import recipes",
         "NSPhotoLibraryUsageDescription": "Select recipe photos from your library to import recipes",
-        "NSMicrophoneUsageDescription": "Record family recipes through voice"
+        "NSMicrophoneUsageDescription": "Record family recipes through voice",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

@@ -22,9 +22,8 @@ import ProfileIconCreatorScreen from './ProfileIconCreatorScreen';
 import ProfileAvatar from '../components/ProfileAvatar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import PremiumStatus from '../components/PremiumStatus';
-import { RevenueCatValidator } from '../utils/RevenueCatValidator';
 import RecipeDebugger from '../utils/RecipeDebugger';
-import RevenueCatService from '../services/RevenueCatServiceMock'; // For mock premium toggle
+import { usePremium } from '../contexts/PremiumContext';
 
 export default function ProfileScreen({ navigation, user = null }) {
   // 📱 UI State
@@ -349,12 +348,7 @@ export default function ProfileScreen({ navigation, user = null }) {
     }
   };
 
-  // 🔧 Debug: RevenueCat Configuration Check
-  const debugRevenueCat = () => {
-    RevenueCatValidator.showValidationAlert();
-  };
-
-  // 🔍 Debug: Recipe Issues  
+  //  Debug: Recipe Issues  
   const debugRecipes = async () => {
     try {
       const report = await RecipeDebugger.showDiagnosticAlert();
@@ -381,12 +375,13 @@ export default function ProfileScreen({ navigation, user = null }) {
     }
   };
 
-  // 🧪 Debug: Toggle Mock Premium Status
-  const toggleMockPremium = () => {
-    const newStatus = RevenueCatService.toggleMockPremium();
+  // 🧪 Debug: Toggle Mock Premium Status (for development)
+  const { upgradeToPremium, userTier } = usePremium();
+  const toggleMockPremium = async () => {
+    const result = await upgradeToPremium();
     Alert.alert(
-      '🧪 Mock Premium Toggled',
-      `Premium status is now: ${newStatus ? 'ACTIVE' : 'INACTIVE'}\n\nRefresh the screen to see changes.`
+      '🧪 Premium Status',
+      `Current tier: ${userTier}\n\n${result.success ? 'Upgraded to premium!' : 'Already premium or error occurred'}`
     );
   };
 
@@ -540,12 +535,6 @@ export default function ProfileScreen({ navigation, user = null }) {
           {__DEV__ && (
             <View style={styles.debugCard}>
               <Text style={styles.cardTitle}>🔧 Development Tools</Text>
-              <TouchableOpacity 
-                style={styles.debugButton} 
-                onPress={debugRevenueCat}
-              >
-                <Text style={styles.debugButtonText}>Check RevenueCat Config</Text>
-              </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.debugButton} 
                 onPress={debugAvatarStorage}

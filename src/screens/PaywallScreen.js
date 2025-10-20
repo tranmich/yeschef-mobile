@@ -1,6 +1,7 @@
 /**
  * 💰 Paywall Screen
  * Beautiful subscription screen with features and pricing
+ * Backend-based premium tier system
  */
 
 import React, { useState, useEffect } from 'react';
@@ -17,97 +18,76 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '../components/IconLibrary';
-import RevenueCatService from '../services/RevenueCatServiceMock'; // Using mock for now
+import { usePremium } from '../contexts/PremiumContext';
+
+// Pricing plans
+const PRICING_PLANS = [
+  {
+    id: 'monthly',
+    name: 'Monthly',
+    price: '$4.99',
+    period: '/month',
+    priceValue: 4.99,
+    billingPeriod: 'monthly',
+  },
+  {
+    id: 'yearly',
+    name: 'Annual',
+    price: '$49',
+    period: '/year',
+    priceValue: 49,
+    billingPeriod: 'yearly',
+    savings: 'Save 17%',
+    popular: true,
+  },
+];
 
 const PaywallScreen = ({ visible, onClose, feature = null }) => {
-  const [offerings, setOfferings] = useState(null);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { upgradeToPremium } = usePremium();
+  const [selectedPlan, setSelectedPlan] = useState(PRICING_PLANS[1]); // Default to yearly
   const [isPurchasing, setIsPurchasing] = useState(false);
-  const [customerInfo, setCustomerInfo] = useState(null);
-
-  useEffect(() => {
-    if (visible) {
-      loadOfferings();
-      loadCustomerInfo();
-    }
-  }, [visible]);
-
-  const loadOfferings = async () => {
-    setIsLoading(true);
-    try {
-      const offerings = await RevenueCatService.loadOfferings();
-      setOfferings(offerings);
-      
-      // Auto-select the first available product
-      if (offerings?.current?.availablePackages?.length > 0) {
-        setSelectedProduct(offerings.current.availablePackages[0]);
-      }
-    } catch (error) {
-      console.error('Failed to load offerings:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadCustomerInfo = async () => {
-    try {
-      const info = await RevenueCatService.loadCustomerInfo();
-      setCustomerInfo(info);
-    } catch (error) {
-      console.error('Failed to load customer info:', error);
-    }
-  };
 
   const handlePurchase = async () => {
-    if (!selectedProduct) return;
+    if (!selectedPlan) return;
 
     setIsPurchasing(true);
     try {
-      const result = await RevenueCatService.purchaseProduct(selectedProduct.product.identifier);
+      // TODO: Implement Stripe payment flow here
+      // For now, simulate upgrade (development only)
       
-      if (result.success) {
-        Alert.alert(
-          '🎉 Welcome to Premium!',
-          'Thank you for your purchase! You now have access to all premium features.',
-          [{ text: 'Great!', onPress: onClose }]
-        );
-      } else if (result.cancelled) {
-        // User cancelled, do nothing
-      } else {
-        Alert.alert('Purchase Failed', result.error || 'Something went wrong. Please try again.');
-      }
+      Alert.alert(
+        '🚧 Payment Coming Soon',
+        `Stripe integration will be added here. Selected plan: ${selectedPlan.name} (${selectedPlan.price}${selectedPlan.period})`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Simulate Upgrade (Dev Only)',
+            onPress: async () => {
+              const result = await upgradeToPremium();
+              if (result.success) {
+                Alert.alert(
+                  '🎉 Welcome to Premium!',
+                  'You now have access to all premium features.',
+                  [{ text: 'Great!', onPress: onClose }]
+                );
+              }
+            }
+          }
+        ]
+      );
     } catch (error) {
-      Alert.alert('Purchase Error', 'Unable to complete purchase. Please try again.');
+      Alert.alert('Error', 'Unable to process payment. Please try again.');
     } finally {
       setIsPurchasing(false);
     }
   };
 
   const handleRestore = async () => {
-    setIsPurchasing(true);
-    try {
-      const result = await RevenueCatService.restorePurchases();
-      
-      if (result.success) {
-        const isPremium = RevenueCatService.isPremiumUser();
-        if (isPremium) {
-          Alert.alert(
-            '✅ Purchases Restored',
-            'Your premium subscription has been restored!',
-            [{ text: 'Great!', onPress: onClose }]
-          );
-        } else {
-          Alert.alert('No Purchases Found', 'No active subscriptions were found to restore.');
-        }
-      } else {
-        Alert.alert('Restore Failed', result.error || 'Unable to restore purchases.');
-      }
-    } catch (error) {
-      Alert.alert('Restore Error', 'Unable to restore purchases. Please try again.');
-    } finally {
-      setIsPurchasing(false);
-    }
+    Alert.alert(
+      '🔄 Restore Purchases',
+      'Stripe subscription restoration will be added here.',
+      [{ text: 'OK' }]
+    );
   };
 
   const premiumFeatures = [
@@ -203,58 +183,44 @@ const PaywallScreen = ({ visible, onClose, feature = null }) => {
             <View style={styles.pricingSection}>
               <Text style={styles.sectionTitle}>Choose Your Plan:</Text>
               
-              {isLoading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color="#ffffff" />
-                  <Text style={styles.loadingText}>Loading pricing...</Text>
-                </View>
-              ) : offerings?.current?.availablePackages?.length > 0 ? (
-                <View style={styles.packagesContainer}>
-                  {offerings.current.availablePackages.map((pkg) => (
-                    <TouchableOpacity
-                      key={pkg.identifier}
-                      style={[
-                        styles.packageCard,
-                        selectedProduct?.identifier === pkg.identifier && styles.selectedPackage
-                      ]}
-                      onPress={() => setSelectedProduct(pkg)}
-                    >
-                      <View style={styles.packageHeader}>
-                        <Text style={styles.packageTitle}>
-                          {RevenueCatService.formatPeriod(pkg.product)}
-                        </Text>
-                        {pkg.packageType === 'ANNUAL' && (
-                          <View style={styles.bestValueBadge}>
-                            <Text style={styles.bestValueText}>Best Value!</Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={styles.packagePrice}>
-                        {RevenueCatService.formatPrice(pkg.product)}
-                      </Text>
-                      <Text style={styles.packageDescription}>
-                        {pkg.product.title}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ) : (
-                <View style={styles.errorContainer}>
-                  <Text style={styles.errorText}>Unable to load pricing. Please try again.</Text>
-                  <TouchableOpacity onPress={loadOfferings} style={styles.retryButton}>
-                    <Text style={styles.retryButtonText}>Retry</Text>
+              {/* Pricing Plans */}
+              <View style={styles.packagesContainer}>
+                {PRICING_PLANS.map((plan) => (
+                  <TouchableOpacity
+                    key={plan.id}
+                    style={[
+                      styles.packageCard,
+                      selectedPlan?.id === plan.id && styles.selectedPackage
+                    ]}
+                    onPress={() => setSelectedPlan(plan)}
+                  >
+                    <View style={styles.packageHeader}>
+                      <Text style={styles.packageTitle}>{plan.name}</Text>
+                      {plan.popular && (
+                        <View style={styles.bestValueBadge}>
+                          <Text style={styles.bestValueText}>Best Value!</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.packagePrice}>
+                      {plan.price}
+                      <Text style={styles.packagePeriod}>{plan.period}</Text>
+                    </Text>
+                    {plan.savings && (
+                      <Text style={styles.packageSavings}>{plan.savings}</Text>
+                    )}
                   </TouchableOpacity>
-                </View>
-              )}
+                ))}
+              </View>
             </View>
           </ScrollView>
 
           {/* Bottom Actions */}
           <View style={styles.bottomActions}>
             <TouchableOpacity
-              style={[styles.purchaseButton, (isPurchasing || !selectedProduct) && styles.disabledButton]}
+              style={[styles.purchaseButton, isPurchasing && styles.disabledButton]}
               onPress={handlePurchase}
-              disabled={isPurchasing || !selectedProduct}
+              disabled={isPurchasing}
             >
               {isPurchasing ? (
                 <ActivityIndicator size="small" color="#ffffff" />

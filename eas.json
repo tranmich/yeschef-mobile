@@ -22,6 +22,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "tran.mich@gmail.com",
+        "ascAppId": "6754093029",
+        "appleTeamId": "K84RZB6NPM"
+      }
+    }
   }
 }

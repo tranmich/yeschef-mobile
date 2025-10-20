@@ -16,6 +16,8 @@ import {
   Linking,
   Modal,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
 import YesChefAPI from '../services/YesChefAPI';
 
 export default function LoginScreen({ onLoginSuccess }) {
@@ -29,6 +31,33 @@ export default function LoginScreen({ onLoginSuccess }) {
   const [showSignUpModal, setShowSignUpModal] = useState(false);
   const [signUpData, setSignUpData] = useState({ email: '', password: '', confirmPassword: '' });
   const [isSignUpLoading, setIsSignUpLoading] = useState(false);
+  
+  // Remember Me & Password Visibility States
+  const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showSignUpPassword, setShowSignUpPassword] = useState(false);
+  const [showSignUpConfirmPassword, setShowSignUpConfirmPassword] = useState(false);
+
+  // Load remembered credentials on component mount
+  useEffect(() => {
+    const loadRememberedCredentials = async () => {
+      try {
+        const rememberedEmail = await SecureStore.getItemAsync('rememberedEmail');
+        const rememberedPassword = await SecureStore.getItemAsync('rememberedPassword');
+        
+        if (rememberedEmail && rememberedPassword) {
+          setEmail(rememberedEmail);
+          setPassword(rememberedPassword);
+          setRememberMe(true);
+          console.log('🔐 Loaded remembered credentials for:', rememberedEmail);
+        }
+      } catch (error) {
+        console.log('📱 No remembered credentials found');
+      }
+    };
+    
+    loadRememberedCredentials();
+  }, []);
 
   // Listen for deep link returns from Google OAuth
   useEffect(() => {
@@ -164,6 +193,9 @@ export default function LoginScreen({ onLoginSuccess }) {
             onPress: () => {
               setShowSignUpModal(false);
               setSignUpData({ email: '', password: '', confirmPassword: '' });
+              // Reset password visibility states
+              setShowSignUpPassword(false);
+              setShowSignUpConfirmPassword(false);
               onLoginSuccess(response.user);
             }
           }]
@@ -198,6 +230,26 @@ export default function LoginScreen({ onLoginSuccess }) {
       const result = await YesChefAPI.login(email.trim(), password.trim());
       
       if (result.success) {
+        // Handle Remember Me functionality
+        if (rememberMe) {
+          try {
+            await SecureStore.setItemAsync('rememberedEmail', email.trim());
+            await SecureStore.setItemAsync('rememberedPassword', password.trim());
+            console.log('🔐 Credentials saved for Remember Me');
+          } catch (error) {
+            console.log('❌ Failed to save Remember Me credentials:', error);
+          }
+        } else {
+          // Clear remembered credentials if user unchecked Remember Me
+          try {
+            await SecureStore.deleteItemAsync('rememberedEmail');
+            await SecureStore.deleteItemAsync('rememberedPassword');
+            console.log('🗑️ Cleared remembered credentials');
+          } catch (error) {
+            console.log('⚠️ No credentials to clear');
+          }
+        }
+        
         Alert.alert('Success!', 'Logged in successfully!', [
           { text: 'OK', onPress: () => onLoginSuccess(result.user) }
         ]);
@@ -251,15 +303,40 @@ export default function LoginScreen({ onLoginSuccess }) {
               autoComplete="email"
             />
 
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor="#9CA3AF"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete="password"
-            />
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Password"
+                placeholderTextColor="#9CA3AF"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoComplete="password"
+              />
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-off' : 'eye'}
+                  size={20}
+                  color="#6B7280"
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Remember Me Checkbox */}
+            <TouchableOpacity
+              style={styles.rememberMeContainer}
+              onPress={() => setRememberMe(!rememberMe)}
+            >
+              <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+                {rememberMe && (
+                  <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                )}
+              </View>
+              <Text style={styles.rememberMeText}>Remember Me</Text>
+            </TouchableOpacity>
 
             {/* Forgot Password Link */}
             <TouchableOpacity 
@@ -307,7 +384,12 @@ export default function LoginScreen({ onLoginSuccess }) {
             {/* Sign Up Link */}
             <View style={styles.signUpContainer}>
               <Text style={styles.signUpPrompt}>Don't have an account? </Text>
-              <TouchableOpacity onPress={() => setShowSignUpModal(true)}>
+              <TouchableOpacity onPress={() => {
+                setShowSignUpModal(true);
+                // Reset password visibility states
+                setShowSignUpPassword(false);
+                setShowSignUpConfirmPassword(false);
+              }}>
                 <Text style={styles.signUpLink}>Sign Up</Text>
               </TouchableOpacity>
             </View>
@@ -401,25 +483,49 @@ export default function LoginScreen({ onLoginSuccess }) {
               autoComplete="email"
             />
             
-            <TextInput
-              style={styles.signUpInput}
-              placeholder="Password (min 6 characters)"
-              placeholderTextColor="#9CA3AF"
-              value={signUpData.password}
-              onChangeText={(text) => setSignUpData(prev => ({...prev, password: text}))}
-              secureTextEntry
-              autoComplete="password"
-            />
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Password (min 6 characters)"
+                placeholderTextColor="#9CA3AF"
+                value={signUpData.password}
+                onChangeText={(text) => setSignUpData(prev => ({...prev, password: text}))}
+                secureTextEntry={!showSignUpPassword}
+                autoComplete="password"
+              />
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setShowSignUpPassword(!showSignUpPassword)}
+              >
+                <Ionicons
+                  name={showSignUpPassword ? 'eye-off' : 'eye'}
+                  size={20}
+                  color="#6B7280"
+                />
+              </TouchableOpacity>
+            </View>
             
-            <TextInput
-              style={styles.signUpInput}
-              placeholder="Confirm Password"
-              placeholderTextColor="#9CA3AF"
-              value={signUpData.confirmPassword}
-              onChangeText={(text) => setSignUpData(prev => ({...prev, confirmPassword: text}))}
-              secureTextEntry
-              autoComplete="password"
-            />
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Confirm Password"
+                placeholderTextColor="#9CA3AF"
+                value={signUpData.confirmPassword}
+                onChangeText={(text) => setSignUpData(prev => ({...prev, confirmPassword: text}))}
+                secureTextEntry={!showSignUpConfirmPassword}
+                autoComplete="password"
+              />
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setShowSignUpConfirmPassword(!showSignUpConfirmPassword)}
+              >
+                <Ionicons
+                  name={showSignUpConfirmPassword ? 'eye-off' : 'eye'}
+                  size={20}
+                  color="#6B7280"
+                />
+              </TouchableOpacity>
+            </View>
             
             <View style={styles.signUpButtons}>
               <TouchableOpacity 
@@ -427,6 +533,9 @@ export default function LoginScreen({ onLoginSuccess }) {
                 onPress={() => {
                   setShowSignUpModal(false);
                   setSignUpData({ email: '', password: '', confirmPassword: '' });
+                  // Reset password visibility states
+                  setShowSignUpPassword(false);
+                  setShowSignUpConfirmPassword(false);
                 }}
               >
                 <Text style={styles.signUpCancelText}>Cancel</Text>
@@ -515,6 +624,59 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     marginBottom: 16,
+    color: '#1F2937',
+    fontFamily: 'Nunito-Regular',
+  },
+  
+  // Password Container with Eye Button
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: 'rgba(156, 163, 175, 0.5)',
+    borderRadius: 12,
+    marginBottom: 16,
+    paddingRight: 12,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#1F2937',
+    fontFamily: 'Nunito-Regular',
+  },
+  eyeButton: {
+    padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // Remember Me Checkbox
+  rememberMeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderColor: 'rgba(156, 163, 175, 0.5)',
+    borderRadius: 4,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  checkboxChecked: {
+    backgroundColor: '#AAC6AD',
+    borderColor: '#AAC6AD',
+  },
+  rememberMeText: {
+    fontSize: 16,
     color: '#1F2937',
     fontFamily: 'Nunito-Regular',
   },
