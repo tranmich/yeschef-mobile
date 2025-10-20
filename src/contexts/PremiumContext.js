@@ -1,13 +1,37 @@
 /**
  * 🌟 Premium Context
  * Manages subscription state and premium features throughout the app
+ * Backend-based tier system (Free vs Premium)
  */
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import RevenueCatService from '../services/RevenueCatServiceMock'; // Using mock for now
-import { isFeaturePremium, getFeatureEntitlement } from '../config/RevenueCatConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PremiumContext = createContext();
+
+// Tier limits configuration
+const TIER_LIMITS = {
+  free: {
+    maxRecipes: 100,
+    maxSpaces: 5,
+    canInvite: false,
+    canCombineGroceryLists: false,
+    canShareMealPlans: false,
+    canUseHousehold: false,
+    canBeautifyRecipeCards: false,
+    importMethods: ['manual', 'url'], // No photo/voice
+  },
+  premium: {
+    maxRecipes: null, // Unlimited
+    maxSpaces: null, // Unlimited
+    canInvite: true,
+    canCombineGroceryLists: true,
+    canShareMealPlans: true,
+    canUseHousehold: true,
+    canBeautifyRecipeCards: true,
+    importMethods: ['manual', 'url', 'photo', 'voice'],
+  },
+};
 
 export const usePremium = () => {
   const context = useContext(PremiumContext);
@@ -18,40 +42,28 @@ export const usePremium = () => {
 };
 
 export const PremiumProvider = ({ children }) => {
-  const [isPremium, setIsPremium] = useState(false);
+  const [userTier, setUserTier] = useState('free'); // 'free' or 'premium'
   const [isLoading, setIsLoading] = useState(true);
-  const [customerInfo, setCustomerInfo] = useState(null);
-  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
+  const [tierInfo, setTierInfo] = useState(null);
+  const [recipeCount, setRecipeCount] = useState(0);
+  const [spaceCount, setSpaceCount] = useState(0);
 
   useEffect(() => {
     initializePremium();
-    
-    // Listen for purchase updates
-    const handlePurchaseUpdate = (customerInfo, success, error) => {
-      if (success && customerInfo) {
-        updatePremiumStatus(customerInfo);
-      }
-    };
-
-    RevenueCatService.addPurchaseListener(handlePurchaseUpdate);
-    
-    return () => {
-      RevenueCatService.removePurchaseListener(handlePurchaseUpdate);
-    };
   }, []);
 
   const initializePremium = async () => {
     try {
       setIsLoading(true);
       
-      // Initialize RevenueCat
-      const initialized = await RevenueCatService.initialize();
-      
-      if (initialized) {
-        // Load customer info
-        const customerInfo = await RevenueCatService.loadCustomerInfo();
-        updatePremiumStatus(customerInfo);
+      // Load tier from backend
+      const storedTier = await AsyncStorage.getItem('userTier');
+      if (storedTier) {
+        setUserTier(storedTier);
       }
+      
+      // Load tier info from backend API
+      await fetchTierInfo();
     } catch (error) {
       console.error('Failed to initialize premium:', error);
     } finally {
@@ -59,54 +71,133 @@ export const PremiumProvider = ({ children }) => {
     }
   };
 
-  const updatePremiumStatus = (customerInfo) => {
-    if (customerInfo) {
-      setCustomerInfo(customerInfo);
-      setIsPremium(RevenueCatService.isPremiumUser());
-      setSubscriptionStatus(RevenueCatService.getSubscriptionStatus());
+  const fetchTierInfo = async () => {
+    try {
+      // For now, disable tier info fetching since the backend endpoint doesn't exist yet
+      // TODO: Implement /api/user/tier endpoint on backend when premium features are ready
+      console.log('💡 Tier info fetching disabled - using free tier defaults');
       
-      console.log('🌟 Premium status updated:', {
-        isPremium: RevenueCatService.isPremiumUser(),
-        activeSubscriptions: Object.keys(customerInfo.activeSubscriptions)
+      // Set default free tier values
+      setUserTier('free');
+      setRecipeCount(0);
+      setSpaceCount(0);
+      setTierInfo({ tier: 'free', recipeCount: 0, spaceCount: 0 });
+      
+      return;
+      
+      /* 
+      // Future implementation when backend supports tier endpoints:
+      const token = await AsyncStorage.getItem('authToken');
+      
+      const response = await fetch('http://192.168.1.72:5000/api/user/tier', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setUserTier(data.tier || 'free');
+        setRecipeCount(data.recipeCount || 0);
+        setSpaceCount(data.spaceCount || 0);
+        setTierInfo(data);
+      }
+      */
+    } catch (error) {
+      console.error('Failed to fetch tier info:', error);
+      // Default to free tier on error
+      setUserTier('free');
     }
   };
+
+  const isPremium = userTier === 'premium';
+  const tierLimits = TIER_LIMITS[userTier];
 
   const checkFeatureAccess = (feature) => {
-    // Check if feature requires premium using config
-    if (!isFeaturePremium(feature)) {
-      return true; // Feature is free
+    // Check specific feature permissions based on tier
+    switch (feature) {
+      case 'add_recipe':
+        if (tierLimits.maxRecipes === null) return { allowed: true };
+        return {
+          allowed: recipeCount < tierLimits.maxRecipes,
+          limit: tierLimits.maxRecipes,
+          current: recipeCount,
+          message: `Recipe limit: ${recipeCount}/${tierLimits.maxRecipes}`,
+        };
+      
+      case 'create_space':
+        if (tierLimits.maxSpaces === null) return { allowed: true };
+        return {
+          allowed: spaceCount < tierLimits.maxSpaces,
+          limit: tierLimits.maxSpaces,
+          current: spaceCount,
+          message: `Space limit: ${spaceCount}/${tierLimits.maxSpaces}`,
+        };
+      
+      case 'invite_user':
+        return {
+          allowed: tierLimits.canInvite,
+          message: tierLimits.canInvite ? null : 'Inviting is a premium feature',
+        };
+      
+      case 'combine_grocery_lists':
+        return {
+          allowed: tierLimits.canCombineGroceryLists,
+          message: tierLimits.canCombineGroceryLists ? null : 'Combining grocery lists is premium',
+        };
+      
+      case 'share_meal_plans':
+        return {
+          allowed: tierLimits.canShareMealPlans,
+          message: tierLimits.canShareMealPlans ? null : 'Sharing meal plans is premium',
+        };
+      
+      case 'use_household':
+        return {
+          allowed: tierLimits.canUseHousehold,
+          message: tierLimits.canUseHousehold ? null : 'Household features are premium',
+        };
+      
+      case 'beautify_recipe_cards':
+        return {
+          allowed: tierLimits.canBeautifyRecipeCards,
+          message: tierLimits.canBeautifyRecipeCards ? null : 'Recipe card customization is premium',
+        };
+      
+      default:
+        return { allowed: true }; // Unknown features allowed by default
     }
-    
-    // Feature requires premium - check entitlement
-    const requiredEntitlement = getFeatureEntitlement(feature);
-    return isPremium && RevenueCatService.hasEntitlement(requiredEntitlement);
   };
 
-  const showPaywallForFeature = (feature) => {
-    // This will be implemented to show the paywall
-    console.log('🚪 Showing paywall for feature:', feature);
-    return RevenueCatService.showPaywallAlert(feature);
+  const canUseImportMethod = (method) => {
+    return tierLimits.importMethods.includes(method);
   };
 
-  const restorePurchases = async () => {
+  const showUpgradePrompt = (reason) => {
+    // This will trigger the upgrade/paywall UI
+    console.log('🚪 Showing upgrade prompt for:', reason);
+    // TODO: Navigate to upgrade screen or show modal
+    return { upgradeRequired: true, reason };
+  };
+
+  const upgradeToPremium = async () => {
     try {
-      const result = await RevenueCatService.restorePurchases();
-      if (result.success) {
-        updatePremiumStatus(result.customerInfo);
-      }
-      return result;
+      // TODO: Implement payment flow (Stripe, etc.)
+      // For now, just update local state
+      setUserTier('premium');
+      await AsyncStorage.setItem('userTier', 'premium');
+      await fetchTierInfo();
+      return { success: true };
     } catch (error) {
-      console.error('Failed to restore purchases:', error);
+      console.error('Failed to upgrade:', error);
       return { success: false, error: error.message };
     }
   };
 
   const setUserId = async (userId) => {
     try {
-      await RevenueCatService.setUserId(userId);
-      const customerInfo = await RevenueCatService.loadCustomerInfo();
-      updatePremiumStatus(customerInfo);
+      await AsyncStorage.setItem('userId', userId);
+      await fetchTierInfo();
     } catch (error) {
       console.error('Failed to set user ID:', error);
     }
@@ -114,31 +205,38 @@ export const PremiumProvider = ({ children }) => {
 
   const logOut = async () => {
     try {
-      await RevenueCatService.logOut();
-      setIsPremium(false);
-      setCustomerInfo(null);
-      setSubscriptionStatus(null);
+      await AsyncStorage.removeItem('userTier');
+      await AsyncStorage.removeItem('userId');
+      setUserTier('free');
+      setTierInfo(null);
+      setRecipeCount(0);
+      setSpaceCount(0);
     } catch (error) {
-      console.error('Failed to log out from RevenueCat:', error);
+      console.error('Failed to log out:', error);
     }
   };
 
   const value = {
     // Status
     isPremium,
+    userTier,
+    tierLimits,
     isLoading,
-    customerInfo,
-    subscriptionStatus,
+    tierInfo,
+    recipeCount,
+    spaceCount,
     
     // Functions
     checkFeatureAccess,
-    showPaywallForFeature,
-    restorePurchases,
+    canUseImportMethod,
+    showUpgradePrompt,
+    upgradeToPremium,
     setUserId,
     logOut,
     
     // Utilities
-    refreshStatus: () => initializePremium(),
+    refreshStatus: () => fetchTierInfo(),
+    TIER_LIMITS, // Export for reference
   };
 
   return (

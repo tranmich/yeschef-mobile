@@ -123,6 +123,8 @@ const RecipeImportReviewScreen = ({ route, navigation }) => {
   };
 
   useEffect(() => {
+
+
     if (importResult && importResult.recipe) {
       // Apply OCR repair and formatting to the imported recipe
       const repairedRecipe = {
@@ -260,6 +262,8 @@ const RecipeImportReviewScreen = ({ route, navigation }) => {
       return;
     }
 
+
+
     setIsSaving(true);
     try {
       let result;
@@ -294,13 +298,23 @@ const RecipeImportReviewScreen = ({ route, navigation }) => {
         
         result = await YesChefAPI.saveReviewedImportedRecipe(recipeToSave);
       } else {
-        // Fallback: Save as new recipe (for older flow compatibility)
-        console.log('💾 Saving as new reviewed recipe (fallback)');
+        // Check if we have an existing recipe ID from import (to avoid duplicates)
+        const existingRecipeId = importResult?.recipe_id || recipe?.id;
+        
+        if (existingRecipeId) {
+          // We have an existing recipe from import - delete it and create a new reviewed one
+          try {
+            await YesChefAPI.deleteRecipe(existingRecipeId);
+          } catch (deleteError) {
+            console.warn('⚠️ Failed to delete original recipe, continuing with save:', deleteError);
+          }
+        }
         
         const recipeToSave = {
           ...recipe,
           category: selectedCategory,
-          // Remove meal_role - existing recipes don't have this field
+          // Remove any existing ID to ensure we create a new recipe
+          id: undefined,
         };
         
         result = await YesChefAPI.saveReviewedImportedRecipe(recipeToSave);
@@ -337,19 +351,25 @@ const RecipeImportReviewScreen = ({ route, navigation }) => {
           `"${recipe.title}" has been saved to your ${categories.find(c => c.id === selectedCategory)?.name || selectedCategory} collection.`,
           [
             { 
-              text: 'View Collection', 
+              text: 'Add Another', 
               onPress: () => {
-                // Navigate to Recipes tab (which contains RecipeCollection)
-                navigation.navigate('Recipes', { 
-                  screen: 'RecipeCollection',
-                  params: { refresh: true }
+                // Reset to the Add Recipe screen by popping this screen and navigating fresh
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'AddRecipeHub' }],
                 });
               }
             },
-            {
-              text: 'OK',
+            { 
+              text: 'View Collection', 
               onPress: () => {
-                // Navigate to Recipes tab (which contains RecipeCollection)
+                // First reset the Add Recipe navigation stack to clean state
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'AddRecipeHub' }],
+                });
+                
+                // Then navigate to Recipes tab (which contains RecipeCollection)
                 navigation.navigate('Recipes', { 
                   screen: 'RecipeCollection',
                   params: { refresh: true }

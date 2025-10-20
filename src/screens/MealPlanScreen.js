@@ -13,10 +13,13 @@ import {
   Alert,
   ImageBackground,
   StatusBar,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Icon, IconButton } from '../components/IconLibrary';
 import { ThemedText, typography } from '../components/Typography';
+import DayOptionsModal from '../components/DayOptionsModal';
 // 🎨 SMOOTH DRAG: Using LightweightDragSystem for smooth Google Keep-style dragging
 import { SimpleDraggableList } from '../components/LightweightDragSystem';
 // 🚫 REMOVED: Complex CrossContainerDragSystem (572 lines) - replaced with simple move buttons
@@ -38,7 +41,7 @@ function MealPlanScreen({ navigation, route }) {
   const [mealPlanTitle, setMealPlanTitle] = useState('Weekly Meal Plan');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
-  const [showDayOptionsMenu, setShowDayOptionsMenu] = useState(null); // Track which day's menu is open
+  const [showDayOptionsModal, setShowDayOptionsModal] = useState(null); // Track which day's bottom sheet is open
   const [showMealOptionsMenu, setShowMealOptionsMenu] = useState(null); // Track which meal's menu is open
   const [editingDayId, setEditingDayId] = useState(null); // Track which day name is being edited
   const [editingMealId, setEditingMealId] = useState(null); // Track which meal name is being edited
@@ -47,6 +50,34 @@ function MealPlanScreen({ navigation, route }) {
   const [availablePlans, setAvailablePlans] = useState([]); // Available plans to load
   const [currentPlanId, setCurrentPlanId] = useState(null); // Track currently loaded plan for refresh
   const [lastRefreshTime, setLastRefreshTime] = useState(0); // Throttle refreshes
+  
+  // Refs for keyboard handling
+  const scrollViewRef = useRef(null);
+  const editingInputRef = useRef(null);
+  
+  // Function to handle day name editing with keyboard-aware scrolling
+  const handleEditDayName = (dayId, dayIndex) => {
+    setEditingDayId(dayId);
+    
+    // Scroll to the editing field after a short delay to ensure the TextInput is rendered
+    setTimeout(() => {
+      if (scrollViewRef.current && dayIndex !== undefined) {
+        // More accurate position calculation - account for header and day spacing
+        // Each day container height varies but average around 180-250px depending on meals
+        const headerHeight = 120; // Approximate header height
+        const averageDayHeight = 220; // Average day container height including meals
+        const targetYPosition = headerHeight + (dayIndex * averageDayHeight);
+        
+        // Add some offset to ensure the input is well above the keyboard
+        const keyboardOffset = 100;
+        
+        scrollViewRef.current.scrollTo({
+          y: Math.max(0, targetYPosition - keyboardOffset),
+          animated: true,
+        });
+      }
+    }, 150); // Slightly longer delay to ensure TextInput is rendered
+  };
   
   // 📋 Default empty meal plan structure
   const getDefaultMealPlan = () => {
@@ -1452,7 +1483,23 @@ function MealPlanScreen({ navigation, route }) {
       </Modal>
 
       {/* Main content area with days */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        enabled={!!editingDayId}
+      >
+        <ScrollView 
+          ref={scrollViewRef}
+          style={styles.content} 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          keyboardShouldPersistTaps="handled"
+          scrollEventThrottle={16}
+          bounces={true}
+          alwaysBounceVertical={true}
+          removeClippedSubviews={false}
+        >
         {days.map((day, dayIndex) => (
           <View key={`day-${day.id}-${dayIndex}`} style={styles.dayContainer}>
             {/* Enhanced Day Header with drag handle and options */}
@@ -1477,6 +1524,7 @@ function MealPlanScreen({ navigation, route }) {
               <View style={styles.dayNameContainer}>
                 {editingDayId === day.id ? (
                   <TextInput
+                    ref={editingInputRef}
                     style={styles.dayNameInput}
                     value={day.name}
                     onChangeText={(text) => updateDayName(day.id, text)}
@@ -1484,9 +1532,11 @@ function MealPlanScreen({ navigation, route }) {
                     onSubmitEditing={() => setEditingDayId(null)}
                     autoFocus
                     placeholder="Enter day name"
+                    returnKeyType="done"
+                    blurOnSubmit={true}
                   />
                 ) : (
-                  <TouchableOpacity onPress={() => setEditingDayId(day.id)}>
+                  <TouchableOpacity onPress={() => handleEditDayName(day.id, dayIndex)}>
                     <Text style={styles.dayName}>{day.name}</Text>
                   </TouchableOpacity>
                 )}
@@ -1505,32 +1555,13 @@ function MealPlanScreen({ navigation, route }) {
               {/* Day options menu */}
               <TouchableOpacity 
                 style={styles.dayOptionsButton}
-                onPress={() => setShowDayOptionsMenu(showDayOptionsMenu === day.id ? null : day.id)}
+                onPress={() => setShowDayOptionsModal(day.id)}
               >
                 <Text style={styles.optionsIcon}>⋯</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Day Options Menu Dropdown */}
-            {showDayOptionsMenu === day.id && (
-              <View style={styles.dayOptionsMenu}>
-                <TouchableOpacity 
-                  style={styles.menuItem} 
-                  onPress={() => { setShowDayOptionsMenu(null); handleAddMeal(day.id); }}
-                >
-                  <Text style={styles.menuIcon}>➕</Text>
-                  <Text style={styles.menuText}>Add Meal</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.menuItem, styles.deleteMenuItem]} 
-                  onPress={() => { setShowDayOptionsMenu(null); handleDeleteDay(day.id); }}
-                >
-                  <Text style={styles.deleteIcon}>❌</Text>
-                  <Text style={styles.deleteText}>Delete Day</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+
 
             {day.isExpanded && (
               <View style={styles.dayContent}>
@@ -1566,7 +1597,8 @@ function MealPlanScreen({ navigation, route }) {
             )}
           </View>
         ))}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Load Plans Modal */}
       <Modal
@@ -1722,6 +1754,28 @@ function MealPlanScreen({ navigation, route }) {
           </View>
         </Modal>
       )}
+
+      {/* Day Options Bottom Sheet Modal */}
+      <DayOptionsModal
+        visible={!!showDayOptionsModal}
+        onClose={() => setShowDayOptionsModal(null)}
+        dayName={showDayOptionsModal ? days.find(d => d.id === showDayOptionsModal)?.name : ''}
+        onAddMeal={() => {
+          // Navigate to My Recipes section
+          navigation.navigate('Recipes', { 
+            screen: 'RecipeCollection',
+            params: { 
+              fromMealPlan: true,
+              selectedDayId: showDayOptionsModal 
+            }
+          });
+        }}
+        onDeleteDay={() => {
+          if (showDayOptionsModal) {
+            handleDeleteDay(showDayOptionsModal);
+          }
+        }}
+      />
 
     </SafeAreaView>
     </ImageBackground>
@@ -1966,21 +2020,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: '#f3f4f6',
   },
-  dayOptionsMenu: {
-    position: 'absolute',
-    top: 60,
-    right: 16,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-    zIndex: 1000,
-    minWidth: 160,
-  },
+
   dayContent: {
     padding: 16,
   },

@@ -11,7 +11,7 @@
  * Phase 2: Navigation Polish
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,18 +24,58 @@ import {
   Platform,
   SafeAreaView,
   StatusBar,
-  Alert
+  Alert,
+  Animated
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import YesChefAPI from '../services/YesChefAPI';
 
 const AddRecipeScreen = ({ navigation }) => {
   // URL Import state
   const [importUrl, setImportUrl] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+  
+  // Toast notification state
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const toastAnimation = useRef(new Animated.Value(0)).current;
 
   // Background
   const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/mintbackground.jpg');
+
+  // Reset URL input when screen comes into focus (e.g., after saving a recipe or returning from collection)
+  useFocusEffect(
+    React.useCallback(() => {
+      // Clear any previous import state when returning to this screen
+      setImportUrl('');
+      setIsImporting(false);
+    }, [])
+  );
+
+  // Show toast notification
+  const showToastNotification = (message) => {
+    setToastMessage(message);
+    setShowToast(true);
+    
+    // Gentle fade in
+    Animated.timing(toastAnimation, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+
+    // Auto dismiss after 2.5 seconds
+    setTimeout(() => {
+      Animated.timing(toastAnimation, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => {
+        setShowToast(false);
+      });
+    }, 2500);
+  };
 
   const importRecipeFromUrl = async () => {
     if (!importUrl.trim()) {
@@ -43,25 +83,42 @@ const AddRecipeScreen = ({ navigation }) => {
       return;
     }
 
+    // Prevent double-tap by checking if already importing
+    if (isImporting) {
+      console.log('⚠️ Already importing, ignoring duplicate tap');
+      return;
+    }
+
     setIsImporting(true);
+    showToastNotification('Processing recipe... 🍳');
 
     try {
       const result = await YesChefAPI.importRecipe(importUrl.trim());
       
       if (result.success) {
-        // Navigate to review screen
-        navigation.navigate('RecipeImportReview', {
-          importResult: result
-        });
+        showToastNotification('Recipe imported successfully! ✅');
+        
+        // Navigate to review screen after brief delay to show success toast
+        setTimeout(() => {
+          navigation.navigate('RecipeImportReview', {
+            importResult: result
+          });
+        }, 500);
         
         // Clear URL after successful import
         setImportUrl('');
       } else {
-        Alert.alert('Import Failed', result.error || 'Failed to import recipe.');
+        showToastNotification('Import failed ❌');
+        setTimeout(() => {
+          Alert.alert('Import Failed', result.error || 'Failed to import recipe.');
+        }, 500);
       }
     } catch (error) {
       console.error('Import error:', error);
-      Alert.alert('Error', 'An error occurred while importing the recipe.');
+      showToastNotification('Network error ❌');
+      setTimeout(() => {
+        Alert.alert('Error', 'An error occurred while importing the recipe.');
+      }, 500);
     } finally {
       setIsImporting(false);
     }
@@ -158,6 +215,26 @@ const AddRecipeScreen = ({ navigation }) => {
             <Ionicons name="chevron-forward" size={28} color="#6366f1" style={styles.methodArrow} />
           </TouchableOpacity>
         </ScrollView>
+        
+        {/* Toast Notification */}
+        {showToast && (
+          <Animated.View 
+            style={[
+              styles.toast,
+              {
+                opacity: toastAnimation,
+                transform: [{
+                  translateY: toastAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                }],
+              }
+            ]}
+          >
+            <Text style={styles.toastText}>{toastMessage}</Text>
+          </Animated.View>
+        )}
       </SafeAreaView>
     </ImageBackground>
   );
@@ -275,6 +352,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     fontFamily: 'Nunito-Bold',
+  },
+  
+  // Toast Notification Styles
+  toast: {
+    position: 'absolute',
+    bottom: 100,
+    left: 20,
+    right: 20,
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  toastText: {
+    backgroundColor: '#e6fffa',
+    color: '#1f2937',
+    fontSize: 15,
+    fontWeight: '500',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    textAlign: 'center',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+    fontFamily: 'Nunito-Regular',
   },
 });
 
