@@ -13,7 +13,8 @@ async function apiFetch(endpoint, options = {}) {
   const url = getApiUrl(endpoint);
   const apiVersion = getApiVersion();
   
-  console.log(`[${apiVersion}] ${options.method || 'GET'} ${endpoint}`);
+  console.log(`[${apiVersion}] ${options.method || 'GET'} ${url}`);
+  console.log(`[${apiVersion}] Full URL: ${url}`);
   
   try {
     const response = await fetch(url, {
@@ -23,6 +24,8 @@ async function apiFetch(endpoint, options = {}) {
         ...options.headers,
       },
     });
+    
+    console.log(`[${apiVersion}] Response status: ${response.status}`);
     
     const data = await response.json();
     
@@ -39,6 +42,7 @@ async function apiFetch(endpoint, options = {}) {
     
   } catch (error) {
     console.error(`[${apiVersion}] Error:`, error.message);
+    console.error(`[${apiVersion}] Full error:`, error);
     throw error;
   }
 }
