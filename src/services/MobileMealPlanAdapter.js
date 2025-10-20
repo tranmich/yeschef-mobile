@@ -96,47 +96,84 @@ class MobileMealPlanAdapter {
       const dayData = traditionalMealPlan.days[dayKey];
       if (!dayData) return;
 
+      // Check if this day has the simplified format (recipes array at day level)
+      const hasSimplifiedFormat = Array.isArray(dayData.recipes) && !dayData.meals;
+      
       // Convert meals for this day
       const mobileMeals = [];
-      const mealsData = dayData.meals || {};
       
-      // Standard meal types to check
-      const standardMeals = ['breakfast', 'lunch', 'dinner', 'snacks'];
-      
-      standardMeals.forEach(mealType => {
-        const mealData = mealsData[mealType] || [];
+      if (hasSimplifiedFormat) {
+        // 🆕 SIMPLIFIED FORMAT: Web app stores recipes directly at day.recipes
+        console.log(`📱 Day ${dayKey} using SIMPLIFIED format with ${dayData.recipes.length} recipes`);
+        const convertedRecipes = MobileMealPlanAdapter.convertRecipesToMobileFormat(dayData.recipes);
         
-        // Handle Traditional webapp nested format: {name: "Dinner", recipes: [...]}
-        let recipes = [];
-        if (Array.isArray(mealData)) {
-          // Direct array format
-          recipes = mealData;
-        } else if (mealData && typeof mealData === 'object' && Array.isArray(mealData.recipes)) {
-          // Nested format with wrapper object
-          recipes = mealData.recipes;
-        } else {
-          // Empty or invalid format
-          recipes = [];
-        }
+        // Create a single meal entry for mobile (we'll show at day level)
+        mobileMeals.push({
+          id: `all-recipes-${index + 1}`,
+          name: 'All Recipes',
+          recipes: convertedRecipes
+        });
+      } else {
+        // Traditional format with meals object
+        const mealsData = dayData.meals || {};
         
-        // Only include meals that have content or are standard types
-        if (recipes.length > 0 || ['breakfast', 'lunch', 'dinner'].includes(mealType)) {
-          const convertedRecipes = MobileMealPlanAdapter.convertRecipesToMobileFormat(recipes);
+        // Standard meal types to check
+        const standardMeals = ['breakfast', 'lunch', 'dinner', 'snacks'];
+        
+        standardMeals.forEach(mealType => {
+          const mealData = mealsData[mealType] || [];
           
-          mobileMeals.push({
-            id: `${mealType}-${index + 1}`,
-            name: mealType.charAt(0).toUpperCase() + mealType.slice(1), // Capitalize
-            recipes: convertedRecipes
-          });
-        }
-      });
+          // Handle Traditional webapp nested format: {name: "Dinner", recipes: [...]}
+          let recipes = [];
+          if (Array.isArray(mealData)) {
+            // Direct array format
+            recipes = mealData;
+          } else if (mealData && typeof mealData === 'object' && Array.isArray(mealData.recipes)) {
+            // Nested format with wrapper object
+            recipes = mealData.recipes;
+          } else {
+            // Empty or invalid format
+            recipes = [];
+          }
+          
+          // Only include meals that have content or are standard types
+          if (recipes.length > 0 || ['breakfast', 'lunch', 'dinner'].includes(mealType)) {
+            const convertedRecipes = MobileMealPlanAdapter.convertRecipesToMobileFormat(recipes);
+            
+            mobileMeals.push({
+              id: `${mealType}-${index + 1}`,
+              name: mealType.charAt(0).toUpperCase() + mealType.slice(1), // Capitalize
+              recipes: convertedRecipes
+            });
+          }
+        });
+      }
+      
+      // 🆕 Extract day-level recipes for mobile display (whether simplified or traditional)
+      let dayRecipes = [];
+      if (hasSimplifiedFormat) {
+        dayRecipes = MobileMealPlanAdapter.convertRecipesToMobileFormat(dayData.recipes);
+      } else {
+        // For traditional format, aggregate all recipes from all meals
+        const mealsData = dayData.meals || {};
+        Object.values(mealsData).forEach(mealData => {
+          let recipes = [];
+          if (Array.isArray(mealData)) {
+            recipes = mealData;
+          } else if (mealData && typeof mealData === 'object' && Array.isArray(mealData.recipes)) {
+            recipes = mealData.recipes;
+          }
+          dayRecipes = dayRecipes.concat(MobileMealPlanAdapter.convertRecipesToMobileFormat(recipes));
+        });
+      }
       
       // Create mobile day structure
       mobileDays.push({
         id: index + 1,
         name: dayData.name || `Day ${index + 1}`,
         isExpanded: true,
-        meals: mobileMeals
+        meals: mobileMeals,
+        recipes: dayRecipes // 🆕 Add day-level recipes for mobile
       });
     });
 
