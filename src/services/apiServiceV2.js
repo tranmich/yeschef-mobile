@@ -241,7 +241,213 @@ export const UserServiceV2 = {
   },
 };
 
+/**
+ * V2 Meal Plan Service
+ * 🎯 PHASE 1: Critical Feature
+ */
+export const MealPlanServiceV2 = {
+  /**
+   * Create a new meal plan
+   */
+  async createMealPlan(userId, mealPlanData) {
+    const { name, startDate, endDate, meals } = mealPlanData;
+    
+    return await apiFetch('meal-plans', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: userId,
+        name: name,
+        start_date: startDate,
+        end_date: endDate,
+        meals: meals,
+      }),
+    });
+  },
+  
+  /**
+   * Get a specific meal plan by ID
+   */
+  async getMealPlan(planId, userId) {
+    return await apiFetch(`meal-plans/${planId}?user_id=${userId}`);
+  },
+  
+  /**
+   * Get all meal plans for a user
+   */
+  async getUserMealPlans(userId, limit = 50, offset = 0) {
+    const endpoint = `meal-plans/user/${userId}?limit=${limit}&offset=${offset}`;
+    const data = await apiFetch(endpoint);
+    
+    return {
+      mealPlans: data.items || data.meal_plans || [],
+      pagination: data.pagination,
+      total: data.total || data.items?.length || 0,
+    };
+  },
+  
+  /**
+   * Get meal plans within a date range
+   */
+  async getMealPlansByDateRange(userId, startDate, endDate) {
+    const endpoint = `meal-plans/user/${userId}/date-range?start_date=${startDate}&end_date=${endDate}`;
+    const data = await apiFetch(endpoint);
+    
+    return {
+      mealPlans: data.items || data.meal_plans || [],
+      dateRange: {
+        start: startDate,
+        end: endDate,
+      },
+    };
+  },
+  
+  /**
+   * Update an existing meal plan
+   */
+  async updateMealPlan(planId, userId, updates) {
+    return await apiFetch(`meal-plans/${planId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        user_id: userId,
+        ...updates,
+      }),
+    });
+  },
+  
+  /**
+   * Delete a meal plan
+   */
+  async deleteMealPlan(planId, userId) {
+    return await apiFetch(`meal-plans/${planId}?user_id=${userId}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+/**
+ * V2 Grocery List Service
+ * 🎯 PHASE 1: Critical Feature
+ */
+export const GroceryListServiceV2 = {
+  /**
+   * Create a new grocery list
+   */
+  async createGroceryList(userId, listData) {
+    const { name, items = [] } = listData;
+    
+    return await apiFetch('grocery-lists', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: userId,
+        name: name,
+        items: items,
+      }),
+    });
+  },
+  
+  /**
+   * Create grocery list from meal plan
+   */
+  async createFromMealPlan(userId, mealPlanId) {
+    return await apiFetch(`grocery-lists/from-meal-plan/${mealPlanId}?user_id=${userId}`, {
+      method: 'POST',
+    });
+  },
+  
+  /**
+   * Get a specific grocery list
+   */
+  async getGroceryList(listId, userId) {
+    return await apiFetch(`grocery-lists/${listId}?user_id=${userId}`);
+  },
+  
+  /**
+   * Get all grocery lists for a user
+   */
+  async getUserGroceryLists(userId, limit = 50, offset = 0) {
+    const endpoint = `grocery-lists/user/${userId}?limit=${limit}&offset=${offset}`;
+    const data = await apiFetch(endpoint);
+    
+    return {
+      groceryLists: data.items || data.grocery_lists || [],
+      pagination: data.pagination,
+      total: data.total || data.items?.length || 0,
+    };
+  },
+  
+  /**
+   * Update grocery list (name, etc.)
+   */
+  async updateGroceryList(listId, userId, updates) {
+    return await apiFetch(`grocery-lists/${listId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        user_id: userId,
+        ...updates,
+      }),
+    });
+  },
+  
+  /**
+   * Add item to grocery list
+   */
+  async addItem(listId, userId, item) {
+    return await apiFetch(`grocery-lists/${listId}/items`, {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: userId,
+        item: item,
+      }),
+    });
+  },
+  
+  /**
+   * Remove item from grocery list
+   */
+  async removeItem(listId, userId, itemIndex) {
+    return await apiFetch(`grocery-lists/${listId}/items/${itemIndex}?user_id=${userId}`, {
+      method: 'DELETE',
+    });
+  },
+  
+  /**
+   * Mark item as purchased/unpurchased
+   */
+  async markItemPurchased(listId, userId, itemIndex, purchased = true) {
+    return await apiFetch(`grocery-lists/${listId}/items/${itemIndex}/purchase`, {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: userId,
+        purchased: purchased,
+      }),
+    });
+  },
+  
+  /**
+   * Clear all purchased items from list
+   */
+  async clearPurchasedItems(listId, userId) {
+    return await apiFetch(`grocery-lists/${listId}/clear-purchased`, {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: userId,
+      }),
+    });
+  },
+  
+  /**
+   * Delete entire grocery list
+   */
+  async deleteGroceryList(listId, userId) {
+    return await apiFetch(`grocery-lists/${listId}?user_id=${userId}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 export default {
   RecipeServiceV2,
   UserServiceV2,
+  MealPlanServiceV2,
+  GroceryListServiceV2,
 };
