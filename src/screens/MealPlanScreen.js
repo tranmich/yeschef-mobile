@@ -736,7 +736,7 @@ function MealPlanScreen({ navigation, route }) {
     // Auto-edit the new day name
     setEditingDayId(newDayId);
   };
-    const handleGenerateGroceryList = async () => {
+  const handleGenerateGroceryList = async () => {
     if (!currentPlanId) {
       Alert.alert('No Meal Plan', 'Please save your meal plan first to generate a grocery list.');
       return;
@@ -748,26 +748,46 @@ function MealPlanScreen({ navigation, route }) {
       // Show loading state
       Alert.alert('Generating...', 'Creating your grocery list from meal plan recipes.');
 
-      // Call the existing API to generate grocery list from meal plan
-      const response = await YesChefAPI.generateGroceryListFromMealPlan(currentPlanId);
-      
-      if (response.success && response.grocery_list) {
-        console.log('✅ Grocery list generated successfully');
-        
-        // Convert backend format to mobile format using existing adapter (now async with spaCy)
-        const mobileItems = await MobileGroceryAdapter.backendToMobile({
-          list_data: response
-        });
+      // 🎯 USE V2 API - The power endpoint!
+      const userId = YesChefAPI.user?.id;
+      if (!userId) {
+        Alert.alert('Error', 'Please log in first');
+        return;
+      }
 
-        console.log('📱 Converted to mobile format:', mobileItems?.length, 'items');
+      console.log('🎯 Calling v2 API: /api/v2/grocery-lists/from-meal-plan/' + currentPlanId);
+      
+      const response = await YesChefAPI.debugFetch(
+        `/api/v2/grocery-lists/from-meal-plan/${currentPlanId}?user_id=${userId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...YesChefAPI.getAuthHeaders()
+          }
+        }
+      );
+      
+      const result = await response.json();
+      console.log('📡 v2 Response:', result.success ? '✅ SUCCESS' : '❌ FAILED');
+      
+      if (result.success && result.data) {
+        const groceryList = result.data;
+        console.log('✅ Grocery list generated:', groceryList.items?.length, 'items');
+        
+        // v2 API returns ready-to-use format!
+        const mobileItems = groceryList.items || [];
+
+        console.log('📱 Mobile items ready:', mobileItems.length);
         
         // Store the generated list for the grocery screen to access
         global.tempGeneratedGroceryList = {
           items: mobileItems,
-          title: `Grocery List - ${mealPlanTitle}`,
+          title: groceryList.name || `Grocery List - ${mealPlanTitle}`,
           sourceType: 'meal_plan',
           sourceName: mealPlanTitle,
-          generatedAt: new Date().toISOString()
+          generatedAt: new Date().toISOString(),
+          backendId: groceryList.id  // v2 API creates it in DB!
         };
         
         console.log('✅ Grocery list ready for grocery screen');
@@ -786,8 +806,8 @@ function MealPlanScreen({ navigation, route }) {
         );
         
       } else {
-        console.error('❌ Failed to generate grocery list:', response);
-        Alert.alert('Generation Failed', response.message || response.error || 'Could not generate grocery list from meal plan.');
+        console.error('❌ Failed to generate grocery list:', result);
+        Alert.alert('Generation Failed', result.message || result.error || 'Could not generate grocery list from meal plan.');
       }
       
     } catch (error) {
