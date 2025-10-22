@@ -291,7 +291,18 @@ export default function GroceryListScreen({ route, navigation }) {
 
   // Simple delete function without confirmation dialog
   const deleteItem = (id) => {
+    console.log('🗑️ Deleting item:', id);
+    
+    // Find the item being deleted to preserve its position context
+    const deletedIndex = groceryItems.findIndex(item => item.id === id);
+    
     setGroceryItems(prev => prev.filter(item => item.id !== id));
+    
+    // Update stable ref immediately to prevent jump
+    if (stableDataRef.current) {
+      stableDataRef.current = stableDataRef.current.filter(item => item.id !== id);
+    }
+    
     autoSave(); // Auto-save when items are deleted
   };
 

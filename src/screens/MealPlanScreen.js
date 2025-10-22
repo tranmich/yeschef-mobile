@@ -385,8 +385,17 @@ function MealPlanScreen({ navigation, route }) {
     
     try {
       // 🔍 CHECK IF NAME CHANGED: If we have a plan loaded and the name changed, create new plan
+      console.log('🔍 Name check:', {
+        currentPlanId,
+        originalPlanName,
+        mealPlanTitle,
+        hasOriginalName: !!originalPlanName
+      });
+      
       const nameChanged = currentPlanId && originalPlanName && 
                          originalPlanName.toLowerCase().trim() !== mealPlanTitle.toLowerCase().trim();
+      
+      console.log('📝 Name changed?', nameChanged);
       
       if (nameChanged) {
         console.log('📝 Name changed from', originalPlanName, 'to', mealPlanTitle, '- creating NEW plan');
