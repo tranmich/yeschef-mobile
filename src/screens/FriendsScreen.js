@@ -440,10 +440,12 @@ export default function FriendsScreen({ navigation }) {
               
               <TouchableOpacity 
                 style={styles.optionItem}
-                onPress={() => {
+                onPress={async () => {
                   setSelectedHousehold(item);
-                  setShowRemoveMemberModal(true);
                   setShowHouseholdActionMenu(null);
+                  // Load members before showing modal
+                  await loadHouseholdMembers(item.id);
+                  setShowRemoveMemberModal(true);
                 }}
               >
                 <Icon name="minus" size={18} color="#DC313F" style={{marginRight: 12}} />

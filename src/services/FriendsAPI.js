@@ -289,10 +289,29 @@ class FriendsAPI {
             const userId = this.getUserId();
             const response = await this.authenticatedRequest(`/api/v2/households/user/${userId}`);
             
+            // Map v2 response to mobile app format
+            const households = (response.data?.households || []).map(household => ({
+                id: household.id,
+                name: household.name,
+                description: household.description,
+                owner_user_id: household.owner_user_id,
+                creator_name: household.creator_name,
+                user_role: household.user_role,
+                is_active: household.is_active,
+                created_at: household.created_at,
+                // Map member_count to members for UI display
+                members: household.member_count || 0,
+                // Optional fields for future use
+                sharedLists: household.shared_lists || 0,
+                sharedPlans: household.shared_plans || 0,
+                // Generate initials from name
+                initials: this.getInitials(household.name)
+            }));
+            
             return {
                 success: true,
-                households: response.data?.households || [],
-                count: response.data?.count || 0
+                households: households,
+                count: response.data?.count || households.length
             };
         } catch (error) {
             console.error('❌ Get households error:', error);
@@ -422,9 +441,20 @@ class FriendsAPI {
                 `/api/v2/households/${householdId}/members?user_id=${userId}`
             );
             
+            // Map v2 response to mobile app format
+            const members = (response.data?.members || []).map(member => ({
+                id: member.membership_id || member.id,
+                user_id: member.user_id,
+                name: member.user_name,
+                email: member.user_email,
+                role: member.role,
+                joined_at: member.joined_at,
+                initials: this.getInitials(member.user_name)
+            }));
+            
             return {
                 success: true,
-                members: response.data?.members || []
+                members: members
             };
         } catch (error) {
             console.error('❌ Get household members error:', error);
