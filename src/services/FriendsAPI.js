@@ -1,17 +1,30 @@
 /**
- * 👥 Friends API Service
+ * 👥 Friends API Service (v2)
  * Handles all Friends, Households, and Collaboration API calls
- * Follows YesChefAPI patterns with JWT authentication
+ * Updated to use v2 endpoints with proper user_id handling
  */
 
 import YesChefAPI from './YesChefAPI';
 
 class FriendsAPI {
     /**
-     * Make authenticated API request
+     * Get current user ID from YesChefAPI
+     */
+    static getUserId() {
+        const userId = YesChefAPI.user?.id;
+        if (!userId) {
+            throw new Error('User not logged in');
+        }
+        return userId;
+    }
+
+    /**
+     * Make authenticated API request (v2)
      */
     static async authenticatedRequest(endpoint, options = {}) {
         try {
+            console.log(`🔵 FriendsAPI v2: ${options.method || 'GET'} ${endpoint}`);
+            
             const response = await YesChefAPI.debugFetch(endpoint, {
                 ...options,
                 headers: {
@@ -22,6 +35,9 @@ class FriendsAPI {
             });
             
             const result = await response.json();
+            
+            console.log(`📡 FriendsAPI v2 response:`, result.success ? '✅ SUCCESS' : '❌ FAILED');
+            
             if (result.success === false) {
                 throw new Error(result.error || 'API request failed');
             }
@@ -34,19 +50,21 @@ class FriendsAPI {
     }
 
     // ================================================================
-    // FRIENDS MANAGEMENT
+    // FRIENDS MANAGEMENT (v2)
     // ================================================================
 
     /**
-     * Get user's friends list
+     * Get user's friends list (v2)
      */
     static async getFriends() {
         try {
-            const response = await this.authenticatedRequest('/api/friends/list');
+            const userId = this.getUserId();
+            const response = await this.authenticatedRequest(`/api/v2/friends/user/${userId}`);
+            
             return {
                 success: true,
-                friends: response.friends || [],
-                count: response.count || 0
+                friends: response.data?.friends || [],
+                count: response.data?.count || 0
             };
         } catch (error) {
             console.error('❌ Get friends error:', error);
@@ -59,44 +77,52 @@ class FriendsAPI {
     }
 
     /**
-     * Get friend requests (incoming and outgoing)
+     * Get friend requests (incoming and outgoing) (v2)
      */
     static async getFriendRequests() {
         try {
-            const response = await this.authenticatedRequest('/api/friends/requests');
+            const userId = this.getUserId();
+            const response = await this.authenticatedRequest(`/api/v2/friends/requests/user/${userId}`);
+            
             return {
                 success: true,
-                requests: response.requests || [],
-                incoming_count: response.incoming_count || 0,
-                outgoing_count: response.outgoing_count || 0
+                requests: response.data?.requests || [],
+                incoming: response.data?.incoming || [],
+                outgoing: response.data?.outgoing || [],
+                incoming_count: response.data?.incoming_count || 0,
+                outgoing_count: response.data?.outgoing_count || 0
             };
         } catch (error) {
             console.error('❌ Get friend requests error:', error);
             return {
                 success: false,
                 error: error.message || 'Failed to load friend requests',
-                requests: []
+                requests: [],
+                incoming: [],
+                outgoing: []
             };
         }
     }
 
     /**
-     * Send friend request by email
+     * Send friend request by email (v2)
      */
     static async sendFriendRequest(email, message = '') {
         try {
-            const response = await this.authenticatedRequest('/api/friends/request', {
+            const userId = this.getUserId();
+            const response = await this.authenticatedRequest('/api/v2/friends/request', {
                 method: 'POST',
                 body: JSON.stringify({
-                    email: email.trim(),
-                    message: message.trim()
+                    requester_id: userId,
+                    recipient_email: email.trim(),
+                    message: message.trim() || undefined
                 })
             });
             
             return {
                 success: true,
                 message: response.message || 'Friend request sent!',
-                request_id: response.request_id
+                request_id: response.data?.id
             };
         } catch (error) {
             console.error('❌ Send friend request error:', error);
@@ -108,12 +134,16 @@ class FriendsAPI {
     }
 
     /**
-     * Accept friend request
+     * Accept friend request (v2)
      */
     static async acceptFriendRequest(requestId) {
         try {
-            const response = await this.authenticatedRequest(`/api/friends/request/${requestId}/accept`, {
-                method: 'POST'
+            const userId = this.getUserId();
+            const response = await this.authenticatedRequest(`/api/v2/friends/request/${requestId}/accept`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    user_id: userId
+                })
             });
             
             return {
@@ -130,12 +160,16 @@ class FriendsAPI {
     }
 
     /**
-     * Decline friend request
+     * Decline friend request (v2)
      */
     static async declineFriendRequest(requestId) {
         try {
-            const response = await this.authenticatedRequest(`/api/friends/request/${requestId}/decline`, {
-                method: 'POST'
+            const userId = this.getUserId();
+            const response = await this.authenticatedRequest(`/api/v2/friends/request/${requestId}/decline`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    user_id: userId
+                })
             });
             
             return {
@@ -152,11 +186,12 @@ class FriendsAPI {
     }
 
     /**
-     * Remove friend
+     * Remove friend (v2)
      */
     static async removeFriend(friendId) {
         try {
-            const response = await this.authenticatedRequest(`/api/friends/${friendId}/remove`, {
+            const userId = this.getUserId();
+            const response = await this.authenticatedRequest(`/api/v2/friends/${friendId}?user_id=${userId}`, {
                 method: 'DELETE'
             });
             
@@ -173,20 +208,46 @@ class FriendsAPI {
         }
     }
 
+    /**
+     * Get friendship status between users (v2)
+     */
+    static async getFriendshipStatus(otherUserId) {
+        try {
+            const userId = this.getUserId();
+            const response = await this.authenticatedRequest(
+                `/api/v2/friends/status?user_id=${userId}&other_user_id=${otherUserId}`
+            );
+            
+            return {
+                success: true,
+                status: response.data?.status || 'none'
+            };
+        } catch (error) {
+            console.error('❌ Get friendship status error:', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to get friendship status',
+                status: 'none'
+            };
+        }
+    }
+
     // ================================================================
-    // HOUSEHOLDS MANAGEMENT
+    // HOUSEHOLDS MANAGEMENT (v2)
     // ================================================================
 
     /**
-     * Get user's households
+     * Get user's households (v2)
      */
     static async getHouseholds() {
         try {
-            const response = await this.authenticatedRequest('/api/households/list');
+            const userId = this.getUserId();
+            const response = await this.authenticatedRequest(`/api/v2/households/user/${userId}`);
+            
             return {
                 success: true,
-                households: response.households || [],
-                count: response.count || 0
+                households: response.data?.households || [],
+                count: response.data?.count || 0
             };
         } catch (error) {
             console.error('❌ Get households error:', error);
@@ -199,22 +260,48 @@ class FriendsAPI {
     }
 
     /**
-     * Create new household
+     * Get household by ID (v2)
+     */
+    static async getHousehold(householdId) {
+        try {
+            const userId = this.getUserId();
+            const response = await this.authenticatedRequest(
+                `/api/v2/households/${householdId}?user_id=${userId}`
+            );
+            
+            return {
+                success: true,
+                household: response.data?.household,
+                members: response.data?.members || []
+            };
+        } catch (error) {
+            console.error('❌ Get household error:', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to load household'
+            };
+        }
+    }
+
+    /**
+     * Create new household (v2)
      */
     static async createHousehold(name, description = '') {
         try {
-            const response = await this.authenticatedRequest('/api/households/create', {
+            const userId = this.getUserId();
+            const response = await this.authenticatedRequest('/api/v2/households', {
                 method: 'POST',
                 body: JSON.stringify({
+                    user_id: userId,
                     name: name.trim(),
-                    description: description.trim()
+                    description: description.trim() || undefined
                 })
             });
             
             return {
                 success: true,
                 message: response.message || 'Household created!',
-                household: response.household
+                household: response.data
             };
         } catch (error) {
             console.error('❌ Create household error:', error);
@@ -226,13 +313,46 @@ class FriendsAPI {
     }
 
     /**
-     * Delete household
+     * Update household (v2)
+     */
+    static async updateHousehold(householdId, name, description) {
+        try {
+            const userId = this.getUserId();
+            const response = await this.authenticatedRequest(`/api/v2/households/${householdId}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    user_id: userId,
+                    name: name?.trim(),
+                    description: description?.trim()
+                })
+            });
+            
+            return {
+                success: true,
+                message: response.message || 'Household updated!',
+                household: response.data
+            };
+        } catch (error) {
+            console.error('❌ Update household error:', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to update household'
+            };
+        }
+    }
+
+    /**
+     * Delete household (v2)
      */
     static async deleteHousehold(householdId) {
         try {
-            const response = await this.authenticatedRequest(`/api/households/${householdId}/delete`, {
-                method: 'DELETE'
-            });
+            const userId = this.getUserId();
+            const response = await this.authenticatedRequest(
+                `/api/v2/households/${householdId}?user_id=${userId}`, 
+                {
+                    method: 'DELETE'
+                }
+            );
             
             return {
                 success: true,
@@ -248,16 +368,46 @@ class FriendsAPI {
     }
 
     /**
-     * Add member to household
+     * Get household members (v2)
      */
-    static async addHouseholdMember(householdId, friendId) {
+    static async getHouseholdMembers(householdId) {
         try {
-            const response = await this.authenticatedRequest(`/api/households/${householdId}/members/add`, {
-                method: 'POST',
-                body: JSON.stringify({
-                    user_id: friendId
-                })
-            });
+            const userId = this.getUserId();
+            const response = await this.authenticatedRequest(
+                `/api/v2/households/${householdId}/members?user_id=${userId}`
+            );
+            
+            return {
+                success: true,
+                members: response.data?.members || []
+            };
+        } catch (error) {
+            console.error('❌ Get household members error:', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to load household members',
+                members: []
+            };
+        }
+    }
+
+    /**
+     * Add member to household (v2)
+     */
+    static async addHouseholdMember(householdId, friendId, role = 'member') {
+        try {
+            const userId = this.getUserId();
+            const response = await this.authenticatedRequest(
+                `/api/v2/households/${householdId}/members`, 
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        user_id: userId,
+                        new_member_id: friendId,
+                        role: role
+                    })
+                }
+            );
             
             return {
                 success: true,
@@ -273,13 +423,17 @@ class FriendsAPI {
     }
 
     /**
-     * Remove member from household
+     * Remove member from household (v2)
      */
     static async removeHouseholdMember(householdId, memberId) {
         try {
-            const response = await this.authenticatedRequest(`/api/households/${householdId}/members/${memberId}/remove`, {
-                method: 'DELETE'
-            });
+            const userId = this.getUserId();
+            const response = await this.authenticatedRequest(
+                `/api/v2/households/${householdId}/members/${memberId}?user_id=${userId}`, 
+                {
+                    method: 'DELETE'
+                }
+            );
             
             return {
                 success: true,
@@ -295,52 +449,66 @@ class FriendsAPI {
     }
 
     /**
-     * Get household members
+     * Update member role in household (v2)
      */
-    static async getHouseholdMembers(householdId) {
+    static async updateHouseholdMemberRole(householdId, memberId, newRole) {
         try {
-            const response = await this.authenticatedRequest(`/api/households/${householdId}/members`);
+            const userId = this.getUserId();
+            const response = await this.authenticatedRequest(
+                `/api/v2/households/${householdId}/members/${memberId}/role`, 
+                {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        user_id: userId,
+                        new_role: newRole
+                    })
+                }
+            );
+            
             return {
                 success: true,
-                members: response.members || []
+                message: response.message || 'Member role updated'
             };
         } catch (error) {
-            console.error('❌ Get household members error:', error);
+            console.error('❌ Update member role error:', error);
             return {
                 success: false,
-                error: error.message || 'Failed to load household members',
-                members: []
+                error: error.message || 'Failed to update member role'
             };
         }
     }
 
     // ================================================================
-    // UTILITY FUNCTIONS
+    // UTILITY FUNCTIONS (v2)
     // ================================================================
 
     /**
-     * Check if Friends API is available
+     * Check if Friends API is available (v2)
      */
     static async isAvailable() {
         try {
-            const response = await this.authenticatedRequest('/api/friends/list');
+            const userId = this.getUserId();
+            const response = await this.authenticatedRequest(`/api/v2/friends/user/${userId}`);
+            console.log('✅ Friends API v2 is available');
             return true;
         } catch (error) {
-            console.log('ℹ️ Friends API not available, will use fallback');
+            console.log('ℹ️ Friends API v2 not available, will use fallback');
             return false;
         }
     }
 
     /**
      * Search users by email (for friend requests)
+     * Note: v2 uses direct email in friend requests, no search needed
      */
     static async searchUsers(query) {
         try {
-            // TODO: Implement user search endpoint if needed
-            // For now, friend requests work by exact email
+            // v2 API sends friend requests directly by email
+            // No user search endpoint needed - backend looks up user
             return {
                 success: true,
-                users: []
+                users: [],
+                message: 'Use sendFriendRequest() with email directly'
             };
         } catch (error) {
             console.error('❌ Search users error:', error);
