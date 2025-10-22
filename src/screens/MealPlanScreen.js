@@ -389,36 +389,10 @@ function MealPlanScreen({ navigation, route }) {
                          originalPlanName.toLowerCase().trim() !== mealPlanTitle.toLowerCase().trim();
       
       if (nameChanged) {
-        console.log('📝 Name changed from', originalPlanName, 'to', mealPlanTitle, '- creating new plan');
-        
-        // Ask user if they want to create a new plan or rename existing
-        const shouldCreateNew = await new Promise((resolve) => {
-          Alert.alert(
-            'Name Changed',
-            `You changed the plan name from "${originalPlanName}" to "${mealPlanTitle}". What would you like to do?`,
-            [
-              {
-                text: 'Rename Existing',
-                onPress: () => resolve(false)
-              },
-              {
-                text: 'Create New Plan',
-                style: 'default',
-                onPress: () => resolve(true)
-              }
-            ]
-          );
-        });
-        
-        if (shouldCreateNew) {
-          // Clear currentPlanId to force creation of new plan
-          console.log('➕ Creating new plan with new name');
-          setCurrentPlanId(null);
-          setOriginalPlanName(null);
-        } else {
-          console.log('🔄 Renaming existing plan');
-          // Keep currentPlanId to update existing plan
-        }
+        console.log('📝 Name changed from', originalPlanName, 'to', mealPlanTitle, '- creating NEW plan');
+        // Clear currentPlanId to force creation of new plan
+        setCurrentPlanId(null);
+        setOriginalPlanName(null);
       }
       
       // 🔍 CHECK FOR DUPLICATES: Get existing meal plans to check for name conflicts

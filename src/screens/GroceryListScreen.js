@@ -107,14 +107,23 @@ export default function GroceryListScreen({ route, navigation }) {
   useEffect(() => {
     // Check for generated grocery list first
     if (global.tempGeneratedGroceryList) {
-      console.log('📋 Loading generated grocery list:', global.tempGeneratedGroceryList.items.length, 'items');
+      console.log('📋 Loading generated list on focus:', global.tempGeneratedGroceryList.items.length, 'items');
+      
+      // 🔧 FIX: Ensure all items have unique IDs!
+      const itemsWithIds = global.tempGeneratedGroceryList.items.map((item, index) => ({
+        ...item,
+        id: item.id || `generated-${Date.now()}-${index}`, // Generate unique ID if missing
+        checked: item.checked || false
+      }));
+      
+      console.log('✅ Added IDs to generated items');
       
       // Load the generated items
-      setGroceryItems(global.tempGeneratedGroceryList.items);
+      setGroceryItems(itemsWithIds);
       setListTitle(global.tempGeneratedGroceryList.title);
       
       // Store item count before clearing
-      const itemCount = global.tempGeneratedGroceryList.items.length;
+      const itemCount = itemsWithIds.length;
       
       // Clear the temporary list after loading
       global.tempGeneratedGroceryList = null;
