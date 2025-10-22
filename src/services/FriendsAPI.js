@@ -337,7 +337,7 @@ class FriendsAPI {
             const response = await this.authenticatedRequest('/api/v2/households', {
                 method: 'POST',
                 body: JSON.stringify({
-                    user_id: userId,
+                    created_by: userId,  // Backend expects created_by not user_id
                     name: name.trim(),
                     description: description.trim() || undefined
                 })
