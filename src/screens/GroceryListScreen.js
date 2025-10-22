@@ -26,9 +26,8 @@ import YesChefAPI from '../services/YesChefAPI';
 import FriendsAPI from '../services/FriendsAPI';
 import OfflineSyncManager from '../services/OfflineSyncManager';
 import MobileGroceryAdapter from '../services/MobileGroceryAdapter';
-// ☁️ CLOUD SYNC - Phase 1 v2 API Integration
-import GroceryListSyncService from '../services/GroceryListSyncService';
-import MealPlanSyncService from '../services/MealPlanSyncService';
+// 🔄 MEAL PLAN INTEGRATION - For generate feature
+import MealPlanAPI from '../services/MealPlanAPI';
 
 export default function GroceryListScreen({ route, navigation }) {
   // 🎨 Background Configuration (matches other screens)
@@ -730,110 +729,64 @@ export default function GroceryListScreen({ route, navigation }) {
                 <Text style={styles.modalMenuText}>Load List</Text>
               </TouchableOpacity>
               
-              {/* ☁️ CLOUD SYNC BUTTONS - Phase 1 */}
               <View style={styles.modalDivider} />
               
-              <TouchableOpacity 
-                style={[styles.modalMenuItem, {backgroundColor: '#eff6ff'}]}
-                onPress={async () => { 
-                  setShowOptionsMenu(false);
-                  setIsSaving(true);
-                  try {
-                    const result = await GroceryListSyncService.saveToCloud(
-                      groceryItems,
-                      listTitle,
-                      currentBackendList?.id
-                    );
-                    
-                    if (result.success) {
-                      setCurrentBackendList({ ...currentBackendList, id: result.listId });
-                      setLastSaved(new Date());
-                      showToastNotification('Saved to Cloud ☁️');
-                    } else {
-                      Alert.alert('Sync Failed', result.error);
-                    }
-                  } catch (error) {
-                    Alert.alert('Error', 'Failed to save to cloud');
-                  } finally {
-                    setIsSaving(false);
-                  }
-                }}
-              >
-                <Icon name="cloud-upload" size={22} color="#3B82F6" style={{marginRight: 16}} />
-                <Text style={[styles.modalMenuText, {color: '#3B82F6', fontWeight: '600'}]}>Save to Cloud ☁️</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.modalMenuItem, {backgroundColor: '#f0fdf4'}]}
-                onPress={async () => { 
-                  setShowOptionsMenu(false);
-                  setIsLoading(true);
-                  try {
-                    const result = await GroceryListSyncService.getCloudLists();
-                    
-                    if (result.success && result.lists.length > 0) {
-                      Alert.alert(
-                        'Load from Cloud ☁️',
-                        `Found ${result.lists.length} cloud grocery lists. Select one:`,
-                        [
-                          ...result.lists.map(list => ({
-                            text: `${list.name} (${list.items?.length || 0} items)`,
-                            onPress: async () => {
-                              const loadResult = await GroceryListSyncService.loadFromCloud(list.id);
-                              if (loadResult.success) {
-                                setGroceryItems(loadResult.groceryList.items);
-                                setListTitle(loadResult.groceryList.name);
-                                setCurrentBackendList(loadResult.groceryList);
-                                showToastNotification('Loaded from Cloud ☁️');
-                              } else {
-                                Alert.alert('Load Failed', loadResult.error);
-                              }
-                            }
-                          })),
-                          { text: 'Cancel', style: 'cancel' }
-                        ]
-                      );
-                    } else if (result.success) {
-                      Alert.alert('No Cloud Lists', 'No grocery lists found in cloud. Save one first!');
-                    } else {
-                      Alert.alert('Error', result.error);
-                    }
-                  } catch (error) {
-                    Alert.alert('Error', 'Failed to load from cloud');
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-              >
-                <Icon name="cloud-download" size={22} color="#22C55E" style={{marginRight: 16}} />
-                <Text style={[styles.modalMenuText, {color: '#22C55E', fontWeight: '600'}]}>Load from Cloud ☁️</Text>
-              </TouchableOpacity>
-              
+              {/* 🎯 GENERATE FROM MEAL PLAN - New v2 Feature! */}
               <TouchableOpacity 
                 style={[styles.modalMenuItem, {backgroundColor: '#fff7ed'}]}
                 onPress={async () => { 
                   setShowOptionsMenu(false);
                   setIsLoading(true);
+                  
                   try {
-                    // First get meal plans
-                    const plansResult = await MealPlanSyncService.getCloudPlans();
+                    // Get user ID
+                    const userId = YesChefAPI.user?.id;
+                    if (!userId) {
+                      Alert.alert('Error', 'Please log in first');
+                      setIsLoading(false);
+                      return;
+                    }
+                    
+                    // Load meal plans using v2 API
+                    const plansResult = await MealPlanAPI.loadMealPlansList();
                     
                     if (plansResult.success && plansResult.plans.length > 0) {
                       Alert.alert(
                         'Generate from Meal Plan 🎯',
-                        `Select a meal plan to auto-generate grocery list:`,
+                        'Select a meal plan to auto-generate grocery list:',
                         [
                           ...plansResult.plans.map(plan => ({
-                            text: `${plan.name} (${plan.start_date})`,
+                            text: `${plan.name || 'Unnamed Plan'}`,
                             onPress: async () => {
-                              const generateResult = await GroceryListSyncService.createFromMealPlan(plan.id);
-                              if (generateResult.success) {
-                                setGroceryItems(generateResult.groceryList.items);
-                                setListTitle(generateResult.groceryList.name);
-                                setCurrentBackendList(generateResult.groceryList);
-                                Alert.alert('Success! 🎯', generateResult.message);
-                              } else {
-                                Alert.alert('Generation Failed', generateResult.error);
+                              try {
+                                // Call v2 auto-generate endpoint
+                                const response = await YesChefAPI.debugFetch(
+                                  `/api/v2/grocery-lists/from-meal-plan/${plan.id}?user_id=${userId}`,
+                                  {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                      ...YesChefAPI.getAuthHeaders()
+                                    }
+                                  }
+                                );
+                                
+                                const result = await response.json();
+                                
+                                if (result.success) {
+                                  const list = result.data;
+                                  setGroceryItems(list.items || []);
+                                  setListTitle(list.name);
+                                  setCurrentBackendList(list);
+                                  Alert.alert(
+                                    'Success! 🎯', 
+                                    `Generated ${list.items?.length || 0} items from meal plan!`
+                                  );
+                                } else {
+                                  Alert.alert('Generation Failed', result.error);
+                                }
+                              } catch (error) {
+                                Alert.alert('Error', 'Failed to generate grocery list');
                               }
                             }
                           })),
@@ -841,18 +794,18 @@ export default function GroceryListScreen({ route, navigation }) {
                         ]
                       );
                     } else if (plansResult.success) {
-                      Alert.alert('No Meal Plans', 'Save a meal plan to cloud first!');
+                      Alert.alert('No Meal Plans', 'Save a meal plan first!');
                     } else {
                       Alert.alert('Error', plansResult.error);
                     }
                   } catch (error) {
-                    Alert.alert('Error', 'Failed to generate from meal plan');
+                    Alert.alert('Error', 'Failed to load meal plans');
                   } finally {
                     setIsLoading(false);
                   }
                 }}
               >
-                <Icon name="magic-wand" size={22} color="#F59E0B" style={{marginRight: 16}} />
+                <Icon name="sparkles" size={22} color="#F59E0B" style={{marginRight: 16}} />
                 <Text style={[styles.modalMenuText, {color: '#F59E0B', fontWeight: '600'}]}>Generate from Meal Plan 🎯</Text>
               </TouchableOpacity>
               

@@ -12,33 +12,46 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 class MealPlanAPI {
   
   /**
-   * Save a meal plan to the backend
-   * Converts mobile format to NotionMealPlanner format for storage
+   * Save a meal plan to the backend (v2 API)
+   * Now uses direct mobile format - no conversion needed!
    */
   static async saveMealPlan(mobileDays, planTitle, userId = null) {
-    console.log('💾 Saving meal plan:', planTitle);
+    console.log('💾 Saving meal plan (v2):', planTitle);
     
     try {
-      // Convert mobile format to NotionMealPlanner format
-      const notionMealPlan = MobileMealPlanAdapter.mobileToNotion(mobileDays, planTitle);
-      console.log('🔄 Converted to Notion format for backend');
+      // Get user ID from YesChefAPI if not provided
+      if (!userId) {
+        userId = YesChefAPI.user?.id;
+        if (!userId) {
+          throw new Error('User not logged in');
+        }
+      }
       
-      // Prepare API request
+      // Calculate date range
+      const startDate = new Date().toISOString().split('T')[0];
+      const daysCount = mobileDays?.length || 7;
+      const endDate = new Date(Date.now() + (daysCount * 24 * 60 * 60 * 1000))
+        .toISOString().split('T')[0];
+      
+      // v2 API format (direct mobile format!)
       const requestData = {
-        plan_name: planTitle,
-        week_start_date: new Date().toISOString().split('T')[0], // Today's date
-        meal_data: notionMealPlan,
-        plan_type: 'notion_style' // Specify format type for backend compatibility
+        user_id: userId,
+        name: planTitle,
+        meals: mobileDays,  // Direct mobile format - no conversion!
+        start_date: startDate,
+        end_date: endDate
       };
       
-      console.log('🌐 Sending to backend:', {
-        plan_name: planTitle,
-        meal_data: '...',
-        plan_type: 'notion_style'
+      console.log('🌐 Sending to v2 backend:', {
+        user_id: userId,
+        name: planTitle,
+        meals_count: mobileDays?.length,
+        start_date: startDate,
+        end_date: endDate
       });
       
-      // Make API call using YesChefAPI's debugFetch with auth headers
-      const response = await YesChefAPI.debugFetch('/api/meal-plans', {
+      // Call v2 endpoint
+      const response = await YesChefAPI.debugFetch('/api/v2/meal-plans', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -48,26 +61,27 @@ class MealPlanAPI {
       });
       
       const result = await response.json();
-      console.log('📡 Backend response:', result);
+      console.log('📡 v2 Response:', result);
       
+      // v2 returns {success, data}
       if (result.success) {
-        console.log('✅ Meal plan saved successfully:', result.plan_id);
+        console.log('✅ Meal plan saved (v2):', result.data.id);
         
         return {
           success: true,
-          planId: result.plan_id,
-          planName: result.plan_name
+          planId: result.data.id,
+          planName: result.data.name
         };
       } else {
-        console.error('❌ Backend save error:', result.error);
+        console.error('❌ v2 save error:', result.error);
         return {
           success: false,
-          error: result.error || 'Unknown save error'
+          error: result.error || 'Save failed'
         };
       }
       
     } catch (error) {
-      console.error('💥 Save meal plan error:', error);
+      console.error('💥 Save error:', error);
       return {
         success: false,
         error: error.message || 'Network error while saving'
@@ -76,56 +90,58 @@ class MealPlanAPI {
   }
 
   /**
-   * Update an existing meal plan on the backend
+   * Update an existing meal plan on the backend (v2 API)
    */
   static async updateMealPlan(planId, mobileDays, planTitle = null) {
-    console.log('🔄 Updating meal plan:', planId);
+    console.log('🔄 Updating meal plan (v2):', planId);
     
     try {
-      // Convert mobile format to NotionMealPlanner format
-      const notionMealPlan = MobileMealPlanAdapter.mobileToNotion(mobileDays, planTitle);
+      const userId = YesChefAPI.user?.id;
+      if (!userId) {
+        throw new Error('User not logged in');
+      }
       
-      const requestData = {
-        meal_data: notionMealPlan,
-        plan_type: 'notion_style'
+      const updates = {
+        user_id: userId,
+        meals: mobileDays  // Direct mobile format!
       };
       
       if (planTitle) {
-        requestData.plan_name = planTitle;
+        updates.name = planTitle;
       }
       
-      console.log('🌐 Updating plan', planId, 'with:', {
-        plan_name: planTitle || '(unchanged)',
-        meal_data: '...'
+      console.log('🌐 Updating v2 plan', planId, 'with:', {
+        name: planTitle || '(unchanged)',
+        meals_count: mobileDays?.length
       });
       
-      const response = await YesChefAPI.debugFetch(`/api/meal-plans/${planId}`, {
-        method: 'PUT',
+      const response = await YesChefAPI.debugFetch(`/api/v2/meal-plans/${planId}`, {
+        method: 'PATCH',  // v2 uses PATCH
         headers: {
           'Content-Type': 'application/json',
           ...YesChefAPI.getAuthHeaders()
         },
-        body: JSON.stringify(requestData)
+        body: JSON.stringify(updates)
       });
       
       const result = await response.json();
       
       if (result.success) {
-        console.log('✅ Meal plan updated successfully:', planId);
+        console.log('✅ Meal plan updated (v2):', planId);
         return {
           success: true,
-          planId: result.plan_id || planId
+          planId: result.data.id
         };
       } else {
-        console.error('❌ Update failed:', result.error);
+        console.error('❌ v2 update failed:', result.error);
         return {
           success: false,
-          error: result.error || 'Unknown update error'
+          error: result.error || 'Update failed'
         };
       }
       
     } catch (error) {
-      console.error('💥 Update meal plan error:', error);
+      console.error('💥 Update error:', error);
       return {
         success: false,
         error: error.message || 'Failed to update meal plan'
@@ -134,14 +150,19 @@ class MealPlanAPI {
   }
 
   /**
-   * Load all meal plans from backend
+   * Load all meal plans from backend (v2 API)
    * Returns list of available plans
    */
   static async loadMealPlansList() {
-    console.log('📂 Loading meal plans list...');
+    console.log('📂 Loading meal plans list (v2)...');
     
     try {
-      const response = await YesChefAPI.debugFetch('/api/meal-plans', {
+      const userId = YesChefAPI.user?.id;
+      if (!userId) {
+        throw new Error('User not logged in');
+      }
+      
+      const response = await YesChefAPI.debugFetch(`/api/v2/meal-plans/user/${userId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -150,28 +171,27 @@ class MealPlanAPI {
       });
       
       const result = await response.json();
-      console.log('📡 Backend response:', result);
+      console.log('📡 v2 Response:', result);
       
       if (result.success) {
-        // For meal plans list, we can't filter by meal_data structure since it's not included
-        // We'll return all plans and validate compatibility when loading specific plans
-        const allPlans = result.meal_plans || [];
+        // v2 returns {success, data: {items, total}}
+        const plans = result.data.items || result.data.meal_plans || [];
         
-        console.log(`✅ Found ${allPlans.length} meal plans (will validate compatibility on load)`);
+        console.log(`✅ Found ${plans.length} meal plans (v2)`);
         return {
           success: true,
-          plans: allPlans
+          plans: plans
         };
       } else {
-        console.error('❌ Backend load error:', result.error);
+        console.error('❌ v2 load error:', result.error);
         return {
           success: false,
-          error: result.error || 'Unknown load error'
+          error: result.error || 'Load failed'
         };
       }
       
     } catch (error) {
-      console.error('💥 Load meal plans error:', error);
+      console.error('💥 Load error:', error);
       return {
         success: false,
         error: error.message || 'Network error while loading'
@@ -180,14 +200,19 @@ class MealPlanAPI {
   }
 
   /**
-   * Load a specific meal plan by ID
-   * Converts NotionMealPlanner format back to mobile format
+   * Load a specific meal plan by ID (v2 API)
+   * Returns direct mobile format - no conversion needed!
    */
   static async loadMealPlan(planId) {
-    console.log('📂 Loading meal plan:', planId);
+    console.log('📂 Loading meal plan (v2):', planId);
     
     try {
-      const response = await YesChefAPI.debugFetch(`/api/meal-plans/${planId}`, {
+      const userId = YesChefAPI.user?.id;
+      if (!userId) {
+        throw new Error('User not logged in');
+      }
+      
+      const response = await YesChefAPI.debugFetch(`/api/v2/meal-plans/${planId}?user_id=${userId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -196,33 +221,31 @@ class MealPlanAPI {
       });
       
       const result = await response.json();
-      console.log('📡 Backend response:', result);
+      console.log('📡 v2 Response:', result);
       
       if (result.success) {
-        const backendPlan = result.meal_plan;
-        console.log('🗄️ Backend plan data:', backendPlan);
+        const plan = result.data;
+        console.log('✅ Loaded meal plan (v2):', plan.name);
         
-        // Convert NotionMealPlanner format to mobile format
-        const mobileDays = MobileMealPlanAdapter.notionToMobile(backendPlan.meal_data);
-        console.log('🔄 Converted to mobile format:', mobileDays);
-        
+        // v2 returns direct mobile format - no conversion needed!
         return {
           success: true,
-          mobileDays: mobileDays,
-          planTitle: backendPlan.plan_name,
-          planId: backendPlan.id,
-          weekStartDate: backendPlan.week_start_date
+          mobileDays: plan.meals,  // Already in mobile format!
+          planTitle: plan.name,
+          planId: plan.id,
+          weekStartDate: plan.start_date,
+          endDate: plan.end_date
         };
       } else {
-        console.error('❌ Backend load error:', result.error);
+        console.error('❌ v2 load error:', result.error);
         return {
           success: false,
-          error: result.error || 'Unknown load error'
+          error: result.error || 'Load failed'
         };
       }
       
     } catch (error) {
-      console.error('💥 Load meal plan error:', error);
+      console.error('💥 Load error:', error);
       return {
         success: false,
         error: error.message || 'Network error while loading'
@@ -231,16 +254,21 @@ class MealPlanAPI {
   }
 
   /**
-   * Delete a meal plan
+   * Delete a meal plan (v2 API)
    */
   static async deleteMealPlan(planId) {
-    console.log('🗑️ Deleting meal plan:', planId);
+    console.log('🗑️ Deleting meal plan (v2):', planId);
     
     try {
-      const response = await YesChefAPI.debugFetch(`/api/meal-plans/${planId}`, {
+      const userId = YesChefAPI.user?.id;
+      if (!userId) {
+        throw new Error('User not logged in');
+      }
+      
+      const response = await YesChefAPI.debugFetch(`/api/v2/meal-plans/${planId}?user_id=${userId}`, {
         method: 'DELETE',
         headers: {
-          ...YesChefAPI.getAuthHeaders(), // Add authentication headers
+          ...YesChefAPI.getAuthHeaders(),
           'Content-Type': 'application/json',
         }
       });

@@ -32,8 +32,6 @@ import MobileGroceryAdapter from '../services/MobileGroceryAdapter';
 // 🔄 LOCAL-FIRST ARCHITECTURE
 import { useMealPlanData } from '../hooks/useLocalData';
 import { LocalDataStatus, DraftPicker } from '../components/LocalDataStatus';
-// ☁️ CLOUD SYNC - Phase 1 v2 API Integration
-import MealPlanSyncService from '../services/MealPlanSyncService';
 
 function MealPlanScreen({ navigation, route }) {
   // 🎨 Background Configuration (matches HomeScreen)
@@ -1417,89 +1415,6 @@ function MealPlanScreen({ navigation, route }) {
                 <Icon name="folder" size={22} color="#1E40AF" style={{marginRight: 16}} />
                 <Text style={styles.modalMenuText}>Load Plan</Text>
               </TouchableOpacity>
-              
-              {/* ☁️ CLOUD SYNC BUTTONS - Phase 1 */}
-              <View style={styles.modalDivider} />
-              
-              <TouchableOpacity 
-                style={[styles.modalMenuItem, {backgroundColor: '#eff6ff'}]}
-                onPress={async () => { 
-                  setShowOptionsMenu(false);
-                  setIsLoading(true);
-                  try {
-                    const result = await MealPlanSyncService.saveToCloud(
-                      days,
-                      mealPlanTitle,
-                      currentPlanId
-                    );
-                    
-                    if (result.success) {
-                      setCurrentPlanId(result.planId);
-                      markAsSaved();
-                      Alert.alert('Success! ☁️', result.message);
-                    } else {
-                      Alert.alert('Sync Failed', result.error);
-                    }
-                  } catch (error) {
-                    Alert.alert('Error', 'Failed to save to cloud');
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-              >
-                <Icon name="cloud-upload" size={22} color="#3B82F6" style={{marginRight: 16}} />
-                <Text style={[styles.modalMenuText, {color: '#3B82F6', fontWeight: '600'}]}>Save to Cloud ☁️</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.modalMenuItem, {backgroundColor: '#f0fdf4'}]}
-                onPress={async () => { 
-                  setShowOptionsMenu(false);
-                  setIsLoading(true);
-                  try {
-                    const result = await MealPlanSyncService.getCloudPlans();
-                    
-                    if (result.success && result.plans.length > 0) {
-                      // Show cloud plans picker
-                      Alert.alert(
-                        'Load from Cloud ☁️',
-                        `Found ${result.plans.length} cloud meal plans. Select one:`,
-                        [
-                          ...result.plans.map(plan => ({
-                            text: `${plan.name} (${plan.start_date})`,
-                            onPress: async () => {
-                              const loadResult = await MealPlanSyncService.loadFromCloud(plan.id);
-                              if (loadResult.success) {
-                                setDays(loadResult.mealPlan.days);
-                                setMealPlanTitle(loadResult.mealPlan.name);
-                                setCurrentPlanId(loadResult.mealPlan.id);
-                                markAsSaved();
-                                Alert.alert('Success! ☁️', loadResult.message);
-                              } else {
-                                Alert.alert('Load Failed', loadResult.error);
-                              }
-                            }
-                          })),
-                          { text: 'Cancel', style: 'cancel' }
-                        ]
-                      );
-                    } else if (result.success) {
-                      Alert.alert('No Cloud Plans', 'No meal plans found in cloud. Save one first!');
-                    } else {
-                      Alert.alert('Error', result.error);
-                    }
-                  } catch (error) {
-                    Alert.alert('Error', 'Failed to load from cloud');
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-              >
-                <Icon name="cloud-download" size={22} color="#22C55E" style={{marginRight: 16}} />
-                <Text style={[styles.modalMenuText, {color: '#22C55E', fontWeight: '600'}]}>Load from Cloud ☁️</Text>
-              </TouchableOpacity>
-              
-              <View style={styles.modalDivider} />
               
               <TouchableOpacity 
                 style={styles.modalMenuItem}
