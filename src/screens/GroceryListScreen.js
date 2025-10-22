@@ -261,11 +261,22 @@ export default function GroceryListScreen({ route, navigation }) {
 
   // Simple toggle function
   const toggleItem = (id) => {
-    setGroceryItems(prev => 
-      prev.map(item => 
-        item.id === id ? { ...item, checked: !item.checked } : item
-      )
-    );
+    console.log('🔘 Toggle item ID:', id);
+    console.log('📋 Current items:', groceryItems.map(i => ({ id: i.id, name: i.name, checked: i.checked })));
+    
+    setGroceryItems(prev => {
+      const updated = prev.map(item => {
+        const shouldToggle = item.id === id;
+        if (shouldToggle) {
+          console.log('✅ Toggling item:', item.id, item.name, 'from', item.checked, 'to', !item.checked);
+        }
+        return shouldToggle ? { ...item, checked: !item.checked } : item;
+      });
+      
+      console.log('📊 Updated items:', updated.map(i => ({ id: i.id, name: i.name, checked: i.checked })));
+      return updated;
+    });
+    
     autoSave(); // Auto-save when items are checked/unchecked
   };
 

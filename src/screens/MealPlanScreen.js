@@ -39,6 +39,7 @@ function MealPlanScreen({ navigation, route }) {
   
   // Main meal plan state
   const [mealPlanTitle, setMealPlanTitle] = useState('Weekly Meal Plan');
+  const [originalPlanName, setOriginalPlanName] = useState(null); // Track original name for detecting changes
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showDayOptionsModal, setShowDayOptionsModal] = useState(null); // Track which day's bottom sheet is open
@@ -383,6 +384,43 @@ function MealPlanScreen({ navigation, route }) {
     console.log('💾 Saving meal plan:', mealPlanTitle);
     
     try {
+      // 🔍 CHECK IF NAME CHANGED: If we have a plan loaded and the name changed, create new plan
+      const nameChanged = currentPlanId && originalPlanName && 
+                         originalPlanName.toLowerCase().trim() !== mealPlanTitle.toLowerCase().trim();
+      
+      if (nameChanged) {
+        console.log('📝 Name changed from', originalPlanName, 'to', mealPlanTitle, '- creating new plan');
+        
+        // Ask user if they want to create a new plan or rename existing
+        const shouldCreateNew = await new Promise((resolve) => {
+          Alert.alert(
+            'Name Changed',
+            `You changed the plan name from "${originalPlanName}" to "${mealPlanTitle}". What would you like to do?`,
+            [
+              {
+                text: 'Rename Existing',
+                onPress: () => resolve(false)
+              },
+              {
+                text: 'Create New Plan',
+                style: 'default',
+                onPress: () => resolve(true)
+              }
+            ]
+          );
+        });
+        
+        if (shouldCreateNew) {
+          // Clear currentPlanId to force creation of new plan
+          console.log('➕ Creating new plan with new name');
+          setCurrentPlanId(null);
+          setOriginalPlanName(null);
+        } else {
+          console.log('🔄 Renaming existing plan');
+          // Keep currentPlanId to update existing plan
+        }
+      }
+      
       // 🔍 CHECK FOR DUPLICATES: Get existing meal plans to check for name conflicts
       const existingPlansResult = await MealPlanAPI.loadMealPlansList();
       const existingPlans = existingPlansResult.success ? existingPlansResult.plans : [];
@@ -461,8 +499,9 @@ function MealPlanScreen({ navigation, route }) {
         
         console.log('💾 Keeping AsyncStorage data for recipe addition compatibility');
         
-        // Update the current plan ID so we can track this plan for future updates
+        // Update the current plan ID and original name so we can track this plan for future updates
         setCurrentPlanId(result.planId);
+        setOriginalPlanName(mealPlanTitle); // Update original name after successful save
         console.log('🆔 Set current plan ID to:', result.planId);
         // Could show success message to user here
       } else {
@@ -528,8 +567,10 @@ function MealPlanScreen({ navigation, route }) {
         });
         
         // Update the mobile app state with loaded data
+        const loadedPlanName = result.planName || result.planTitle || `Plan ${planId}`;
         setDays(compatibleDays);
-        setMealPlanTitle(result.planName || result.planTitle || `Plan ${planId}`);
+        setMealPlanTitle(loadedPlanName);
+        setOriginalPlanName(loadedPlanName); // Track original name for change detection
         setCurrentPlanId(planId); // Track the loaded plan
         
         // 🔧 FIX: Save loaded data to AsyncStorage so RecipeCollectionScreen can detect it
