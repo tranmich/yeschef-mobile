@@ -397,9 +397,13 @@ function MealPlanScreen({ navigation, route }) {
       
       console.log('📝 Name changed?', nameChanged);
       
+      // Use local variable to track if we should create new plan
+      let planIdToUse = currentPlanId;
+      
       if (nameChanged) {
         console.log('📝 Name changed from', originalPlanName, 'to', mealPlanTitle, '- creating NEW plan');
-        // Clear currentPlanId to force creation of new plan
+        // Use null to force creation of new plan (don't rely on async state update)
+        planIdToUse = null;
         setCurrentPlanId(null);
         setOriginalPlanName(null);
       }
@@ -412,8 +416,8 @@ function MealPlanScreen({ navigation, route }) {
       );
       
       if (existingPlan) {
-        // If we're updating the same plan (currentPlanId matches), allow it without dialog
-        if (currentPlanId && currentPlanId.toString() === existingPlan.id.toString()) {
+        // If we're updating the same plan (planIdToUse matches), allow it without dialog
+        if (planIdToUse && planIdToUse.toString() === existingPlan.id.toString()) {
           console.log('🔄 Updating same plan - no dialog needed');
         } else {
           // Different plan with same name - show dialog
@@ -458,16 +462,17 @@ function MealPlanScreen({ navigation, route }) {
           }
           console.log('✅ Existing plan deleted, proceeding with save');
           
-          // Ensure we don't have a currentPlanId set (this will be a new plan)
+          // Ensure we don't have a planIdToUse set (this will be a new plan)
+          planIdToUse = null;
           setCurrentPlanId(null);
         }
       }
       
-      // 🔧 CHOOSE API CALL: Use update if we have currentPlanId, create if new plan
+      // 🔧 CHOOSE API CALL: Use update if we have planIdToUse, create if new plan
       let result;
-      if (currentPlanId) {
-        console.log('🔄 Updating existing plan:', currentPlanId);
-        result = await MealPlanAPI.updateMealPlan(currentPlanId, days, mealPlanTitle);
+      if (planIdToUse) {
+        console.log('🔄 Updating existing plan:', planIdToUse);
+        result = await MealPlanAPI.updateMealPlan(planIdToUse, days, mealPlanTitle);
       } else {
         console.log('➕ Creating new plan');
         result = await MealPlanAPI.saveMealPlan(days, mealPlanTitle);

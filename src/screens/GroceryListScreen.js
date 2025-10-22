@@ -869,7 +869,7 @@ export default function GroceryListScreen({ route, navigation }) {
             data={displayData}
             keyExtractor={(item) => item.id}
             onReorder={handleReorder}
-            key={editingItemId ? `editing-${editingItemId}` : `normal-${totalCount}`}
+            key={editingItemId ? `editing-${editingItemId}` : `grocery-list-stable`}
             renderItem={({ item }) => (
             <View style={styles.itemContainer}>
               <TouchableOpacity 
