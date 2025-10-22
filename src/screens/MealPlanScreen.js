@@ -519,21 +519,34 @@ function MealPlanScreen({ navigation, route }) {
         await clearAllLocalState();
         console.log('🧹 Local state cleared before loading plan data');
         
-        // 🔄 COMPATIBILITY: Move breakfast recipes to day.recipes for simplified UI
+        // 🔄 COMPATIBILITY: Preserve existing recipes AND add breakfast recipes
         const compatibleDays = result.mobileDays.map(day => {
           const breakfastMeal = day.meals?.find(meal => meal.name === 'Breakfast' || meal.id === 'breakfast-1');
           const breakfastRecipes = breakfastMeal?.recipes || [];
+          const existingRecipes = day.recipes || [];
           
           console.log('🔄 LOAD COMPATIBILITY DEBUG:', {
             dayName: day.name,
             breakfastMeal: breakfastMeal?.name,
             breakfastRecipeCount: breakfastRecipes.length,
-            existingDayRecipes: (day.recipes || []).length
+            existingDayRecipes: existingRecipes.length,
+            totalAfterMerge: existingRecipes.length + breakfastRecipes.length
+          });
+          
+          // 🎯 MERGE: Keep existing recipes AND add breakfast recipes (avoid duplicates)
+          const existingIds = new Set(existingRecipes.map(r => r.id));
+          const newBreakfastRecipes = breakfastRecipes.filter(r => !existingIds.has(r.id));
+          const allRecipes = [...existingRecipes, ...newBreakfastRecipes];
+          
+          console.log('✅ Recipe merge result:', {
+            existing: existingRecipes.length,
+            newFromBreakfast: newBreakfastRecipes.length,
+            total: allRecipes.length
           });
           
           return {
             ...day,
-            recipes: breakfastRecipes, // Replace with breakfast recipes (backend is source of truth)
+            recipes: allRecipes, // Merge existing + breakfast recipes
             meals: day.meals?.map(meal => 
               (meal.name === 'Breakfast' || meal.id === 'breakfast-1')
                 ? { ...meal, recipes: [] } // Clear breakfast recipes since they're now in day.recipes
