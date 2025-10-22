@@ -447,8 +447,8 @@ class FriendsAPI {
                 {
                     method: 'POST',
                     body: JSON.stringify({
-                        user_id: userId,
-                        new_member_id: friendId,
+                        requesting_user_id: userId,  // Backend expects requesting_user_id
+                        user_id: friendId,           // Backend expects user_id (not new_member_id)
                         role: role
                     })
                 }
