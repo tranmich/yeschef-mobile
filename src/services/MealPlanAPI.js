@@ -226,47 +226,23 @@ class MealPlanAPI {
       if (result.success) {
         const plan = result.data;
         console.log('✅ Loaded meal plan (v2):', plan.plan_name);
-        console.log('📊 Plan data type:', Array.isArray(plan.plan_data) ? 'Array' : typeof plan.plan_data);
-        console.log('📊 Plan data sample:', JSON.stringify(plan.plan_data).substring(0, 200));
+        console.log('📊 Plan data:', Array.isArray(plan.plan_data) ? `Array with ${plan.plan_data.length} days` : typeof plan.plan_data);
         
-        // Handle both array format (new v2 mobile) and object format (old v1 notion)
-        let mobileDays = plan.plan_data;
+        // Simple v2 format - just use the data directly!
+        const mobileDays = plan.plan_data;
         
-        // If it's an object (old v1 format), we need to convert it
-        if (mobileDays && typeof mobileDays === 'object' && !Array.isArray(mobileDays)) {
-          console.log('🔄 Converting old v1 object format to mobile array format');
-          console.log('🔍 Object keys:', Object.keys(mobileDays));
-          
-          // Convert {monday: {...}, tuesday: {...}} to array format
-          mobileDays = Object.entries(mobileDays).map(([dayName, dayData], index) => {
-            console.log(`🔄 Converting day: ${dayName}`, dayData);
-            return {
-              id: index + 1,
-              name: dayName.charAt(0).toUpperCase() + dayName.slice(1),
-              isExpanded: true,
-              recipes: [],
-              meals: [
-                { id: `breakfast-${index + 1}`, name: 'Breakfast', recipes: [] },
-                { id: `lunch-${index + 1}`, name: 'Lunch', recipes: [] },
-                { id: `dinner-${index + 1}`, name: 'Dinner', recipes: [] }
-              ]
-            };
-          });
-          console.log('✅ Converted to mobile format:', mobileDays.length, 'days');
-        }
-        
-        // Validate mobileDays is an array
+        // Validate it's an array
         if (!Array.isArray(mobileDays)) {
-          console.error('❌ mobileDays is not an array after conversion:', mobileDays);
+          console.error('❌ Invalid plan_data format - expected array, got:', typeof mobileDays);
           return {
             success: false,
-            error: 'Invalid meal plan data format'
+            error: 'Invalid meal plan data format - expected array'
           };
         }
         
-        console.log('✅ Final mobile days count:', mobileDays.length);
+        console.log('✅ Loaded', mobileDays.length, 'days with', mobileDays.reduce((sum, day) => sum + (day.recipes?.length || 0), 0), 'total recipes');
         
-        // v2 returns direct mobile format for new plans, converted for old plans
+        // Clean v2 response
         return {
           success: true,
           mobileDays: mobileDays,

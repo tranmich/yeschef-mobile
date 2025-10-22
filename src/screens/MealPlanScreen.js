@@ -86,12 +86,7 @@ function MealPlanScreen({ navigation, route }) {
         id: 1,  // Use number ID to match RecipeCollectionScreen expectations
         name: 'Day 1',
         isExpanded: true,
-        recipes: [],
-        meals: [
-          { id: 'breakfast-1', name: 'Breakfast', recipes: [] },
-          { id: 'lunch-1', name: 'Lunch', recipes: [] },
-          { id: 'dinner-1', name: 'Dinner', recipes: [] }
-        ]
+        recipes: []
       }
     ];
   };
@@ -519,39 +514,16 @@ function MealPlanScreen({ navigation, route }) {
         await clearAllLocalState();
         console.log('🧹 Local state cleared before loading plan data');
         
-        // 🔄 COMPATIBILITY: Preserve existing recipes AND add breakfast recipes
+        // 🎯 CLEAN v2 FORMAT: Just use the recipes directly
         const compatibleDays = result.mobileDays.map(day => {
-          const breakfastMeal = day.meals?.find(meal => meal.name === 'Breakfast' || meal.id === 'breakfast-1');
-          const breakfastRecipes = breakfastMeal?.recipes || [];
-          const existingRecipes = day.recipes || [];
-          
-          console.log('🔄 LOAD COMPATIBILITY DEBUG:', {
+          console.log('📂 Loading day:', {
             dayName: day.name,
-            breakfastMeal: breakfastMeal?.name,
-            breakfastRecipeCount: breakfastRecipes.length,
-            existingDayRecipes: existingRecipes.length,
-            totalAfterMerge: existingRecipes.length + breakfastRecipes.length
-          });
-          
-          // 🎯 MERGE: Keep existing recipes AND add breakfast recipes (avoid duplicates)
-          const existingIds = new Set(existingRecipes.map(r => r.id));
-          const newBreakfastRecipes = breakfastRecipes.filter(r => !existingIds.has(r.id));
-          const allRecipes = [...existingRecipes, ...newBreakfastRecipes];
-          
-          console.log('✅ Recipe merge result:', {
-            existing: existingRecipes.length,
-            newFromBreakfast: newBreakfastRecipes.length,
-            total: allRecipes.length
+            recipesCount: (day.recipes || []).length
           });
           
           return {
             ...day,
-            recipes: allRecipes, // Merge existing + breakfast recipes
-            meals: day.meals?.map(meal => 
-              (meal.name === 'Breakfast' || meal.id === 'breakfast-1')
-                ? { ...meal, recipes: [] } // Clear breakfast recipes since they're now in day.recipes
-                : meal
-            ) || []
+            recipes: day.recipes || []  // Simple! Just use what's there
           };
         });
         
@@ -642,12 +614,6 @@ function MealPlanScreen({ navigation, route }) {
         setMealPlanTitle(result.planTitle);
         
         console.log(`🔄 State updated with ${result.mobileDays.length} days`);
-        
-        // Compact meal structure logging for debugging
-        result.mobileDays.forEach((day, dayIndex) => {
-          const mealSummary = day.meals.map(meal => `${meal.name}:${meal.recipes?.length || 0}`).join(', ');
-          console.log(`📅 ${day.name}: ${mealSummary}`);
-        });
       } else {
         console.log('❌ Refresh failed:', result);
       }
@@ -668,11 +634,7 @@ function MealPlanScreen({ navigation, route }) {
         id: 1,
         name: 'Day 1',
         isExpanded: true,
-        meals: [
-          { id: 'breakfast-1', name: 'Breakfast', recipes: [] },
-          { id: 'lunch-1', name: 'Lunch', recipes: [] },
-          { id: 'dinner-1', name: 'Dinner', recipes: [] },
-        ]
+        recipes: []
       }
     ]);
     setMealPlanTitle('New Meal Plan');
@@ -762,12 +724,7 @@ function MealPlanScreen({ navigation, route }) {
       id: newDayId,
       name: 'New Day',
       isExpanded: true,
-      recipes: [], // Add recipes array for compatibility
-      meals: [
-        { id: `breakfast-${newDayId}`, name: 'Breakfast', recipes: [] },
-        { id: `lunch-${newDayId}`, name: 'Lunch', recipes: [] },
-        { id: `dinner-${newDayId}`, name: 'Dinner', recipes: [] },
-      ]
+      recipes: []
     };
     
     const updatedDays = [...days, newDay];
