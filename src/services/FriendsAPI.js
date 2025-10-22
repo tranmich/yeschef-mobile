@@ -19,6 +19,18 @@ class FriendsAPI {
     }
 
     /**
+     * Get initials from name
+     */
+    static getInitials(name) {
+        if (!name) return 'U';
+        const parts = name.trim().split(' ');
+        if (parts.length >= 2) {
+            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        }
+        return name.substring(0, 2).toUpperCase();
+    }
+
+    /**
      * Make authenticated API request (v2)
      */
     static async authenticatedRequest(endpoint, options = {}) {
@@ -61,10 +73,24 @@ class FriendsAPI {
             const userId = this.getUserId();
             const response = await this.authenticatedRequest(`/api/v2/friends/user/${userId}`);
             
+            // Map v2 response to mobile app format
+            const friends = (response.data?.friends || []).map(friend => ({
+                id: friend.friend_id,
+                name: friend.friend_name,
+                email: friend.friend_email,
+                status: friend.status || 'accepted',
+                initials: this.getInitials(friend.friend_name),
+                friendSince: friend.friend_since,
+                friendship_id: friend.friendship_id,
+                // Optional fields
+                sharedLists: friend.shared_lists || 0,
+                lastActive: friend.last_active || 'Unknown'
+            }));
+            
             return {
                 success: true,
-                friends: response.data?.friends || [],
-                count: response.data?.count || 0
+                friends: friends,
+                count: response.data?.count || friends.length
             };
         } catch (error) {
             console.error('❌ Get friends error:', error);
@@ -84,13 +110,32 @@ class FriendsAPI {
             const userId = this.getUserId();
             const response = await this.authenticatedRequest(`/api/v2/friends/requests/user/${userId}`);
             
+            // Map requests to mobile format
+            const mapRequest = (req, type) => ({
+                id: req.id,
+                type: type,
+                name: type === 'incoming' ? req.requester_name : req.recipient_name,
+                email: type === 'incoming' ? req.requester_email : req.recipient_email,
+                message: req.message || '',
+                status: req.status,
+                sentAt: req.created_at,
+                initials: this.getInitials(type === 'incoming' ? req.requester_name : req.recipient_name),
+                // Store IDs for actions
+                requester_id: req.requester_id,
+                recipient_id: req.recipient_id
+            });
+            
+            const incoming = (response.data?.incoming || []).map(r => mapRequest(r, 'incoming'));
+            const outgoing = (response.data?.outgoing || []).map(r => mapRequest(r, 'outgoing'));
+            const all = [...incoming, ...outgoing];
+            
             return {
                 success: true,
-                requests: response.data?.requests || [],
-                incoming: response.data?.incoming || [],
-                outgoing: response.data?.outgoing || [],
-                incoming_count: response.data?.incoming_count || 0,
-                outgoing_count: response.data?.outgoing_count || 0
+                requests: all,
+                incoming: incoming,
+                outgoing: outgoing,
+                incoming_count: response.data?.incoming_count || incoming.length,
+                outgoing_count: response.data?.outgoing_count || outgoing.length
             };
         } catch (error) {
             console.error('❌ Get friend requests error:', error);
