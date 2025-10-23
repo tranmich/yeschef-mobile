@@ -19,6 +19,7 @@ import {
 import { Icon, IconButton } from '../components/IconLibrary';
 import { ThemedText, typography } from '../components/Typography';
 import FriendsAPI from '../services/FriendsAPI';
+import HouseholdOptionsModal from '../components/HouseholdOptionsModal';
 
 export default function FriendsScreen({ navigation }) {
   // 🎨 Background Configuration (matches other screens)
@@ -415,56 +416,15 @@ export default function FriendsScreen({ navigation }) {
             <Text style={styles.householdName}>{String(item?.name || 'Unknown Household')}</Text>
           </View>
         </View>
-        <View style={styles.householdActionsContainer}>
-          <TouchableOpacity 
-            style={styles.householdActions}
-            onPress={() => setShowHouseholdActionMenu(showHouseholdActionMenu === item?.id ? null : item?.id)}
-          >
-            <Icon name="more-horizontal" size={20} color="#6b7280" />
-          </TouchableOpacity>
-          
-          {/* Household options dropdown */}
-          {showHouseholdActionMenu === item?.id && (
-            <View style={styles.householdOptionsMenu}>
-              <TouchableOpacity 
-                style={styles.optionItem}
-                onPress={() => {
-                  setSelectedHousehold(item);
-                  setShowAddMemberModal(true);
-                  setShowHouseholdActionMenu(null);
-                }}
-              >
-                <Icon name="add" size={18} color="#22C55E" style={{marginRight: 12}} />
-                <Text style={styles.optionText}>Add Member</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.optionItem}
-                onPress={async () => {
-                  setSelectedHousehold(item);
-                  setShowHouseholdActionMenu(null);
-                  // Load members before showing modal
-                  await loadHouseholdMembers(item.id);
-                  setShowRemoveMemberModal(true);
-                }}
-              >
-                <Icon name="minus" size={18} color="#DC313F" style={{marginRight: 12}} />
-                <Text style={styles.optionText}>Remove Member</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.optionItem}
-                onPress={() => {
-                  handleDeleteHousehold(item);
-                  setShowHouseholdActionMenu(null);
-                }}
-              >
-                <Icon name="delete" size={18} color="#DC313F" style={{marginRight: 12}} />
-                <Text style={styles.optionText}>Delete Household</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
+        <TouchableOpacity 
+          style={styles.householdActions}
+          onPress={() => {
+            setSelectedHousehold(item);
+            setShowHouseholdActionMenu(item.id);
+          }}
+        >
+          <Icon name="more-horizontal" size={20} color="#6b7280" />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.householdStats}>
@@ -794,6 +754,27 @@ export default function FriendsScreen({ navigation }) {
             </View>
           </View>
         </Modal>
+
+        {/* Household Options Modal */}
+        <HouseholdOptionsModal
+          visible={showHouseholdActionMenu !== null}
+          onClose={() => setShowHouseholdActionMenu(null)}
+          household={selectedHousehold}
+          onAddMember={() => {
+            setShowAddMemberModal(true);
+          }}
+          onRemoveMember={async () => {
+            if (selectedHousehold) {
+              await loadHouseholdMembers(selectedHousehold.id);
+              setShowRemoveMemberModal(true);
+            }
+          }}
+          onDeleteHousehold={() => {
+            if (selectedHousehold) {
+              handleDeleteHousehold(selectedHousehold);
+            }
+          }}
+        />
       </SafeAreaView>
     </ImageBackground>
   );
@@ -1161,18 +1142,18 @@ const styles = StyleSheet.create({
   },
   householdOptionsMenu: {
     position: 'absolute',
-    top: 40,
-    right: 0,
+    top: 28,  // Adjusted to appear just below the button
+    right: 4,  // Align with friends menu
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingVertical: 8,
+    borderRadius: 8,  // Slightly smaller radius for consistency
+    paddingVertical: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
     zIndex: 1000,
-    minWidth: 160,
+    minWidth: 180,  // Wider for longer text
   },
   householdStats: {
     flexDirection: 'row',
