@@ -732,7 +732,7 @@ export default function FriendsScreen({ navigation }) {
                         <TouchableOpacity
                           key={member.id}
                           style={styles.friendSelectItem}
-                          onPress={() => handleRemoveMemberFromHousehold(member.id)}
+                          onPress={() => handleRemoveMemberFromHousehold(member.user_id)}
                         >
                           {getInitialsCircle(member.initials, 40)}
                           <View style={styles.friendSelectInfo}>
