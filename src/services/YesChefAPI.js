@@ -406,12 +406,17 @@ class YesChefAPI {
           queryParams.append(key, filters[key]);
         }
       });
+      
+      // Add high per_page limit to get all recipes (v2 defaults to 20)
+      if (!filters.per_page) {
+        queryParams.append('per_page', '1000');  // Request up to 1000 recipes
+      }
 
       // 🔧 v2: Use /api/v2/recipes/user/:userId endpoint
       const baseUrl = `/api/v2/recipes/user/${userId}`;
       const url = queryParams.toString() ? 
         `${baseUrl}?${queryParams.toString()}` : 
-        baseUrl;
+        `${baseUrl}?per_page=1000`;
       
       this.log('🔍 Making recipes API call (v2) to:', url);
       
@@ -424,9 +429,13 @@ class YesChefAPI {
         
         // v2 response format: { success: true, data: { items: [...], pagination: {...} } }
         const recipes = data.data?.items || data.recipes || [];
+        const pagination = data.data?.pagination;
         
         this.log('✅ Recipes fetched successfully (v2):', {
-          count: recipes.length
+          count: recipes.length,
+          total: pagination?.total,
+          page: pagination?.page,
+          per_page: pagination?.per_page
         });
         return { 
           success: true, 
