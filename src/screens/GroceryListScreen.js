@@ -229,7 +229,8 @@ export default function GroceryListScreen({ route, navigation }) {
       
       if (listResult.success) {
         const backendList = listResult.list;
-        console.log('📋 Backend list loaded:', backendList.list_name);
+        console.log('📋 Backend list loaded (v2):', backendList.name);
+        console.log('📋 Backend list data:', JSON.stringify(backendList).substring(0, 200));
         
         // Convert backend data to mobile format (now async with spaCy)
         const mobileItems = await MobileGroceryAdapter.backendToMobile(backendList);
@@ -237,7 +238,7 @@ export default function GroceryListScreen({ route, navigation }) {
         
         setGroceryItems(mobileItems);
         console.log(`🔄 LOAD LIST DEBUG END - LIST REPLACED\n`);
-        setListTitle(backendList.list_name || 'Grocery List');
+        setListTitle(backendList.name || 'Grocery List'); // v2 uses 'name' not 'list_name'
         setCurrentBackendList(backendList);
         
         // Get conversion summary for user info
@@ -350,7 +351,7 @@ export default function GroceryListScreen({ route, navigation }) {
       setIsSaving(true);
       console.log(`\n💾 SAVE DEBUG START - ${new Date().toLocaleTimeString()}`);
       console.log(`📱 SAVING: ${groceryItems.length} items`);
-      console.log(`📋 CURRENT BACKEND LIST:`, currentBackendList ? `ID: ${currentBackendList.id}, Name: "${currentBackendList.list_name}"` : 'None');
+      console.log(`📋 CURRENT BACKEND LIST:`, currentBackendList ? `ID: ${currentBackendList.id}, Name: "${currentBackendList.name}"` : 'None');
       console.log(`📝 LIST TITLE: "${listTitle}"`);
       
       // Convert mobile data back to backend format
@@ -373,7 +374,7 @@ export default function GroceryListScreen({ route, navigation }) {
         console.log(`📋 Current backend list:`, currentBackendList);
         
         // Try to find an existing list with the same name instead of creating new
-        const existingList = availableLists.find(list => list.list_name === listTitle);
+        const existingList = availableLists.find(list => list.name === listTitle);
         if (existingList) {
           console.log(`🔄 FOUND existing list with same name, updating ID: ${existingList.id}`);
           setCurrentBackendList(existingList);
@@ -574,7 +575,7 @@ export default function GroceryListScreen({ route, navigation }) {
 
     Alert.alert(
       'Delete Grocery List',
-      `Are you sure you want to permanently delete "${currentBackendList.list_name || 'this list'}"?\n\nThis action cannot be undone.`,
+      `Are you sure you want to permanently delete "${currentBackendList.name || 'this list'}"?\n\nThis action cannot be undone.`,
       [
         {
           text: 'Cancel',
@@ -586,7 +587,7 @@ export default function GroceryListScreen({ route, navigation }) {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log(`🗑️ DELETING list: ${currentBackendList.list_name} (ID: ${currentBackendList.id})`);
+              console.log(`🗑️ DELETING list: ${currentBackendList.name} (ID: ${currentBackendList.id})`);
               console.log('🗑️ FULL BACKEND LIST OBJECT:', JSON.stringify(currentBackendList, null, 2));
               console.log('🗑️ ID TYPE CHECK:', typeof currentBackendList.id, 'VALUE:', currentBackendList.id);
               
@@ -964,7 +965,7 @@ export default function GroceryListScreen({ route, navigation }) {
                     <Icon name="folder" size={20} color="#1E40AF" style={{marginRight: 12}} />
                     <View style={{flex: 1}}>
                       <Text style={styles.modalMenuText}>
-                        {list.list_name || `List ${list.id}`}
+                        {list.name || `List ${list.id}`}
                       </Text>
                       <Text style={styles.listInfo}>
                         {list.item_count || 0} items
