@@ -619,8 +619,8 @@ class YesChefAPI {
         ingredients: ingredients,  // Array
         instructions: instructions,  // Array
         category: recipeData.category,
-        source: null,
-        is_reviewed: true
+        source: null
+        // NOTE: is_reviewed field removed - column doesn't exist in database
       };
       
       // Add optional fields if they exist and are simple types
