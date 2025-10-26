@@ -74,7 +74,13 @@ export default function GroceryListScreen({ route, navigation }) {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   
-  // 🔍 DEBUG: Track when groceryItems changes
+  // � FIX: Use ref to always get latest state (avoid stale closures)
+  const groceryItemsRef = useRef(groceryItems);
+  useEffect(() => {
+    groceryItemsRef.current = groceryItems;
+  }, [groceryItems]);
+  
+  // �🔍 DEBUG: Track when groceryItems changes
   useEffect(() => {
     console.log(`🔍 GROCERY ITEMS STATE CHANGED: ${groceryItems.length} items at ${new Date().toLocaleTimeString()}`);
     console.log(`📊 Items:`, groceryItems.map(i => i.name).join(', '));
@@ -355,14 +361,19 @@ export default function GroceryListScreen({ route, navigation }) {
     
     try {
       setIsSaving(true);
+      
+      // 🔧 FIX: Use ref to get latest state (avoid stale closure)
+      const currentItems = groceryItemsRef.current;
+      
       console.log(`\n💾 SAVE DEBUG START - ${new Date().toLocaleTimeString()}`);
-      console.log(`📱 SAVING: ${groceryItems.length} items`);
+      console.log(`📱 SAVING: ${currentItems.length} items (from ref)`);
+      console.log(`📊 ITEMS TO SAVE:`, currentItems.map(i => i.name).join(', '));
       console.log(`📋 CURRENT BACKEND LIST:`, currentBackendList ? `ID: ${currentBackendList.id}, Name: "${currentBackendList.name}"` : 'None');
       console.log(`📝 LIST TITLE: "${listTitle}"`);
       
       // Convert mobile data back to backend format
       const backendData = MobileGroceryAdapter.mobileToBackend(
-        groceryItems, 
+        currentItems,  // Use currentItems from ref!
         currentBackendList, 
         listTitle
       );
