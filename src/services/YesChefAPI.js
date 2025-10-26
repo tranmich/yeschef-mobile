@@ -378,7 +378,7 @@ class YesChefAPI {
 
   // Recipe Methods - Authenticated Only
   async getRecipes(filters = {}) {
-    this.log('Getting recipes with filters:', filters);
+    this.log('Getting recipes with filters (v2):', filters);
     
     if (!this.isAuthenticated()) {
       return { success: false, error: 'Authentication required - please login' };
@@ -391,6 +391,14 @@ class YesChefAPI {
         return connectionTest;
       }
 
+      // Get current user ID from stored data
+      const storedUser = await this.getStoredUser();
+      const userId = storedUser?.id;
+      
+      if (!userId) {
+        return { success: false, error: 'User ID not found - please re-login' };
+      }
+
       const queryParams = new URLSearchParams();
       
       // Add filters (category, search, etc.)
@@ -400,14 +408,13 @@ class YesChefAPI {
         }
       });
 
-      // 🔧 FIX: Request more recipes with a reasonable limit
-      const baseUrl = '/api/recipes';
-      const limit = 10000; // High limit to get more recipes
+      // 🔧 v2: Use /api/v2/recipes/user/:userId endpoint
+      const baseUrl = `/api/v2/recipes/user/${userId}`;
       const url = queryParams.toString() ? 
-        `${baseUrl}?limit=${limit}&${queryParams.toString()}` : 
-        `${baseUrl}?limit=${limit}`;
+        `${baseUrl}?${queryParams.toString()}` : 
+        baseUrl;
       
-      this.log('🔍 Making recipes API call to:', url);
+      this.log('🔍 Making recipes API call (v2) to:', url);
       
       const response = await this.debugFetch(url, {
         headers: this.getAuthHeaders(),
@@ -415,12 +422,16 @@ class YesChefAPI {
 
       if (response.ok) {
         const data = await response.json();
-        this.log('✅ Recipes fetched successfully:', {
-          count: data.recipes?.length || 0
+        
+        // v2 response format: { success: true, data: { items: [...], pagination: {...} } }
+        const recipes = data.data?.items || data.recipes || [];
+        
+        this.log('✅ Recipes fetched successfully (v2):', {
+          count: recipes.length
         });
         return { 
           success: true, 
-          recipes: data.recipes || []
+          recipes: recipes  // Return the extracted recipes array
         };
       } else {
         const errorData = await response.text();
@@ -438,34 +449,39 @@ class YesChefAPI {
   }
 
   async getRecipe(recipeId) {
-    this.log('Getting recipe:', recipeId);
+    this.log('Getting recipe (v2):', recipeId);
     
     if (!this.isAuthenticated()) {
       return { success: false, error: 'Authentication required' };
     }
 
     try {
-      const response = await this.debugFetch(`/api/recipes/${recipeId}`, {
+      // Get current user ID
+      const storedUser = await this.getStoredUser();
+      const userId = storedUser?.id;
+      
+      // v2: Use /api/v2/recipes/:id with user_id query param
+      const url = `/api/v2/recipes/${recipeId}${userId ? `?user_id=${userId}` : ''}`;
+      
+      const response = await this.debugFetch(url, {
         headers: this.getAuthHeaders(),
       });
 
       if (response.ok) {
         const responseData = await response.json();
         
-        // 🔧 FIX #3: Extract recipe from 'data' field (backend wraps response)
-        const recipe = responseData.data || responseData;
+        // v2 response format: { success: true, data: {...} }
+        const recipe = responseData.data || responseData.recipe || responseData;
         
-        this.log('✅ Recipe fetched successfully:', recipe.title || recipe.name || 'Untitled');
-        
-        // Simplified debugging - removed verbose data structure logging
+        this.log('✅ Recipe fetched successfully (v2):', recipe.title || recipe.name || 'Untitled');
         
         return { success: true, recipe: recipe };
       } else {
-        this.error('Get recipe failed:', response.status);
+        this.error('Get recipe failed (v2):', response.status);
         return { success: false, error: 'Recipe not found' };
       }
     } catch (error) {
-      this.error('Get recipe error:', error);
+      this.error('Get recipe error (v2):', error);
       return { success: false, error: 'Network error' };
     }
   }
@@ -562,23 +578,32 @@ class YesChefAPI {
 
   // 🆕 Save reviewed imported recipe with category
   async saveReviewedImportedRecipe(recipeData) {
-    this.log('Saving reviewed imported recipe:', recipeData.title);
+    this.log('Saving reviewed imported recipe (v2):', recipeData.title);
     
     if (!this.isAuthenticated()) {
       return { success: false, error: 'Authentication required - please login first' };
     }
 
     try {
+      // Get current user ID
+      const storedUser = await this.getStoredUser();
+      const userId = storedUser?.id;
+      
+      if (!userId) {
+        return { success: false, error: 'User ID not found - please re-login' };
+      }
+      
       // Clean up the request body - remove undefined values and ensure user_id
       const cleanRequestBody = Object.fromEntries(
         Object.entries({
           ...recipeData,
+          user_id: userId,  // Ensure user_id is set
           source: null, // ✅ Match existing recipes (they have source: null)
           is_reviewed: true, // Flag to indicate user reviewed
         }).filter(([key, value]) => value !== undefined && value !== null)
       );
       
-      this.log('📤 Sending recipe data to backend:', {
+      this.log('📤 Sending recipe data to backend (v2):', {
         title: cleanRequestBody.title,
         category: cleanRequestBody.category,
         source: cleanRequestBody.source,
@@ -588,7 +613,8 @@ class YesChefAPI {
         cleanedFields: Object.keys(cleanRequestBody).sort()
       });
       
-      const response = await this.debugFetch('/api/recipes', {
+      // v2: Use /api/v2/recipes endpoint
+      const response = await this.debugFetch('/api/v2/recipes', {
         method: 'POST',
         headers: {
           ...this.getAuthHeaders(),
@@ -598,22 +624,25 @@ class YesChefAPI {
       });
 
       const data = await response.json();
-      this.log('Save reviewed recipe response:', data);
+      this.log('Save reviewed recipe response (v2):', data);
       
       if (response.ok && data.success) {
-        this.log('✅ Reviewed recipe saved successfully!', {
+        // v2 response format: { success: true, data: {...} }
+        const recipe = data.data || data.recipe;
+        
+        this.log('✅ Reviewed recipe saved successfully (v2)!', {
           title: recipeData.title,
           category: recipeData.category,
-          recipe_id: data.data?.id || data.recipe?.id || data.recipe_id,
+          recipe_id: recipe?.id,
           backend_response: data
         });
         return { 
           success: true, 
-          recipe: data.recipe || data.data,
-          recipe_id: data.data?.id || data.recipe?.id || data.recipe_id
+          recipe: recipe,
+          recipe_id: recipe?.id
         };
       } else {
-        this.error('Save reviewed recipe failed:', data);
+        this.error('Save reviewed recipe failed (v2):', data);
         return { success: false, error: data.error || 'Failed to save recipe' };
       }
     } catch (error) {
@@ -627,14 +656,21 @@ class YesChefAPI {
   }
 
   async deleteRecipe(recipeId) {
-    this.log('Deleting recipe:', recipeId);
+    this.log('Deleting recipe (v2):', recipeId);
     
     if (!this.isAuthenticated()) {
       return { success: false, error: 'Authentication required - please login' };
     }
 
     try {
-      const response = await this.debugFetch(`/api/recipes/${recipeId}`, {
+      // Get current user ID
+      const storedUser = await this.getStoredUser();
+      const userId = storedUser?.id;
+      
+      // v2: Use /api/v2/recipes/:id with user_id query param
+      const url = `/api/v2/recipes/${recipeId}${userId ? `?user_id=${userId}` : ''}`;
+      
+      const response = await this.debugFetch(url, {
         method: 'DELETE',
         headers: this.getAuthHeaders(),
       });
@@ -642,46 +678,59 @@ class YesChefAPI {
       const data = await response.json();
       
       if (response.ok && data.success) {
-        this.log('✅ Recipe deleted successfully');
+        this.log('✅ Recipe deleted successfully (v2)');
         return { success: true };
       } else {
-        this.error('Delete failed:', data);
+        this.error('Delete failed (v2):', data);
         return { success: false, error: data.error || 'Delete failed' };
       }
     } catch (error) {
-      this.error('Delete recipe error:', error);
+      this.error('Delete recipe error (v2):', error);
       return { success: false, error: 'Network error - check connection' };
     }
   }
 
   async updateRecipeCategory(recipeId, categoryId) {
-    this.log('Updating recipe category:', { recipeId, categoryId });
+    this.log('Updating recipe category (v2):', { recipeId, categoryId });
     
     if (!this.isAuthenticated()) {
       return { success: false, error: 'Authentication required - please login' };
     }
 
     try {
-      const response = await this.debugFetch(`/api/recipes/${recipeId}/category`, {
-        method: 'PUT',
+      // Get current user ID
+      const storedUser = await this.getStoredUser();
+      const userId = storedUser?.id;
+      
+      // v2: Use PATCH /api/v2/recipes/:id (not separate /category endpoint)
+      const url = `/api/v2/recipes/${recipeId}${userId ? `?user_id=${userId}` : ''}`;
+      
+      const response = await this.debugFetch(url, {
+        method: 'PATCH',  // v2 uses PATCH instead of PUT
         headers: {
           ...this.getAuthHeaders(),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ category: categoryId }),
+        body: JSON.stringify({ 
+          category: categoryId,
+          user_id: userId  // Include in body as well
+        }),
       });
 
       const data = await response.json();
       
       if (response.ok && data.success) {
-        this.log('✅ Recipe category updated successfully');
-        return { success: true, recipe: data.recipe };
+        // v2 response format: { success: true, data: {...} }
+        const recipe = data.data || data.recipe;
+        
+        this.log('✅ Recipe category updated successfully (v2)');
+        return { success: true, recipe: recipe };
       } else {
-        this.error('Update category failed:', data);
+        this.error('Update category failed (v2):', data);
         return { success: false, error: data.error || 'Update failed' };
       }
     } catch (error) {
-      this.error('Update recipe category error:', error);
+      this.error('Update recipe category error (v2):', error);
       return { success: false, error: 'Network error - check connection' };
     }
   }
