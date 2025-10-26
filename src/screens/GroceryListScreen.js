@@ -346,9 +346,9 @@ export default function GroceryListScreen({ route, navigation }) {
     setGroceryItems(newItems);
     console.log(`✅ GROCERY ITEMS UPDATED`);
     
-    // DISABLED AUTO-SAVE during drag to prevent conflicts
-    // Auto-save will trigger from other operations or manual save
-    console.log(`🚫 SKIPPING AUTO-SAVE during drag operation`);
+    // ✅ NOW SAFE: Auto-save after reordering (ref fix prevents stale closures)
+    console.log(`✅ TRIGGERING AUTO-SAVE after reorder (debounced 3s)`);
+    autoSave();
     console.log(`🏪 GROCERY SCREEN REORDER DEBUG END\n`);
   };
 
