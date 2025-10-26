@@ -599,10 +599,24 @@ class YesChefAPI {
         return { success: false, error: 'User ID not found - please re-login' };
       }
       
+      // 🔧 v2 FIX: Ensure ingredients and instructions are arrays (not strings or objects)
+      let ingredients = recipeData.ingredients;
+      let instructions = recipeData.instructions;
+      
+      // Convert string to array (split by newlines)
+      if (typeof ingredients === 'string') {
+        ingredients = ingredients.split('\n').filter(line => line.trim());
+      }
+      if (typeof instructions === 'string') {
+        instructions = instructions.split('\n').filter(line => line.trim());
+      }
+      
       // Clean up the request body - remove undefined values and ensure user_id
       const cleanRequestBody = Object.fromEntries(
         Object.entries({
           ...recipeData,
+          ingredients: ingredients,  // Use converted array
+          instructions: instructions,  // Use converted array
           user_id: userId,  // Ensure user_id is set
           source: null, // ✅ Match existing recipes (they have source: null)
           is_reviewed: true, // Flag to indicate user reviewed
@@ -614,8 +628,10 @@ class YesChefAPI {
         category: cleanRequestBody.category,
         source: cleanRequestBody.source,
         is_reviewed: cleanRequestBody.is_reviewed,
-        hasIngredients: !!cleanRequestBody.ingredients,
-        hasInstructions: !!cleanRequestBody.instructions,
+        ingredientsType: typeof cleanRequestBody.ingredients,
+        ingredientsCount: Array.isArray(cleanRequestBody.ingredients) ? cleanRequestBody.ingredients.length : 'N/A',
+        instructionsType: typeof cleanRequestBody.instructions,
+        instructionsCount: Array.isArray(cleanRequestBody.instructions) ? cleanRequestBody.instructions.length : 'N/A',
         cleanedFields: Object.keys(cleanRequestBody).sort()
       });
       
