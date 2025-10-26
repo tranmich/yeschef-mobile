@@ -611,17 +611,31 @@ class YesChefAPI {
         instructions = instructions.split('\n').filter(line => line.trim());
       }
       
-      // Clean up the request body - remove undefined values and ensure user_id
-      const cleanRequestBody = Object.fromEntries(
-        Object.entries({
-          ...recipeData,
-          ingredients: ingredients,  // Use converted array
-          instructions: instructions,  // Use converted array
-          user_id: userId,  // Ensure user_id is set
-          source: null, // ✅ Match existing recipes (they have source: null)
-          is_reviewed: true, // Flag to indicate user reviewed
-        }).filter(([key, value]) => value !== undefined && value !== null)
-      );
+      // 🔧 CRITICAL: Build clean request body with ONLY fields backend expects
+      // Remove any nested objects/dicts that might cause psycopg2 errors
+      const cleanRequestBody = {
+        user_id: userId,
+        title: recipeData.title,
+        ingredients: ingredients,  // Array
+        instructions: instructions,  // Array
+        category: recipeData.category,
+        source: null,
+        is_reviewed: true
+      };
+      
+      // Add optional fields if they exist and are simple types
+      if (recipeData.prep_time && typeof recipeData.prep_time === 'number') {
+        cleanRequestBody.prep_time = recipeData.prep_time;
+      }
+      if (recipeData.cook_time && typeof recipeData.cook_time === 'number') {
+        cleanRequestBody.cook_time = recipeData.cook_time;
+      }
+      if (recipeData.servings && typeof recipeData.servings === 'number') {
+        cleanRequestBody.servings = recipeData.servings;
+      }
+      if (recipeData.image_url && typeof recipeData.image_url === 'string') {
+        cleanRequestBody.image_url = recipeData.image_url;
+      }
       
       this.log('📤 Sending recipe data to backend (v2):', {
         title: cleanRequestBody.title,
