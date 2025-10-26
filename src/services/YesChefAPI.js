@@ -686,9 +686,9 @@ class YesChefAPI {
     }
   }
 
-  // Grocery List Methods - Authenticated Only
+  // Grocery List Methods - Authenticated Only (v2 API)
   async getGroceryLists() {
-    this.log('Getting grocery lists...');
+    this.log('Getting grocery lists (v2)...');
     
     if (!this.isAuthenticated()) {
       return { success: false, error: 'Authentication required' };
@@ -702,17 +702,17 @@ class YesChefAPI {
         return connectionTest;
       }
 
-      const response = await this.debugFetch('/api/grocery-lists', {
+      const response = await this.debugFetch(`/api/v2/grocery-lists/user/${this.user.id}`, {
         headers: this.getAuthHeaders(),
       });
 
       if (response.ok) {
         const data = await response.json();
-        this.log('✅ Grocery lists fetched:', {
-          count: data.grocery_lists?.length || 0
+        this.log('✅ Grocery lists fetched (v2):', {
+          count: data.data?.grocery_lists?.length || 0
         });
-        // Backend returns 'grocery_lists', normalize to 'lists' for compatibility
-        return { success: true, lists: data.grocery_lists || [] };
+        // v2 returns {success, data: {grocery_lists}}
+        return { success: true, lists: data.data?.grocery_lists || [] };
       } else {
         const errorText = await response.text();
         this.error('Get grocery lists failed:', {
@@ -732,24 +732,25 @@ class YesChefAPI {
   }
 
   async getGroceryListDetails(listId) {
-    this.log('Getting grocery list details for ID:', listId);
+    this.log('Getting grocery list details (v2) for ID:', listId);
     
     if (!this.isAuthenticated()) {
       return { success: false, error: 'Authentication required' };
     }
 
     try {
-      const response = await this.debugFetch(`/api/grocery-lists/${listId}`, {
+      const response = await this.debugFetch(`/api/v2/grocery-lists/${listId}?user_id=${this.user.id}`, {
         headers: this.getAuthHeaders(),
       });
 
       if (response.ok) {
         const data = await response.json();
-        this.log('✅ Grocery list details fetched:', {
+        this.log('✅ Grocery list details fetched (v2):', {
           id: listId,
-          name: data.grocery_list?.list_name
+          name: data.data?.name
         });
-        return { success: true, list: data.grocery_list };
+        // v2 returns {success, data: {groceryList}}
+        return { success: true, list: data.data };
       } else {
         const errorText = await response.text();
         this.error('Get grocery list details failed:', {
@@ -769,20 +770,21 @@ class YesChefAPI {
   }
 
   async saveGroceryList(listData) {
-    console.log('🔧 DEBUG: YesChefAPI.saveGroceryList called with:', listData);
+    console.log('🔧 DEBUG: YesChefAPI.saveGroceryList (v2) called with:', listData);
     
-    // Convert to backend format (backend expects list_name and list_data)
+    // v2 backend expects: {user_id, name, items}
     const backendData = {
-      list_name: listData.name || listData.list_name,
-      list_data: listData.items || listData.list_data,
-      recipe_ids: listData.recipe_ids || []
+      user_id: this.user.id,
+      name: listData.name || listData.list_name,
+      items: listData.items || listData.list_data || [],
+      meal_plan_id: listData.meal_plan_id || null
     };
 
-    console.log('🔧 DEBUG: Backend format data:', backendData);
+    console.log('🔧 DEBUG: v2 Backend format data:', backendData);
 
-    this.log('Saving grocery list (FIXED VERSION):', {
-      list_name: backendData.list_name,
-      itemCount: Array.isArray(backendData.list_data) ? backendData.list_data.length : 'complex'
+    this.log('Saving grocery list (v2):', {
+      name: backendData.name,
+      itemCount: Array.isArray(backendData.items) ? backendData.items.length : 'complex'
     });
     
     if (!this.isAuthenticated()) {
@@ -790,15 +792,15 @@ class YesChefAPI {
     }
 
     // Validate required fields
-    if (!backendData.list_name) {
+    if (!backendData.name) {
       this.error('Save failed: Missing list name');
       return { success: false, error: 'List name is required' };
     }
 
     try {
-      console.log('🔧 DEBUG: About to send backend format data:', JSON.stringify(backendData));
+      console.log('🔧 DEBUG: About to send v2 backend format data:', JSON.stringify(backendData));
       
-      const response = await this.debugFetch('/api/grocery-lists', {
+      const response = await this.debugFetch('/api/v2/grocery-lists', {
         method: 'POST',
         headers: {
           ...this.getAuthHeaders(),
@@ -809,8 +811,9 @@ class YesChefAPI {
 
       if (response.ok) {
         const data = await response.json();
-        this.log('✅ Grocery list saved successfully!');
-        return { success: true, list: data };
+        this.log('✅ Grocery list saved successfully (v2)!');
+        // v2 returns {success, data, message}
+        return { success: true, list: data.data };
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
         this.error('Save grocery list failed:', errorData);
@@ -823,17 +826,18 @@ class YesChefAPI {
   }
 
   async updateGroceryList(listId, listData) {
-    // Convert to backend format (backend expects list_name and list_data)
+    // v2 backend expects: {user_id, name, items}
     const backendData = {
-      list_name: listData.name || listData.list_name,
-      list_data: listData.items || listData.list_data,
-      recipe_ids: listData.recipe_ids || []
+      user_id: this.user.id,
+      name: listData.name || listData.list_name,
+      items: listData.items || listData.list_data || [],
+      meal_plan_id: listData.meal_plan_id || null
     };
 
-    this.log('Updating grocery list:', {
+    this.log('Updating grocery list (v2):', {
       id: listId,
-      list_name: backendData.list_name,
-      itemCount: Array.isArray(backendData.list_data) ? backendData.list_data.length : 'complex'
+      name: backendData.name,
+      itemCount: Array.isArray(backendData.items) ? backendData.items.length : 'complex'
     });
     
     if (!this.isAuthenticated()) {
@@ -841,8 +845,8 @@ class YesChefAPI {
     }
 
     try {
-      const response = await this.debugFetch(`/api/grocery-lists/${listId}`, {
-        method: 'PUT',
+      const response = await this.debugFetch(`/api/v2/grocery-lists/${listId}`, {
+        method: 'PATCH',
         headers: {
           ...this.getAuthHeaders(),
           'Content-Type': 'application/json',
@@ -852,8 +856,9 @@ class YesChefAPI {
 
       if (response.ok) {
         const data = await response.json();
-        this.log('✅ Grocery list updated successfully!');
-        return { success: true, list: data };
+        this.log('✅ Grocery list updated successfully (v2)!');
+        // v2 returns {success, data, message}
+        return { success: true, list: data.data };
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
         this.error('Update grocery list failed:', errorData);
@@ -866,7 +871,7 @@ class YesChefAPI {
   }
 
   async deleteGroceryList(listId) {
-    this.log('🗑️ DELETE REQUEST: Deleting grocery list:', { 
+    this.log('🗑️ DELETE REQUEST (v2): Deleting grocery list:', { 
       id: listId, 
       idType: typeof listId, 
       isAuthenticated: this.isAuthenticated(),
@@ -878,7 +883,7 @@ class YesChefAPI {
     }
 
     try {
-      const url = `/api/grocery-lists/${listId}`;
+      const url = `/api/v2/grocery-lists/${listId}?user_id=${this.user.id}`;
       this.log('🗑️ DELETE URL:', url);
       
       const response = await this.debugFetch(url, {
@@ -893,7 +898,7 @@ class YesChefAPI {
       });
 
       if (response.ok) {
-        this.log('✅ Grocery list deleted successfully!');
+        this.log('✅ Grocery list deleted successfully (v2)!');
         return { success: true };
       } else {
         const errorText = await response.text();
