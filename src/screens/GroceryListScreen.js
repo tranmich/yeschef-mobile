@@ -74,6 +74,12 @@ export default function GroceryListScreen({ route, navigation }) {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   
+  // 🔍 DEBUG: Track when groceryItems changes
+  useEffect(() => {
+    console.log(`🔍 GROCERY ITEMS STATE CHANGED: ${groceryItems.length} items at ${new Date().toLocaleTimeString()}`);
+    console.log(`📊 Items:`, groceryItems.map(i => i.name).join(', '));
+  }, [groceryItems]);
+  
   // Toast notification state
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('Saved ✓');
