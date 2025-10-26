@@ -25,13 +25,16 @@ class MobileGroceryAdapter {
   static async backendToMobile(backendListData) {
     // console.log('🔄 DEBUG: Converting backend to mobile format:', JSON.stringify(backendListData, null, 2));
     
-    if (!backendListData || !backendListData.list_data) {
+    // v2 API: backendListData.items (array)
+    // v1 API: backendListData.list_data (object/array)
+    const listData = backendListData.items || backendListData.list_data;
+    
+    if (!backendListData || !listData) {
       console.log('📋 No backend data, returning empty list');
       return [];
     }
 
     const mobileItems = [];
-    const listData = backendListData.list_data;
     
     // console.log('🔍 DEBUG: list_data structure:', JSON.stringify(listData, null, 2));
     
@@ -375,10 +378,11 @@ class MobileGroceryAdapter {
       });
     });
     
+    // v2 API format: {name, items} not {list_name, list_data}
     const backendData = {
-      list_name: listName,
-      list_data: sections,
-      recipe_ids: originalBackendData?.recipe_ids || []
+      name: listName,
+      items: sections,
+      meal_plan_id: originalBackendData?.meal_plan_id || null
     };
 
     // If updating existing list, preserve the ID
@@ -408,10 +412,11 @@ class MobileGroceryAdapter {
       checked: item.checked || false
     }));
 
+    // v2 API format: {name, items} not {list_name, list_data}
     const backendData = {
-      list_name: listName,
-      list_data: listData,
-      recipe_ids: originalBackendData?.recipe_ids || []
+      name: listName,
+      items: listData,
+      meal_plan_id: originalBackendData?.meal_plan_id || null
     };
 
     // If updating existing list, preserve the ID
@@ -434,9 +439,9 @@ class MobileGroceryAdapter {
   static updateExistingBackendList(mobileItems, originalBackendData, listName) {
     // Start with original complex structure
     const updatedData = JSON.parse(JSON.stringify(originalBackendData));
-    updatedData.list_name = listName;
+    updatedData.name = listName; // v2: name not list_name
 
-    const listData = updatedData.list_data;
+    const listData = updatedData.items || updatedData.list_data; // v2: items not list_data
     
     // Get sections data reference
     let sectionsData = null;
@@ -507,10 +512,11 @@ class MobileGroceryAdapter {
   static createNewBackendList(mobileItems, listName) {
     console.log('🆕 Creating new backend list from mobile items');
     
+    // v2 API format: {name, items} not {list_name, list_data}
     const backendData = {
-      list_name: listName,
-      list_data: mobileItems, // Store as simple array for mobile-created lists
-      recipe_ids: []
+      name: listName,
+      items: mobileItems, // Store as simple array for mobile-created lists
+      meal_plan_id: null
     };
 
     console.log('✅ Created new backend list structure');
@@ -528,10 +534,14 @@ class MobileGroceryAdapter {
    * Check if a grocery list was created by mobile app
    */
   static isMobileCreatedList(backendListData) {
-    if (!backendListData || !backendListData.list_data) return false;
+    if (!backendListData) return false;
+    
+    // Check v2 format (items) or v1 format (list_data)
+    const listData = backendListData.items || backendListData.list_data;
+    if (!listData) return false;
     
     // Mobile lists are stored as simple arrays
-    return Array.isArray(backendListData.list_data);
+    return Array.isArray(listData);
   }
 
   /**
