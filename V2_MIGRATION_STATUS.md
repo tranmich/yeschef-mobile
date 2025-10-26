@@ -37,6 +37,33 @@
 
 ---
 
+### 🛒 **Grocery Lists** (100% Complete) ⭐ **JUST FIXED!**
+| Feature | Backend v2 | Mobile v2 | Tested | Status |
+|---------|------------|-----------|--------|--------|
+| Create List | ✅ | ✅ | ⏳ | **READY TO TEST** |
+| View Lists | ✅ | ✅ | ⏳ | **READY TO TEST** |
+| Load List | ✅ | ✅ | ⏳ | **READY TO TEST** |
+| Update List | ✅ | ✅ | ⏳ | **READY TO TEST** |
+| Delete List | ✅ | ✅ | ⏳ | **READY TO TEST** |
+| Add Items | ✅ | ✅ | ⏳ | **READY TO TEST** |
+| Reorder Items | ✅ | ✅ | ⏳ | **READY TO TEST** |
+
+**Endpoints:**
+- `/api/v2/grocery-lists/*`
+
+**Critical Fixes Applied:**
+- ✅ Fixed database column mismatch (`list_data` vs `items_json`)
+- ✅ Fixed stale closure bug in auto-save (using ref)
+- ✅ Fixed field mapping (`list_name/list_data` → `name/items`)
+- ✅ Fixed MobileGroceryAdapter for v2 compatibility
+- ✅ Re-enabled auto-save after reordering (now safe with ref)
+
+---
+
+## 🔄 **NEEDS MIGRATION**
+
+---
+
 ## 🔄 **NEEDS MIGRATION**
 
 ### 🛒 **Grocery Lists** (Currently v1)
@@ -86,9 +113,18 @@ These v2 blueprints exist in backend but mobile doesn't use them yet:
 - [x] Household Members: Add, remove, view
 - [x] Meal Plans: Create, save, load, update, delete
 
+### ⏳ **Ready to Test (Grocery Lists v2):**
+- [ ] Create new grocery list
+- [ ] Add items to list
+- [ ] Reorder items (should persist now! 🎉)
+- [ ] Delete items
+- [ ] Rename items
+- [ ] Check/uncheck items
+- [ ] Save and reload list
+- [ ] Delete list
+- [ ] Generate from meal plan
+
 ### ❓ **Needs Testing:**
-- [ ] Meal Plans: Generate grocery list from meal plan
-- [ ] Grocery Lists: Migrate to v2 and test
 - [ ] Recipes: Migrate to v2 and test
 - [ ] Community: Check if v2 is used
 - [ ] Profile: Check if v2 is used
@@ -99,10 +135,12 @@ These v2 blueprints exist in backend but mobile doesn't use them yet:
 
 ## 🎯 **NEXT STEPS**
 
-### **Phase 3: Grocery Lists v2 Migration**
-1. Update `MobileGroceryAdapter.js` to use `/api/v2/grocery-lists`
-2. Test all grocery list operations
-3. Verify field mapping (similar to friends/households)
+### **Phase 3: Grocery Lists v2 Testing** ⭐ **CURRENT**
+1. ✅ ~~Update mobile to use v2 endpoints~~ **DONE**
+2. ✅ ~~Fix field mapping issues~~ **DONE**
+3. ✅ ~~Fix stale closure bug~~ **DONE**
+4. ⏳ **Test all operations** ← **YOU ARE HERE**
+5. 🔜 Document any remaining issues
 
 ### **Phase 4: Recipes v2 Migration**
 1. Update recipe API calls to use `/api/v2/recipes`
@@ -118,13 +156,13 @@ These v2 blueprints exist in backend but mobile doesn't use them yet:
 
 ## 📊 **OVERALL PROGRESS**
 
-**Core Features Migration:** 60% Complete
+**Core Features Migration:** 75% Complete ⬆️
 
 | Category | Progress |
 |----------|----------|
 | Social (Friends/Households) | ✅ 100% |
 | Meal Plans | ✅ 100% |
-| Grocery Lists | 🔄 50% (backend done, mobile pending) |
+| Grocery Lists | ⏳ 95% (awaiting user testing) |
 | Recipes | 🔄 50% (backend done, mobile pending) |
 | Other Features | ❓ Unknown |
 
