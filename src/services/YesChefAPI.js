@@ -391,9 +391,8 @@ class YesChefAPI {
         return connectionTest;
       }
 
-      // Get current user ID from stored data
-      const storedUser = await this.getStoredUser();
-      const userId = storedUser?.id;
+      // Get user ID from this.user
+      const userId = this.user?.id;
       
       if (!userId) {
         return { success: false, error: 'User ID not found - please re-login' };
@@ -456,9 +455,8 @@ class YesChefAPI {
     }
 
     try {
-      // Get current user ID
-      const storedUser = await this.getStoredUser();
-      const userId = storedUser?.id;
+      // Get user ID from this.user
+      const userId = this.user?.id;
       
       // v2: Use /api/v2/recipes/:id with user_id query param
       const url = `/api/v2/recipes/${recipeId}${userId ? `?user_id=${userId}` : ''}`;
@@ -585,9 +583,8 @@ class YesChefAPI {
     }
 
     try {
-      // Get current user ID
-      const storedUser = await this.getStoredUser();
-      const userId = storedUser?.id;
+      // Get user ID from this.user
+      const userId = this.user?.id;
       
       if (!userId) {
         return { success: false, error: 'User ID not found - please re-login' };
@@ -663,9 +660,8 @@ class YesChefAPI {
     }
 
     try {
-      // Get current user ID
-      const storedUser = await this.getStoredUser();
-      const userId = storedUser?.id;
+      // Get user ID from this.user
+      const userId = this.user?.id;
       
       // v2: Use /api/v2/recipes/:id with user_id query param
       const url = `/api/v2/recipes/${recipeId}${userId ? `?user_id=${userId}` : ''}`;
@@ -698,9 +694,8 @@ class YesChefAPI {
     }
 
     try {
-      // Get current user ID
-      const storedUser = await this.getStoredUser();
-      const userId = storedUser?.id;
+      // Get user ID from this.user
+      const userId = this.user?.id;
       
       // v2: Use PATCH /api/v2/recipes/:id (not separate /category endpoint)
       const url = `/api/v2/recipes/${recipeId}${userId ? `?user_id=${userId}` : ''}`;
