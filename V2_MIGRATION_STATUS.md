@@ -85,20 +85,40 @@
 
 ---
 
-### 📖 **Recipes** (Currently v1)
-| Feature | Backend v2 | Mobile v2 | Status |
-|---------|------------|-----------|--------|
-| Recipe CRUD | ✅ | ❌ | **Mobile uses `/api/recipes` (v1)** |
-| Recipe Import | ❌ | ❌ | **Not v2** |
-| Recipe Sharing | ❌ | ❌ | **Not v2** |
+### 📖 **Recipes** (95% Complete) ✅ **TESTED & WORKING!**
+| Feature | Backend v2 | Mobile v2 | Tested | Status |
+|---------|------------|-----------|--------|--------|
+| List Recipes | ✅ | ✅ | ✅ | **WORKING** (38→39 recipes) |
+| Get Recipe | ✅ | ✅ | ✅ | **WORKING** |
+| Create Recipe | ✅ | ✅ | ✅ | **WORKING** |
+| Delete Recipe | ✅ | ✅ | ✅ | **WORKING** |
+| Update Category | ✅ | ✅ | ⏳ | **READY TO TEST** |
+| Import URL | ❌ | ❌ | ✅ | **V1 (working)** |
+| Voice Import | ❌ | ❌ | ⏳ | **V1 (untested)** |
+| OCR Import | ❌ | ❌ | ⏳ | **V1 (untested)** |
 
-**Current:** Mobile uses v1 endpoints  
-**Backend:** v2 exists at `/api/v2/recipes/*`  
-**Action Needed:** Update mobile to use v2
+**Endpoints:**
+- `/api/v2/recipes/*`
+- Special features still on v1: `/api/recipes/import/*`
+
+**Critical Fixes Applied:**
+- ✅ Fixed `this.getStoredUser is not a function` → Use `this.user.id`
+- ✅ Fixed pagination (default 20) → Added `per_page=1000`
+- ✅ Fixed `can't adapt type 'dict'` → Built explicit clean request body
+- ✅ Fixed `column "is_reviewed" doesn't exist` → Removed invalid field
+- ✅ Converted string ingredients/instructions to arrays
+
+**Testing Verified (Oct 26, 2025):**
+- ✅ Listed 38 recipes successfully
+- ✅ Created recipe ID 2720 (Asian Pear Salad)
+- ✅ Retrieved recipe details for ID 2720
+- ✅ Recipe list updated to 39 recipes
+- ✅ Deleted recipes successfully
+- ✅ Full import → save → verify → delete workflow working!
 
 ---
 
-## 🆕 **V2 EXISTS BUT NOT USED**
+## 🔄 **NEEDS MIGRATION**
 
 These v2 blueprints exist in backend but mobile doesn't use them yet:
 
@@ -121,18 +141,20 @@ These v2 blueprints exist in backend but mobile doesn't use them yet:
 - [x] Household Members: Add, remove, view
 - [x] Meal Plans: Create, save, load, update, delete
 - [x] **Grocery Lists: All operations verified!** ⭐
-  - [x] Create new grocery list
-  - [x] Add items to list
-  - [x] Reorder items (persists correctly! 🎉)
-  - [x] Delete items
-  - [x] Rename items
+  - [x] Create, view, load, update, delete lists
+  - [x] Add, reorder, delete items
   - [x] Check/uncheck items
-  - [x] Save and reload list
-  - [x] Load multiple lists
+  - [x] Save persistence (including reorder!)
+- [x] **Recipes: Core CRUD operations verified!** ⭐
+  - [x] List recipes (pagination working)
+  - [x] Get single recipe
+  - [x] Create recipe
+  - [x] Delete recipe
+  - [x] Import → Save → Verify workflow
 
-### ❓ **Needs Testing:**
+### ⏳ **Ready to Test:**
+- [ ] Update recipe category (PATCH endpoint)
 - [ ] Generate grocery list from meal plan
-- [ ] Recipes: Migrate to v2 and test
 - [ ] Community: Check if v2 is used
 - [ ] Profile: Check if v2 is used
 - [ ] Favorites: Check if v2 is used
@@ -163,14 +185,14 @@ These v2 blueprints exist in backend but mobile doesn't use them yet:
 
 ## 📊 **OVERALL PROGRESS**
 
-**Core Features Migration:** 80% Complete ⬆️
+**Core Features Migration:** 90% Complete ⬆️
 
 | Category | Progress |
 |----------|----------|
 | Social (Friends/Households) | ✅ 100% |
 | Meal Plans | ✅ 100% |
 | Grocery Lists | ✅ 100% ⭐ **COMPLETE!** |
-| Recipes | 🔄 50% (backend done, mobile pending) |
+| Recipes | ✅ 95% ⭐ **WORKING!** (category update untested) |
 | Other Features | ❓ Unknown |
 
 ---
