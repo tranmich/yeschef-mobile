@@ -5,6 +5,50 @@
 
 ---
 
+## 📊 **V2 API ENDPOINT INVENTORY**
+
+### **Total v2 Endpoints Available:** 107 endpoints
+
+**By Blueprint:**
+- 🤝 **Friends** - 7 endpoints
+- 🏠 **Households** - 10 endpoints  
+- 🍽️ **Meal Plans** - 9 endpoints
+- 🛒 **Grocery Lists** - 13 endpoints
+- 📖 **Recipes** - 10 endpoints
+- 🔍 **Recipe Search** - 10 endpoints
+- 👥 **Users** - 7 endpoints
+- 👤 **Profile** - 6 endpoints
+- 🥫 **Pantry** - 10 endpoints
+- ⭐ **Favorites** - 6 endpoints
+- 🌐 **Community** - 10 endpoints
+- 🔧 **System** - 13 endpoints
+
+### **Mobile Migration Status**
+
+| Category | Total Endpoints | Migrated | Tested | % Complete |
+|----------|----------------|----------|--------|------------|
+| **Friends** | 7 | 7 | 7 | ✅ 100% |
+| **Households** | 10 | 10 | 10 | ✅ 100% |
+| **Meal Plans** | 9 | 9 | 9 | ✅ 100% |
+| **Grocery Lists** | 13 | 13 | 13 | ✅ 100% |
+| **Recipes (Core)** | 6 | 6 | 5 | ✅ 95% |
+| **Recipe Search** | 10 | 0 | 0 | ❌ 0% |
+| **Users** | 7 | 0 | 0 | ❓ Unknown |
+| **Profile** | 6 | 0 | 0 | ❓ Unknown |
+| **Pantry** | 10 | 0 | 0 | ❓ Unknown |
+| **Favorites** | 6 | 0 | 0 | ❓ Unknown |
+| **Community** | 10 | 0 | 0 | ❓ Unknown |
+| **System** | 13 | 1 | 1 | ⚠️ Partial |
+| **TOTAL** | **107** | **46** | **45** | **43%** |
+
+**Notes:**
+- "Migrated" = Mobile code updated to use v2 endpoint
+- "Tested" = Verified working in production/development
+- Some endpoints may not be needed by mobile app
+- V1-only features (import/voice) not included in count
+
+---
+
 ## ✅ **COMPLETED & FULLY TESTED**
 
 ### 🤝 **Social Features** (100% - 12 endpoints)
