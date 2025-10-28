@@ -639,22 +639,11 @@ export default function GroceryListScreen({ route, navigation }) {
   
   // Create a new empty list
   const createNewList = () => {
-    Alert.alert(
-      'New List',
-      'Create a new grocery list? Unsaved changes will be lost.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Create New',
-          onPress: () => {
-            setGroceryItems([]);
-            setListTitle('New Grocery List');
-            setCurrentBackendList(null);
-            setLastSaved(null);
-          }
-        }
-      ]
-    );
+    // Directly create new list without confirmation
+    setGroceryItems([]);
+    setListTitle('New Grocery List');
+    setCurrentBackendList(null);
+    setLastSaved(null);
   };
   
   const completedCount = groceryItems.filter(item => item.checked).length;
