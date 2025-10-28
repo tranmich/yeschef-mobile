@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import YesChefAPI from '../services/YesChefAPI';
 import { Icon } from '../components/IconLibrary';
 import FullScreenEditor from '../components/FullScreenEditor';
-import SimpleToast from '../components/SimpleToast';
 
 const RecipeViewScreen = ({ route, navigation }) => {
   const [recipe, setRecipe] = useState(null);
@@ -32,14 +31,32 @@ const RecipeViewScreen = ({ route, navigation }) => {
   });
   const [isSaving, setIsSaving] = useState(false);
   
-  // 🆕 Toast notification
-  const [toastVisible, setToastVisible] = useState(false);
+  // 🆕 Toast notification (inline like GroceryListScreen)
+  const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const toastAnimation = useRef(new Animated.Value(0)).current;
 
-  const showToast = (message) => {
+  const showToastNotification = (message = 'Saved ✓') => {
     setToastMessage(message);
-    setToastVisible(true);
-    setTimeout(() => setToastVisible(false), 2000);
+    setShowToast(true);
+    
+    // Gentle fade in
+    Animated.timing(toastAnimation, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+
+    // Auto dismiss after 2.5 seconds
+    setTimeout(() => {
+      Animated.timing(toastAnimation, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => {
+        setShowToast(false);
+      });
+    }, 2500);
   };
 
   // 🔧 Enhanced OCR text repair (from webapp)
@@ -310,10 +327,10 @@ const RecipeViewScreen = ({ route, navigation }) => {
       
       if (result.success) {
         console.log('✅ Recipe updated successfully');
-        showToast('Saved ✓');
+        showToastNotification('Saved ✓');
       } else {
         console.error('❌ Failed to update recipe:', result.error);
-        showToast('Save failed');
+        showToastNotification('Save failed');
         // Reload recipe to revert changes
         if (recipe.id) {
           await loadRecipe(recipe.id);
@@ -321,7 +338,7 @@ const RecipeViewScreen = ({ route, navigation }) => {
       }
     } catch (error) {
       console.error('❌ Error updating recipe:', error);
-      showToast('Save failed');
+      showToastNotification('Save failed');
       // Reload recipe to revert changes
       if (recipe.id) {
         await loadRecipe(recipe.id);
@@ -566,12 +583,25 @@ const RecipeViewScreen = ({ route, navigation }) => {
         editorType={editorConfig.type}
       />
       
-      {/* Toast Notification */}
-      <SimpleToast
-        visible={toastVisible}
-        message={toastMessage}
-        onHide={() => setToastVisible(false)}
-      />
+      {/* Toast Notification (inline) */}
+      {showToast && (
+        <Animated.View 
+          style={[
+            styles.toast,
+            {
+              opacity: toastAnimation,
+              transform: [{
+                translateY: toastAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [20, 0],
+                }),
+              }],
+            }
+          ]}
+        >
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </Animated.View>
+      )}
       
       {/* Saving Indicator */}
       {isSaving && (
@@ -846,6 +876,31 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  
+  // Toast Notification Styles (from GroceryListScreen)
+  toast: {
+    position: 'absolute',
+    bottom: 100,
+    left: '50%',
+    transform: [{ translateX: -75 }],
+    backgroundColor: '#10b981',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+    minWidth: 150,
+    alignItems: 'center',
+  },
+  toastText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontFamily: 'Nunito-SemiBold',
+    textAlign: 'center',
   },
 });
 
