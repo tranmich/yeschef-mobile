@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,16 +7,40 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Animated,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import YesChefAPI from '../services/YesChefAPI';
 import { Icon } from '../components/IconLibrary';
+import FullScreenEditor from '../components/FullScreenEditor';
+import SimpleToast from '../components/SimpleToast';
 
 const RecipeViewScreen = ({ route, navigation }) => {
   const [recipe, setRecipe] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCookingMode, setIsCookingMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  
+  // 🆕 Editing state
+  const [showEditor, setShowEditor] = useState(false);
+  const [editorConfig, setEditorConfig] = useState({
+    type: 'title',
+    title: 'Edit Title',
+    field: 'title',
+    value: '',
+    multiline: false
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // 🆕 Toast notification
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
+  const showToast = (message) => {
+    setToastMessage(message);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 2000);
+  };
 
   // 🔧 Enhanced OCR text repair (from webapp)
   const repairOCRText = (text) => {
@@ -222,6 +246,91 @@ const RecipeViewScreen = ({ route, navigation }) => {
     }
   };
 
+  // 🆕 Editing Functions
+  const openEditor = (type, field, title, multiline = true) => {
+    const value = recipe[field];
+    
+    setEditorConfig({
+      type,
+      title,
+      field,
+      value: Array.isArray(value) ? value.join('\n') : (value || ''),
+      multiline
+    });
+    setShowEditor(true);
+  };
+
+  const handleEditorSave = async (newValue) => {
+    const { field } = editorConfig;
+    
+    setShowEditor(false);
+    setIsSaving(true);
+    
+    try {
+      // Prepare update payload
+      let updatedFields = {};
+      
+      // Handle special case: recipe info (prep_time, cook_time, servings)
+      if (field === 'info') {
+        const lines = newValue.split('\n');
+        lines.forEach(line => {
+          const trimmedLine = line.trim();
+          if (trimmedLine.toLowerCase().startsWith('prep time:')) {
+            updatedFields.prep_time = trimmedLine.substring(10).trim();
+          } else if (trimmedLine.toLowerCase().startsWith('cook time:')) {
+            updatedFields.cook_time = trimmedLine.substring(10).trim();
+          } else if (trimmedLine.toLowerCase().startsWith('servings:')) {
+            updatedFields.servings = trimmedLine.substring(9).trim();
+          }
+        });
+      }
+      // Handle array fields (ingredients, instructions)
+      else if (field === 'ingredients' || field === 'instructions') {
+        const arrayValue = newValue
+          .split('\n')
+          .filter(line => line.trim())
+          .map(line => line.trim());
+        
+        updatedFields[field] = arrayValue;
+      }
+      // Handle simple string fields
+      else {
+        updatedFields[field] = newValue.trim();
+      }
+      
+      // Update local state immediately for instant feedback
+      setRecipe(prev => ({
+        ...prev,
+        ...updatedFields
+      }));
+      
+      // Save to backend
+      console.log('💾 Saving recipe edits:', updatedFields);
+      const result = await YesChefAPI.updateRecipe(recipe.id, updatedFields);
+      
+      if (result.success) {
+        console.log('✅ Recipe updated successfully');
+        showToast('Saved ✓');
+      } else {
+        console.error('❌ Failed to update recipe:', result.error);
+        showToast('Save failed');
+        // Reload recipe to revert changes
+        if (recipe.id) {
+          await loadRecipe(recipe.id);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error updating recipe:', error);
+      showToast('Save failed');
+      // Reload recipe to revert changes
+      if (recipe.id) {
+        await loadRecipe(recipe.id);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const exitCookingMode = () => {
     setIsCookingMode(false);
     setCurrentStep(0);
@@ -329,24 +438,64 @@ const RecipeViewScreen = ({ route, navigation }) => {
       <ScrollView style={styles.content}>
         {/* Recipe Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>{recipe.title || recipe.name || 'Untitled Recipe'}</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.title}>{recipe.title || recipe.name || 'Untitled Recipe'}</Text>
+            <TouchableOpacity 
+              style={styles.editButton}
+              onPress={() => openEditor('title', 'title', 'Edit Title', false)}
+            >
+              <Icon name="edit" size={16} color="#10b981" />
+            </TouchableOpacity>
+          </View>
+          
           {recipe.description && (
-            <Text style={styles.description}>{recipe.description}</Text>
+            <View style={styles.descriptionContainer}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.descriptionLabel}>Description</Text>
+                <TouchableOpacity 
+                  style={styles.editButton}
+                  onPress={() => openEditor('description', 'description', 'Edit Description', true)}
+                >
+                  <Icon name="edit" size={16} color="#10b981" />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.description}>{recipe.description}</Text>
+            </View>
           )}
           
-          <View style={styles.metadata}>
-            {recipe.prep_time && (
-              <Text style={styles.metadataItem}>⏱️ Prep: {recipe.prep_time}</Text>
-            )}
-            {recipe.cook_time && (
-              <Text style={styles.metadataItem}>🔥 Cook: {recipe.cook_time}</Text>
-            )}
-            {recipe.servings && (
-              <Text style={styles.metadataItem}>👥 Serves: {recipe.servings}</Text>
-            )}
-            {recipe.difficulty && (
-              <Text style={styles.metadataItem}>📊 {recipe.difficulty}</Text>
-            )}
+          <View style={styles.metadataContainer}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.metadata}>
+                {recipe.prep_time && (
+                  <Text style={styles.metadataItem}>⏱️ Prep: {recipe.prep_time}</Text>
+                )}
+                {recipe.cook_time && (
+                  <Text style={styles.metadataItem}>🔥 Cook: {recipe.cook_time}</Text>
+                )}
+                {recipe.servings && (
+                  <Text style={styles.metadataItem}>👥 Serves: {recipe.servings}</Text>
+                )}
+                {recipe.difficulty && (
+                  <Text style={styles.metadataItem}>📊 {recipe.difficulty}</Text>
+                )}
+              </View>
+              <TouchableOpacity 
+                style={styles.editButton}
+                onPress={() => {
+                  const infoText = `Prep Time: ${recipe.prep_time || ''}\nCook Time: ${recipe.cook_time || ''}\nServings: ${recipe.servings || ''}`;
+                  setEditorConfig({
+                    type: 'info',
+                    title: 'Edit Recipe Info',
+                    field: 'info',
+                    value: infoText,
+                    multiline: true
+                  });
+                  setShowEditor(true);
+                }}
+              >
+                <Icon name="edit" size={16} color="#10b981" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {recipe.confidence_score && (
@@ -358,7 +507,15 @@ const RecipeViewScreen = ({ route, navigation }) => {
 
         {/* Ingredients */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🛒 Ingredients ({ingredients.length})</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>🛒 Ingredients ({ingredients.length})</Text>
+            <TouchableOpacity 
+              style={styles.editButton}
+              onPress={() => openEditor('ingredients', 'ingredients', 'Edit Ingredients', true)}
+            >
+              <Icon name="edit" size={16} color="#10b981" />
+            </TouchableOpacity>
+          </View>
           {ingredients.map((ingredient, index) => (
             <Text key={index} style={styles.ingredient}>
               {ingredient.startsWith('•') ? ingredient : `• ${ingredient}`}
@@ -368,7 +525,15 @@ const RecipeViewScreen = ({ route, navigation }) => {
 
         {/* Instructions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>👨‍🍳 Instructions ({instructions.length} steps)</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>👨‍🍳 Instructions ({instructions.length} steps)</Text>
+            <TouchableOpacity 
+              style={styles.editButton}
+              onPress={() => openEditor('instructions', 'instructions', 'Edit Instructions', true)}
+            >
+              <Icon name="edit" size={16} color="#10b981" />
+            </TouchableOpacity>
+          </View>
           {instructions.map((instruction, index) => (
             <View key={index} style={styles.instructionStep}>
               <Text style={styles.stepNumber}>{index + 1}</Text>
@@ -389,6 +554,31 @@ const RecipeViewScreen = ({ route, navigation }) => {
       <TouchableOpacity style={styles.cookingButton} onPress={startCookingMode}>
         <Text style={styles.cookingButtonText}>🔥 Start Cooking Mode</Text>
       </TouchableOpacity>
+      
+      {/* Full-Screen Editor Modal */}
+      <FullScreenEditor
+        isVisible={showEditor}
+        onClose={() => setShowEditor(false)}
+        onSave={handleEditorSave}
+        title={editorConfig.title}
+        initialValue={editorConfig.value}
+        multiline={editorConfig.multiline}
+        editorType={editorConfig.type}
+      />
+      
+      {/* Toast Notification */}
+      <SimpleToast
+        visible={toastVisible}
+        message={toastMessage}
+        onHide={() => setToastVisible(false)}
+      />
+      
+      {/* Saving Indicator */}
+      {isSaving && (
+        <View style={styles.savingOverlay}>
+          <ActivityIndicator size="small" color="#10b981" />
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -618,6 +808,44 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Nunito-Bold',
     color: '#ffffff',
+  },
+  
+  // 🆕 Editing Styles
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  editButton: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+  },
+  descriptionContainer: {
+    marginTop: 12,
+  },
+  descriptionLabel: {
+    fontSize: 14,
+    fontFamily: 'Nunito-SemiBold',
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  metadataContainer: {
+    marginTop: 8,
+  },
+  savingOverlay: {
+    position: 'absolute',
+    top: 60,
+    right: 16,
+    backgroundColor: 'white',
+    padding: 8,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
 });
 
