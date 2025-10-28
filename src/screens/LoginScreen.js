@@ -80,9 +80,8 @@ export default function LoginScreen({ onLoginSuccess }) {
             YesChefAPI.storeAuthData({ access_token: token, user });
             
             setIsGoogleLoading(false);
-            Alert.alert('Welcome!', 'Signed in with Google successfully!', [
-              { text: 'OK', onPress: () => onLoginSuccess(user) }
-            ]);
+            // Directly call onLoginSuccess without alert
+            onLoginSuccess(user);
           } catch (error) {
             console.error('❌ Error parsing deep link data:', error);
             setIsGoogleLoading(false);
@@ -185,21 +184,13 @@ export default function LoginScreen({ onLoginSuccess }) {
       const response = await YesChefAPI.register(name, email.trim(), password);
       
       if (response.success) {
-        Alert.alert(
-          'Account Created!', 
-          'Your account has been created successfully. You are now logged in!',
-          [{ 
-            text: 'OK', 
-            onPress: () => {
-              setShowSignUpModal(false);
-              setSignUpData({ email: '', password: '', confirmPassword: '' });
-              // Reset password visibility states
-              setShowSignUpPassword(false);
-              setShowSignUpConfirmPassword(false);
-              onLoginSuccess(response.user);
-            }
-          }]
-        );
+        setShowSignUpModal(false);
+        setSignUpData({ email: '', password: '', confirmPassword: '' });
+        // Reset password visibility states
+        setShowSignUpPassword(false);
+        setShowSignUpConfirmPassword(false);
+        // Directly call onLoginSuccess without alert
+        onLoginSuccess(response.user);
       } else {
         Alert.alert('Sign Up Failed', response.error || 'Failed to create account');
       }
@@ -250,9 +241,8 @@ export default function LoginScreen({ onLoginSuccess }) {
           }
         }
         
-        Alert.alert('Success!', 'Logged in successfully!', [
-          { text: 'OK', onPress: () => onLoginSuccess(result.user) }
-        ]);
+        // Directly call onLoginSuccess without alert
+        onLoginSuccess(result.user);
       } else {
         Alert.alert('Login Failed', result.error || 'Invalid credentials');
       }
