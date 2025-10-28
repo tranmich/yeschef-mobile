@@ -1695,6 +1695,12 @@ class YesChefAPI {
     }
 
     try {
+      // 🔧 Add user_id to updates (required by backend for authorization)
+      const updatePayload = {
+        user_id: this.user?.id,
+        ...updates
+      };
+
       // v2: Use PATCH to /api/v2/recipes/:id
       const response = await this.debugFetch(`/api/v2/recipes/${recipeId}`, {
         method: 'PATCH',
@@ -1702,7 +1708,7 @@ class YesChefAPI {
           ...this.getAuthHeaders(),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(updates),
+        body: JSON.stringify(updatePayload),
       });
 
       const data = await response.json();
