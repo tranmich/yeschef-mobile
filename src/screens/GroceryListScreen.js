@@ -589,8 +589,8 @@ export default function GroceryListScreen({ route, navigation }) {
     }
 
     Alert.alert(
-      'Delete List?',
       `Delete "${currentBackendList.name || 'this list'}"?`,
+      '', // Empty message since title has the question
       [
         {
           text: 'No',
