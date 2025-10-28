@@ -1685,6 +1685,51 @@ class YesChefAPI {
       };
     }
   }
+
+  // 🆕 Update existing recipe (PATCH)
+  async updateRecipe(recipeId, updates) {
+    this.log('Updating recipe (v2):', recipeId, updates);
+    
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Authentication required - please login' };
+    }
+
+    try {
+      // v2: Use PATCH to /api/v2/recipes/:id
+      const response = await this.debugFetch(`/api/v2/recipes/${recipeId}`, {
+        method: 'PATCH',
+        headers: {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+
+      const data = await response.json();
+      this.log('Update recipe response (v2):', data);
+      
+      if (response.ok && data.success) {
+        this.log('✅ Recipe updated successfully (v2)!', {
+          recipe_id: recipeId,
+          updated_fields: Object.keys(updates)
+        });
+        return { 
+          success: true, 
+          recipe: data.data || data.recipe
+        };
+      } else {
+        this.error('Update recipe failed (v2):', data);
+        return { success: false, error: data.error || 'Failed to update recipe' };
+      }
+    } catch (error) {
+      this.error('Update recipe error:', error);
+      return { 
+        success: false, 
+        error: 'Network error - check backend connection',
+        details: error.message 
+      };
+    }
+  }
 }
 
 // Export singleton instance
