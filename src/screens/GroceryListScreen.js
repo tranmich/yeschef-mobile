@@ -179,6 +179,24 @@ export default function GroceryListScreen({ route, navigation }) {
         setGroceryItems(global.tempGeneratedGroceryList.items);
         setListTitle(global.tempGeneratedGroceryList.title);
         
+        // 🔧 FIX: Set the backend list reference so auto-save updates instead of creating new
+        if (global.tempGeneratedGroceryList.backendList) {
+          console.log('✅ Setting backend list reference from generated list:', global.tempGeneratedGroceryList.backendList.id);
+          setCurrentBackendList(global.tempGeneratedGroceryList.backendList);
+        } else {
+          // 🔄 If no backend list provided, try to find it by refreshing available lists
+          console.log('⚠️ No backend list in generated data, will refresh lists to find it');
+          YesChefAPI.getGroceryLists().then(result => {
+            if (result.success && result.lists.length > 0) {
+              // Find the most recent list (likely the one just generated)
+              const mostRecent = result.lists[0];
+              console.log('✅ Found most recent list, setting as current:', mostRecent.id, mostRecent.name);
+              setCurrentBackendList(mostRecent);
+              setAvailableLists(result.lists);
+            }
+          });
+        }
+        
         // Store item count before clearing
         const itemCount = global.tempGeneratedGroceryList.items.length;
         
