@@ -590,7 +590,7 @@ export default function GroceryListScreen({ route, navigation }) {
 
     Alert.alert(
       `Delete "${currentBackendList.name || 'this list'}"?`,
-      '', // Empty message since title has the question
+      undefined, // No message parameter to minimize spacing
       [
         {
           text: 'No',
