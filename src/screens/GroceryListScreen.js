@@ -551,10 +551,8 @@ export default function GroceryListScreen({ route, navigation }) {
       const result = await YesChefAPI.inviteToCollaborate(inviteData);
       
       if (result.success) {
-        Alert.alert(
-          'Invitation Sent!', 
-          `Successfully invited ${household.name} household (${household.members || 0} members) to collaborate on "${listTitle}". They will now be able to see and edit this grocery list!`
-        );
+        // Show mint toast instead of alert
+        showToastNotification(`Invited ${household.name} ✓`);
         console.log('🎯 GROCERY INVITE SUCCESS:', result.data);
       } else {
         Alert.alert(
@@ -586,22 +584,21 @@ export default function GroceryListScreen({ route, navigation }) {
   // Delete current grocery list with confirmation
   const deleteCurrentList = async () => {
     if (!currentBackendList || !currentBackendList.id) {
-      Alert.alert('Cannot Delete', 'No saved list to delete. This appears to be a new unsaved list.');
+      showToastNotification('No saved list to delete');
       return;
     }
 
     Alert.alert(
-      'Delete Grocery List',
-      `Are you sure you want to permanently delete "${currentBackendList.name || 'this list'}"?\n\nThis action cannot be undone.`,
+      'Delete List?',
+      `Delete "${currentBackendList.name || 'this list'}"?`,
       [
         {
-          text: 'Cancel',
+          text: 'No',
           style: 'cancel',
           onPress: () => console.log('🚫 Delete cancelled by user')
         },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: 'Yes',
           onPress: async () => {
             try {
               console.log(`🗑️ DELETING list: ${currentBackendList.name} (ID: ${currentBackendList.id})`);
@@ -622,7 +619,8 @@ export default function GroceryListScreen({ route, navigation }) {
                 // Refresh available lists
                 await initializeGroceryList();
                 
-                Alert.alert('Success', 'Grocery list deleted successfully.');
+                // Show mint toast instead of alert
+                showToastNotification('List deleted ✓');
               } else {
                 console.error('❌ Failed to delete list:', result.error);
                 Alert.alert('Error', `Failed to delete list: ${result.error}`);
