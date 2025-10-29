@@ -348,29 +348,6 @@ export default function LoginScreen({ onLoginSuccess }) {
               )}
             </TouchableOpacity>
 
-            {/* OR Divider */}
-            <View style={styles.dividerContainer}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>OR</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* Google Sign-In Button */}
-            <TouchableOpacity
-              style={[styles.googleButton, isGoogleLoading && styles.googleButtonDisabled]}
-              onPress={handleGoogleSignIn}
-              disabled={isGoogleLoading}
-            >
-              {isGoogleLoading ? (
-                <ActivityIndicator size="small" color="#757575" />
-              ) : (
-                <>
-                  <Text style={styles.googleIcon}>🔐</Text>
-                  <Text style={styles.googleButtonText}>Continue with Google</Text>
-                </>
-              )}
-            </TouchableOpacity>
-
             {/* Sign Up Link */}
             <View style={styles.signUpContainer}>
               <Text style={styles.signUpPrompt}>Don't have an account? </Text>
