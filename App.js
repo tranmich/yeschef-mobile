@@ -31,8 +31,6 @@ import TranscriptApprovalScreen from './src/screens/TranscriptApprovalScreen';
 import AddRecipeScreen from './src/screens/AddRecipeScreen';
 // 📷 OCR/Camera Scanning (Phase 3 - Oct 7, 2025)
 import CameraRecipeScanner from './src/screens/CameraRecipeScanner';
-// 🚀 V2 API Test Screen (Phase 6 - Oct 20, 2025)
-import V2ApiTestScreen from './src/screens/V2ApiTestScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -459,20 +457,6 @@ export default function App() {
           }}
         />
         
-        {/* 🚀 V2 API Test - Phase 6 (Oct 20, 2025) */}
-        <Tab.Screen 
-          name="V2ApiTest" 
-          component={V2ApiTestScreen}
-          options={{
-            title: 'V2 Test',
-            headerShown: false,
-            tabBarIcon: ({ color, size, focused }) => (
-              <Text style={{ fontSize: size, color }}>🚀</Text>
-            ),
-          }}
-        />
-        
-        {/* Debug tab removed for cleaner navigation */}
       </Tab.Navigator>
     </NavigationContainer>
     </GestureHandlerRootView>
