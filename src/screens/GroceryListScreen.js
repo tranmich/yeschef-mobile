@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { Icon, IconButton } from '../components/IconLibrary';
 import { ThemedText, typography } from '../components/Typography';
-// � BACK TO SMOOTH: LightweightDragSystem with driver conflict FIXED
+// ï¿½ BACK TO SMOOTH: LightweightDragSystem with driver conflict FIXED
 import { SimpleDraggableList } from '../components/LightweightDragSystem';
 // REGRESSION: import { SimpleDraggableList } from '../components/UltraSmoothDragSystem'; // (Lost smooth swapping)
 // FALLBACK: import { SimpleDraggableList } from '../components/DragSystem';
@@ -26,11 +26,11 @@ import YesChefAPI from '../services/YesChefAPI';
 import FriendsAPI from '../services/FriendsAPI';
 import OfflineSyncManager from '../services/OfflineSyncManager';
 import MobileGroceryAdapter from '../services/MobileGroceryAdapter';
-// 🔄 MEAL PLAN INTEGRATION - For generate feature
+// ðŸ”„ MEAL PLAN INTEGRATION - For generate feature
 import MealPlanAPI from '../services/MealPlanAPI';
 
 export default function GroceryListScreen({ route, navigation }) {
-  // 🎨 Background Configuration (matches other screens)
+  // ðŸŽ¨ Background Configuration (matches other screens)
   const SELECTED_BACKGROUND = require('../../assets/images/backgrounds/mintbackground.jpg');
   
   const [groceryItems, setGroceryItems] = useState([]);
@@ -74,25 +74,30 @@ export default function GroceryListScreen({ route, navigation }) {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   
-  // � FIX: Use ref to always get latest state (avoid stale closures)
+  // ï¿½ FIX: Use ref to always get latest state (avoid stale closures)
   const groceryItemsRef = useRef(groceryItems);
   useEffect(() => {
     groceryItemsRef.current = groceryItems;
   }, [groceryItems]);
   
-  // �🔍 DEBUG: Track when groceryItems changes
+  // ï¿½ðŸ” DEBUG: Track when groceryItems changes
   useEffect(() => {
-    console.log(`🔍 GROCERY ITEMS STATE CHANGED: ${groceryItems.length} items at ${new Date().toLocaleTimeString()}`);
-    console.log(`📊 Items:`, groceryItems.map(i => i.name).join(', '));
+    console.log(`ðŸ” GROCERY ITEMS STATE CHANGED: ${groceryItems.length} items at ${new Date().toLocaleTimeString()}`);
+    console.log(`ðŸ“Š Items:`, groceryItems.map(i => i.name).join(', '));
   }, [groceryItems]);
   
   // Toast notification state
   const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('Saved ✓');
+  const [toastMessage, setToastMessage] = useState('Saved âœ“');
   const toastAnimation = useRef(new Animated.Value(0)).current;
 
+  // ðŸ†• Bulk import state
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+  const [bulkImportText, setBulkImportText] = useState('');
+  const [bulkImportPreview, setBulkImportPreview] = useState([]);
+
   // Show toast notification
-  const showToastNotification = (message = 'Saved ✓') => {
+  const showToastNotification = (message = 'Saved âœ“') => {
     setToastMessage(message);
     setShowToast(true);
     
@@ -115,20 +120,108 @@ export default function GroceryListScreen({ route, navigation }) {
     }, 2500);
   };
 
+  // ðŸ†• Smart grocery list parser
+  const parseGroceryList = (text) => {
+    if (!text || !text.trim()) return [];
+    
+    // Remove common headers
+    text = text.replace(/^(shopping list|grocery list|to buy):?\s*/i, '');
+    
+    // Split by lines
+    let items = text.split('\n');
+    
+    // If only one line, try comma split
+    if (items.length === 1 && text.includes(',')) {
+      items = text.split(',');
+    }
+    
+    // Clean each item
+    items = items
+      .map(item => {
+        // Remove common prefixes
+        item = item
+          .replace(/^[-â€¢*âž¤â–ºâ–ªï¸Žâ–«ï¸Ž]\s*/, '')     // Bullets
+          .replace(/^\d+[\.)]\s*/, '')         // Numbers: 1. 2) 3.
+          .replace(/^[\[\]âœ“âœ—â˜â˜‘]\s*/, '')      // Checkboxes
+          .replace(/^\s*[-=]{2,}\s*$/, '')     // Separators
+          .trim();
+        
+        // Remove quantity in parentheses at start
+        // Example: "(2) Apples" -> "Apples"
+        item = item.replace(/^\(\d+\)\s*/, '');
+        
+        return item;
+      })
+      .filter(item => {
+        // Filter empty lines and separators
+        return item.length > 0 && 
+               !item.match(/^[-=_]{2,}$/) &&
+               item.length < 200; // Sanity check
+      });
+    
+    return items;
+  };
+
+  // ðŸ†• Handle bulk import
+  const handleBulkImport = () => {
+    console.log(`ðŸ“‹ Bulk importing ${bulkImportPreview.length} items`);
+    
+    bulkImportPreview.forEach(itemText => {
+      const newItemObj = {
+        id: Date.now() + Math.random(),
+        name: itemText,
+        checked: false,
+      };
+      setGroceryItems(prev => [...prev, newItemObj]);
+    });
+    
+    // Close modal and clear state
+    setShowBulkImportModal(false);
+    setBulkImportText('');
+    setBulkImportPreview([]);
+    
+    // Show success toast
+    showToastNotification(`Added ${bulkImportPreview.length} items âœ“`);
+    
+    // Trigger auto-save
+    setTimeout(() => autoSave(), 500);
+  };
+
+  // ðŸ†• Handle input change with multi-line paste detection
+  const handleNewItemChange = (text) => {
+    // Check if text contains line breaks (multi-line paste)
+    if (text.includes('\n')) {
+      const items = parseGroceryList(text);
+      
+      if (items.length > 1) {
+        console.log(`ðŸ“‹ Multi-line paste detected: ${items.length} items`);
+        // Show preview in modal instead of adding directly
+        setBulkImportText(text);
+        setBulkImportPreview(items);
+        setShowBulkImportModal(true);
+        setNewItem(''); // Clear input
+        return;
+      }
+    }
+    
+    // Normal single-line input
+    setNewItem(text);
+  };
+
   // Initialize grocery list
   useEffect(() => {
     // Check for generated grocery list first
     if (global.tempGeneratedGroceryList) {
-      console.log('📋 Loading generated list on focus:', global.tempGeneratedGroceryList.items.length, 'items');
+      console.log('ðŸ“‹ Loading generated list on focus:', global.tempGeneratedGroceryList.items.length, 'items');
       
-      // 🔧 FIX: Ensure all items have unique IDs!
+      // ðŸ”§ FIX: Ensure all items have unique IDs!
       const itemsWithIds = global.tempGeneratedGroceryList.items.map((item, index) => ({
         ...item,
         id: item.id || `generated-${Date.now()}-${index}`, // Generate unique ID if missing
         checked: item.checked || false
       }));
       
-      console.log('✅ Added IDs to generated items');
+      console.log('âœ… Added IDs to generated items');
       
       // Load the generated items
       setGroceryItems(itemsWithIds);
@@ -152,7 +245,7 @@ export default function GroceryListScreen({ route, navigation }) {
       
     } else if (route?.params?.generatedItems) {
       // Handle navigation parameters (fallback)
-      console.log('📋 Loading grocery list via navigation params');
+      console.log('ðŸ“‹ Loading grocery list via navigation params');
       
       setGroceryItems(route.params.generatedItems);
       if (route.params.listTitle) {
@@ -173,24 +266,24 @@ export default function GroceryListScreen({ route, navigation }) {
       StatusBar.setBarStyle('dark-content', true);
       
       if (global.tempGeneratedGroceryList) {
-        console.log('📋 Loading generated list on focus:', global.tempGeneratedGroceryList.items.length, 'items');
+        console.log('ðŸ“‹ Loading generated list on focus:', global.tempGeneratedGroceryList.items.length, 'items');
         
         // Load the generated items
         setGroceryItems(global.tempGeneratedGroceryList.items);
         setListTitle(global.tempGeneratedGroceryList.title);
         
-        // 🔧 FIX: Set the backend list reference so auto-save updates instead of creating new
+        // ðŸ”§ FIX: Set the backend list reference so auto-save updates instead of creating new
         if (global.tempGeneratedGroceryList.backendList) {
-          console.log('✅ Setting backend list reference from generated list:', global.tempGeneratedGroceryList.backendList.id);
+          console.log('âœ… Setting backend list reference from generated list:', global.tempGeneratedGroceryList.backendList.id);
           setCurrentBackendList(global.tempGeneratedGroceryList.backendList);
         } else {
-          // 🔄 If no backend list provided, try to find it by refreshing available lists
-          console.log('⚠️ No backend list in generated data, will refresh lists to find it');
+          // ðŸ”„ If no backend list provided, try to find it by refreshing available lists
+          console.log('âš ï¸ No backend list in generated data, will refresh lists to find it');
           YesChefAPI.getGroceryLists().then(result => {
             if (result.success && result.lists.length > 0) {
               // Find the most recent list (likely the one just generated)
               const mostRecent = result.lists[0];
-              console.log('✅ Found most recent list, setting as current:', mostRecent.id, mostRecent.name);
+              console.log('âœ… Found most recent list, setting as current:', mostRecent.id, mostRecent.name);
               setCurrentBackendList(mostRecent);
               setAvailableLists(result.lists);
             }
@@ -217,13 +310,13 @@ export default function GroceryListScreen({ route, navigation }) {
     const initializeGroceryList = async () => {
     try {
       setIsLoading(true);
-      console.log('🔄 Loading grocery lists from backend...');
+      console.log('ðŸ”„ Loading grocery lists from backend...');
       
       // Load available grocery lists from backend
       const listsResult = await YesChefAPI.getGroceryLists();
       
       if (listsResult.success && listsResult.lists.length > 0) {
-        console.log(`📋 Found ${listsResult.lists.length} grocery lists`);
+        console.log(`ðŸ“‹ Found ${listsResult.lists.length} grocery lists`);
         setAvailableLists(listsResult.lists);
         
         // Load the most recent list
@@ -231,7 +324,7 @@ export default function GroceryListScreen({ route, navigation }) {
         await loadGroceryListById(mostRecentList.id);
         
       } else {
-        console.log('📋 No grocery lists found, starting with empty list');
+        console.log('ðŸ“‹ No grocery lists found, starting with empty list');
         setGroceryItems([]);
         setListTitle('My Grocery List');
         setCurrentBackendList(null);
@@ -239,7 +332,7 @@ export default function GroceryListScreen({ route, navigation }) {
       }
       
     } catch (error) {
-      console.error('❌ Failed to initialize grocery list:', error);
+      console.error('âŒ Failed to initialize grocery list:', error);
       // Fallback to empty list
       setGroceryItems([]);
       setListTitle('My Grocery List');
@@ -250,37 +343,37 @@ export default function GroceryListScreen({ route, navigation }) {
 
   const loadGroceryListById = async (listId) => {
     try {
-      console.log(`\n🔄 LOAD LIST DEBUG - ${new Date().toLocaleTimeString()}`);
-      console.log(`📋 TRIGGER: Loading grocery list details for ID: ${listId}`);
-      console.log(`📱 CURRENT STATE: ${groceryItems.length} items locally`);
-      console.log(`📊 CURRENT ITEMS:`, groceryItems.map(item => item.name));
+      console.log(`\nðŸ”„ LOAD LIST DEBUG - ${new Date().toLocaleTimeString()}`);
+      console.log(`ðŸ“‹ TRIGGER: Loading grocery list details for ID: ${listId}`);
+      console.log(`ðŸ“± CURRENT STATE: ${groceryItems.length} items locally`);
+      console.log(`ðŸ“Š CURRENT ITEMS:`, groceryItems.map(item => item.name));
       
       const listResult = await YesChefAPI.getGroceryListDetails(listId);
       
       if (listResult.success) {
         const backendList = listResult.list;
-        console.log('📋 Backend list loaded (v2):', backendList.name);
-        console.log('📋 Backend list data:', JSON.stringify(backendList).substring(0, 200));
+        console.log('ðŸ“‹ Backend list loaded (v2):', backendList.name);
+        console.log('ðŸ“‹ Backend list data:', JSON.stringify(backendList).substring(0, 200));
         
         // Convert backend data to mobile format (now async with spaCy)
         const mobileItems = await MobileGroceryAdapter.backendToMobile(backendList);
-        console.log(`✅ Converted to ${mobileItems.length} mobile items`);
+        console.log(`âœ… Converted to ${mobileItems.length} mobile items`);
         
         setGroceryItems(mobileItems);
-        console.log(`🔄 LOAD LIST DEBUG END - LIST REPLACED\n`);
+        console.log(`ðŸ”„ LOAD LIST DEBUG END - LIST REPLACED\n`);
         setListTitle(backendList.name || 'Grocery List'); // v2 uses 'name' not 'list_name'
         setCurrentBackendList(backendList);
         
         // Get conversion summary for user info
         const summary = await MobileGroceryAdapter.getConversionSummary(mobileItems, backendList);
-        console.log('📊 Conversion summary:', summary);
+        console.log('ðŸ“Š Conversion summary:', summary);
         
       } else {
-        console.error('❌ Failed to load grocery list details:', listResult.error);
+        console.error('âŒ Failed to load grocery list details:', listResult.error);
       }
       
     } catch (error) {
-      console.error('❌ Error loading grocery list:', error);
+      console.error('âŒ Error loading grocery list:', error);
     }
   };
 
@@ -301,19 +394,19 @@ export default function GroceryListScreen({ route, navigation }) {
 
   // Simple toggle function
   const toggleItem = (id) => {
-    console.log('🔘 Toggle item ID:', id);
-    console.log('📋 Current items:', groceryItems.map(i => ({ id: i.id, name: i.name, checked: i.checked })));
+    console.log('ðŸ”˜ Toggle item ID:', id);
+    console.log('ðŸ“‹ Current items:', groceryItems.map(i => ({ id: i.id, name: i.name, checked: i.checked })));
     
     setGroceryItems(prev => {
       const updated = prev.map(item => {
         const shouldToggle = item.id === id;
         if (shouldToggle) {
-          console.log('✅ Toggling item:', item.id, item.name, 'from', item.checked, 'to', !item.checked);
+          console.log('âœ… Toggling item:', item.id, item.name, 'from', item.checked, 'to', !item.checked);
         }
         return shouldToggle ? { ...item, checked: !item.checked } : item;
       });
       
-      console.log('📊 Updated items:', updated.map(i => ({ id: i.id, name: i.name, checked: i.checked })));
+      console.log('ðŸ“Š Updated items:', updated.map(i => ({ id: i.id, name: i.name, checked: i.checked })));
       return updated;
     });
     
@@ -322,7 +415,7 @@ export default function GroceryListScreen({ route, navigation }) {
 
   // Simple delete function without confirmation dialog
   const deleteItem = (id) => {
-    console.log('🗑️ Deleting item:', id);
+    console.log('ðŸ—‘ï¸ Deleting item:', id);
     
     // Find the item being deleted to preserve its position context
     const deletedIndex = groceryItems.findIndex(item => item.id === id);
@@ -356,38 +449,38 @@ export default function GroceryListScreen({ route, navigation }) {
 
   // Handle drag and drop reordering
   const handleReorder = (newItems) => {
-    console.log(`\n🏪 GROCERY SCREEN REORDER DEBUG - ${new Date().toLocaleTimeString()}`);
-    console.log(`📱 BEFORE: groceryItems has ${groceryItems.length} items`);
-    console.log(`📱 RECEIVED: newItems has ${newItems.length} items`);
-    console.log(`📊 RECEIVED ITEMS:`, newItems.map((item, idx) => `${idx}: "${item.name}" (id: ${item.id})`));
+    console.log(`\nðŸª GROCERY SCREEN REORDER DEBUG - ${new Date().toLocaleTimeString()}`);
+    console.log(`ðŸ“± BEFORE: groceryItems has ${groceryItems.length} items`);
+    console.log(`ðŸ“± RECEIVED: newItems has ${newItems.length} items`);
+    console.log(`ðŸ“Š RECEIVED ITEMS:`, newItems.map((item, idx) => `${idx}: "${item.name}" (id: ${item.id})`));
     
     setGroceryItems(newItems);
-    console.log(`✅ GROCERY ITEMS UPDATED`);
+    console.log(`âœ… GROCERY ITEMS UPDATED`);
     
-    // ✅ NOW SAFE: Auto-save after reordering (ref fix prevents stale closures)
-    console.log(`✅ TRIGGERING AUTO-SAVE after reorder (debounced 3s)`);
+    // âœ… NOW SAFE: Auto-save after reordering (ref fix prevents stale closures)
+    console.log(`âœ… TRIGGERING AUTO-SAVE after reorder (debounced 3s)`);
     autoSave();
-    console.log(`🏪 GROCERY SCREEN REORDER DEBUG END\n`);
+    console.log(`ðŸª GROCERY SCREEN REORDER DEBUG END\n`);
   };
 
   // Save current mobile list back to backend
   const saveToBackend = async () => {
     if (isSaving) {
-      console.log('🚫 SAVE SKIPPED: Already saving in progress');
+      console.log('ðŸš« SAVE SKIPPED: Already saving in progress');
       return;
     }
     
     try {
       setIsSaving(true);
       
-      // 🔧 FIX: Use ref to get latest state (avoid stale closure)
+      // ðŸ”§ FIX: Use ref to get latest state (avoid stale closure)
       const currentItems = groceryItemsRef.current;
       
-      console.log(`\n💾 SAVE DEBUG START - ${new Date().toLocaleTimeString()}`);
-      console.log(`📱 SAVING: ${currentItems.length} items (from ref)`);
-      console.log(`📊 ITEMS TO SAVE:`, currentItems.map(i => i.name).join(', '));
-      console.log(`📋 CURRENT BACKEND LIST:`, currentBackendList ? `ID: ${currentBackendList.id}, Name: "${currentBackendList.name}"` : 'None');
-      console.log(`📝 LIST TITLE: "${listTitle}"`);
+      console.log(`\nðŸ’¾ SAVE DEBUG START - ${new Date().toLocaleTimeString()}`);
+      console.log(`ðŸ“± SAVING: ${currentItems.length} items (from ref)`);
+      console.log(`ðŸ“Š ITEMS TO SAVE:`, currentItems.map(i => i.name).join(', '));
+      console.log(`ðŸ“‹ CURRENT BACKEND LIST:`, currentBackendList ? `ID: ${currentBackendList.id}, Name: "${currentBackendList.name}"` : 'None');
+      console.log(`ðŸ“ LIST TITLE: "${listTitle}"`);
       
       // Convert mobile data back to backend format
       const backendData = MobileGroceryAdapter.mobileToBackend(
@@ -396,66 +489,66 @@ export default function GroceryListScreen({ route, navigation }) {
         listTitle
       );
       
-      console.log(`🔄 BACKEND DATA PREPARED:`, backendData);
+      console.log(`ðŸ”„ BACKEND DATA PREPARED:`, backendData);
       
       let result;
       if (currentBackendList && currentBackendList.id) {
         // Update existing list
-        console.log(`🔄 UPDATING existing list ID: ${currentBackendList.id}`);
+        console.log(`ðŸ”„ UPDATING existing list ID: ${currentBackendList.id}`);
         result = await YesChefAPI.updateGroceryList(currentBackendList.id, backendData);
       } else {
         // This should rarely happen - prefer updating over creating
-        console.log(`⚠️ WARNING: No current backend list found!`);
-        console.log(`📋 Current backend list:`, currentBackendList);
+        console.log(`âš ï¸ WARNING: No current backend list found!`);
+        console.log(`ðŸ“‹ Current backend list:`, currentBackendList);
         
         // Try to find an existing list with the same name instead of creating new
         const existingList = availableLists.find(list => list.name === listTitle);
         if (existingList) {
-          console.log(`🔄 FOUND existing list with same name, updating ID: ${existingList.id}`);
+          console.log(`ðŸ”„ FOUND existing list with same name, updating ID: ${existingList.id}`);
           setCurrentBackendList(existingList);
           result = await YesChefAPI.updateGroceryList(existingList.id, backendData);
         } else {
-          console.log(`➕ CREATING new list as last resort`);
+          console.log(`âž• CREATING new list as last resort`);
           result = await YesChefAPI.saveGroceryList(backendData);
         }
       }
       
       if (result.success) {
-        console.log(`✅ SAVE SUCCESS: List saved successfully`);
-        console.log(`📋 RESULT:`, result);
+        console.log(`âœ… SAVE SUCCESS: List saved successfully`);
+        console.log(`ðŸ“‹ RESULT:`, result);
         setLastSaved(new Date());
         
         // Show toast notification
-        showToastNotification('Saved ✓');
+        showToastNotification('Saved âœ“');
         
         // If it was a new list, update our current backend reference
         if (!currentBackendList && result.list) {
-          console.log(`📋 SETTING current backend list to new list:`, result.list);
+          console.log(`ðŸ“‹ SETTING current backend list to new list:`, result.list);
           setCurrentBackendList(result.list);
         }
         
         // CRITICAL: Refresh available lists to show updated names
-        console.log(`🔄 REFRESHING available lists to show updated names`);
+        console.log(`ðŸ”„ REFRESHING available lists to show updated names`);
         try {
           const listsResult = await YesChefAPI.getGroceryLists();
           if (listsResult.success) {
             setAvailableLists(listsResult.lists);
-            console.log(`✅ Available lists refreshed: ${listsResult.lists.length} lists`);
+            console.log(`âœ… Available lists refreshed: ${listsResult.lists.length} lists`);
           }
         } catch (refreshError) {
-          console.log(`⚠️ Could not refresh available lists:`, refreshError);
+          console.log(`âš ï¸ Could not refresh available lists:`, refreshError);
         }
         
-        console.log(`💾 SAVE DEBUG END - SUCCESS\n`);
+        console.log(`ðŸ’¾ SAVE DEBUG END - SUCCESS\n`);
         return { success: true };
       } else {
-        console.error(`❌ SAVE FAILED:`, result.error);
-        console.log(`💾 SAVE DEBUG END - FAILED\n`);
+        console.error(`âŒ SAVE FAILED:`, result.error);
+        console.log(`ðŸ’¾ SAVE DEBUG END - FAILED\n`);
         return { success: false, error: result.error };
       }
       
     } catch (error) {
-      console.error('❌ Error saving grocery list:', error);
+      console.error('âŒ Error saving grocery list:', error);
       return { success: false, error: error.message };
     } finally {
       setIsSaving(false);
@@ -530,9 +623,9 @@ export default function GroceryListScreen({ route, navigation }) {
   // Handle inviting specific household
   const handleInviteHousehold = async (household) => {
     try {
-      console.log('🎯 GROCERY INVITE DEBUG: Inviting household:', household);
-      console.log('🎯 GROCERY INVITE DEBUG: Current list:', currentBackendList);
-      console.log('🎯 GROCERY INVITE DEBUG: List title:', listTitle);
+      console.log('ðŸŽ¯ GROCERY INVITE DEBUG: Inviting household:', household);
+      console.log('ðŸŽ¯ GROCERY INVITE DEBUG: Current list:', currentBackendList);
+      console.log('ðŸŽ¯ GROCERY INVITE DEBUG: List title:', listTitle);
       
       if (!currentBackendList || !currentBackendList.id) {
         showToastNotification('Save list first to invite');
@@ -547,24 +640,24 @@ export default function GroceryListScreen({ route, navigation }) {
         permission_level: 'editor'
       };
       
-      console.log('🎯 GROCERY INVITE DEBUG: Sending invite data:', inviteData);
+      console.log('ðŸŽ¯ GROCERY INVITE DEBUG: Sending invite data:', inviteData);
       
       // Call the real backend collaboration API
       const result = await YesChefAPI.inviteToCollaborate(inviteData);
       
       if (result.success) {
         // Show mint toast instead of alert
-        showToastNotification(`Invited ${household.name} ✓`);
-        console.log('🎯 GROCERY INVITE SUCCESS:', result.data);
+        showToastNotification(`Invited ${household.name} âœ“`);
+        console.log('ðŸŽ¯ GROCERY INVITE SUCCESS:', result.data);
       } else {
         showToastNotification('Invitation failed');
-        console.error('🎯 GROCERY INVITE FAILED:', result.error);
+        console.error('ðŸŽ¯ GROCERY INVITE FAILED:', result.error);
       }
       
       setShowInviteModal(false);
       
     } catch (error) {
-      console.error('🎯 GROCERY INVITE ERROR:', error);
+      console.error('ðŸŽ¯ GROCERY INVITE ERROR:', error);
       showToastNotification('Failed to send invitation');
     }
   };
@@ -594,20 +687,20 @@ export default function GroceryListScreen({ route, navigation }) {
         {
           text: 'No',
           style: 'cancel',
-          onPress: () => console.log('🚫 Delete cancelled by user')
+          onPress: () => console.log('ðŸš« Delete cancelled by user')
         },
         {
           text: 'Yes',
           onPress: async () => {
             try {
-              console.log(`🗑️ DELETING list: ${currentBackendList.name} (ID: ${currentBackendList.id})`);
-              console.log('🗑️ FULL BACKEND LIST OBJECT:', JSON.stringify(currentBackendList, null, 2));
-              console.log('🗑️ ID TYPE CHECK:', typeof currentBackendList.id, 'VALUE:', currentBackendList.id);
+              console.log(`ðŸ—‘ï¸ DELETING list: ${currentBackendList.name} (ID: ${currentBackendList.id})`);
+              console.log('ðŸ—‘ï¸ FULL BACKEND LIST OBJECT:', JSON.stringify(currentBackendList, null, 2));
+              console.log('ðŸ—‘ï¸ ID TYPE CHECK:', typeof currentBackendList.id, 'VALUE:', currentBackendList.id);
               
               const result = await YesChefAPI.deleteGroceryList(currentBackendList.id);
               
               if (result.success) {
-                console.log('✅ List deleted successfully');
+                console.log('âœ… List deleted successfully');
                 
                 // Clear current state
                 setGroceryItems([]);
@@ -619,13 +712,13 @@ export default function GroceryListScreen({ route, navigation }) {
                 await initializeGroceryList();
                 
                 // Show mint toast instead of alert
-                showToastNotification('List deleted ✓');
+                showToastNotification('List deleted âœ“');
               } else {
-                console.error('❌ Failed to delete list:', result.error);
+                console.error('âŒ Failed to delete list:', result.error);
                 Alert.alert('Error', `Failed to delete list: ${result.error}`);
               }
             } catch (error) {
-              console.error('❌ Error deleting list:', error);
+              console.error('âŒ Error deleting list:', error);
               Alert.alert('Error', 'An error occurred while deleting the list.');
             }
           }
@@ -646,7 +739,7 @@ export default function GroceryListScreen({ route, navigation }) {
   const completedCount = groceryItems.filter(item => item.checked).length;
   const totalCount = groceryItems.length;
   
-  // 🔧 Use a ref to maintain stable data reference during editing
+  // ðŸ”§ Use a ref to maintain stable data reference during editing
   const stableDataRef = React.useRef([]);
   
   // Update stable data only when not editing, or when structural changes happen
@@ -674,7 +767,7 @@ export default function GroceryListScreen({ route, navigation }) {
     <ImageBackground source={SELECTED_BACKGROUND} style={styles.backgroundImage} resizeMode="cover">
       <View style={styles.overlay} />
       
-      {/* 📱 Top Status Bar Background (Clean Header for Phone Status) */}
+      {/* ðŸ“± Top Status Bar Background (Clean Header for Phone Status) */}
       <View style={styles.topStatusBarOverlay} />
       
       <SafeAreaView style={styles.container}>
@@ -685,7 +778,7 @@ export default function GroceryListScreen({ route, navigation }) {
           animated={true}
         />
         
-        {/* 🏷️ Card 1: Title Section */}
+        {/* ðŸ·ï¸ Card 1: Title Section */}
         <View style={styles.titleCard}>
         <View style={styles.titleContainer}>
           {isEditingTitle ? (
@@ -720,7 +813,7 @@ export default function GroceryListScreen({ route, navigation }) {
           style={styles.optionsButton}
           onPress={() => setShowOptionsMenu(!showOptionsMenu)}
         >
-          <Text style={styles.optionsIcon}>⋯</Text>
+          <Text style={styles.optionsIcon}>â‹¯</Text>
         </TouchableOpacity>
       </View>
 
@@ -786,7 +879,7 @@ export default function GroceryListScreen({ route, navigation }) {
                   handleInviteToGroceryList();
                 }}
               >
-                <Text style={{ fontSize: 22, color: "#7C3AED", marginRight: 16 }}>👥</Text>
+                <Text style={{ fontSize: 22, color: "#7C3AED", marginRight: 16 }}>ðŸ‘¥</Text>
                 <Text style={styles.modalMenuText}>Invite Friends</Text>
               </TouchableOpacity>
               
@@ -840,23 +933,30 @@ export default function GroceryListScreen({ route, navigation }) {
         </Animated.View>
       )}
 
-      {/* ➕ Card 2: Add Item Section */}
+      {/* âž• Card 2: Add Item Section */}
       <View style={styles.addCard}>
         <TextInput
           style={styles.input}
           value={newItem}
-          onChangeText={setNewItem}
+          onChangeText={handleNewItemChange}
           placeholder="Add ingredient..."
           placeholderTextColor="rgba(156, 163, 175, 0.8)" // Light grey placeholder text
           onSubmitEditing={addItem}
           returnKeyType="done"
+          multiline={false}
         />
+        <TouchableOpacity 
+          style={styles.bulkImportButton}
+          onPress={() => setShowBulkImportModal(true)}
+        >
+          <Icon name="clipboard" size={22} color="#10b981" />
+        </TouchableOpacity>
         <TouchableOpacity style={styles.addButton} onPress={addItem}>
           <Icon name="add" size={24} color="#ffffff" />
         </TouchableOpacity>
       </View>
 
-      {/* 📝 Card 3: Grocery List Items */}
+      {/* ðŸ“ Card 3: Grocery List Items */}
       <View style={styles.listCard}>
         {isLoading ? (
           <View style={styles.loadingContainer}>
@@ -880,7 +980,7 @@ export default function GroceryListScreen({ route, navigation }) {
                 style={[styles.checkbox, item.checked && styles.checkboxChecked]}
                 onPress={() => toggleItem(item.id)}
               >
-                {item.checked && <Text style={styles.checkmark}>✓</Text>}
+                {item.checked && <Text style={styles.checkmark}>âœ“</Text>}
               </TouchableOpacity>
               
               {editingItemId === item.id ? (
@@ -941,7 +1041,7 @@ export default function GroceryListScreen({ route, navigation }) {
               <Text style={styles.modalTitle}>Load Grocery List</Text>
               <TouchableOpacity
                 onPress={() => {
-                  console.log('🚫 Load cancelled by user');
+                  console.log('ðŸš« Load cancelled by user');
                   setShowLoadModal(false);
                 }}
               >
@@ -1015,7 +1115,7 @@ export default function GroceryListScreen({ route, navigation }) {
                       style={styles.modalMenuItem}
                       onPress={() => handleInviteHousehold(household)}
                     >
-                      <Text style={{ fontSize: 22, color: "#7C3AED", marginRight: 12 }}>👥</Text>
+                      <Text style={{ fontSize: 22, color: "#7C3AED", marginRight: 12 }}>ðŸ‘¥</Text>
                       <View style={{flex: 1}}>
                         <Text style={styles.modalMenuText}>
                           {household.name}
@@ -1037,13 +1137,108 @@ export default function GroceryListScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* ðŸ“‹ Bulk Import Modal */}
+      <Modal
+        visible={showBulkImportModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowBulkImportModal(false);
+          setBulkImportText('');
+          setBulkImportPreview([]);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.bulkImportModalContainer}>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Import Grocery List</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowBulkImportModal(false);
+                  setBulkImportText('');
+                  setBulkImportPreview([]);
+                }}
+              >
+                <Icon name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.bulkImportSubtitle}>
+              Paste your list here (one item per line)
+            </Text>
+            
+            {/* Multi-line text input */}
+            <TextInput
+              style={styles.bulkImportInput}
+              multiline
+              numberOfLines={8}
+              placeholder="Milk&#10;Eggs&#10;Bread&#10;Apples&#10;...or paste from another app"
+              placeholderTextColor="#9ca3af"
+              value={bulkImportText}
+              onChangeText={(text) => {
+                setBulkImportText(text);
+                setBulkImportPreview(parseGroceryList(text));
+              }}
+              autoFocus
+              textAlignVertical="top"
+            />
+            
+            {/* Preview Section */}
+            {bulkImportPreview.length > 0 && (
+              <View style={styles.previewSection}>
+                <Text style={styles.previewTitle}>
+                  Preview ({bulkImportPreview.length} {bulkImportPreview.length === 1 ? 'item' : 'items'})
+                </Text>
+                <ScrollView style={styles.previewList} showsVerticalScrollIndicator={true}>
+                  {bulkImportPreview.map((item, index) => (
+                    <View key={index} style={styles.previewItem}>
+                      <Text style={styles.previewBullet}>â€¢</Text>
+                      <Text style={styles.previewItemText}>{item}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+            
+            {/* Action Buttons */}
+            <View style={styles.bulkImportButtons}>
+              <TouchableOpacity 
+                style={styles.bulkImportCancelButton}
+                onPress={() => {
+                  setShowBulkImportModal(false);
+                  setBulkImportText('');
+                  setBulkImportPreview([]);
+                }}
+              >
+                <Text style={styles.bulkImportCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[
+                  styles.bulkImportAddButton,
+                  bulkImportPreview.length === 0 && styles.bulkImportAddButtonDisabled
+                ]}
+                onPress={handleBulkImport}
+                disabled={bulkImportPreview.length === 0}
+              >
+                <Text style={styles.bulkImportAddText}>
+                  Add {bulkImportPreview.length > 0 ? bulkImportPreview.length : ''} {bulkImportPreview.length === 1 ? 'Item' : 'Items'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
     </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  // 🎨 Background and Overlay Styles
+  // ðŸŽ¨ Background and Overlay Styles
   backgroundImage: {
     flex: 1,
     width: '100%',
@@ -1075,7 +1270,7 @@ const styles = StyleSheet.create({
     paddingTop: 50, // Add padding to push content below status bar
   },
   
-  // 🎨 Card Styles - Beautiful bubble design
+  // ðŸŽ¨ Card Styles - Beautiful bubble design
   titleCard: {
     paddingHorizontal: 20,
     paddingVertical: 16,
@@ -1514,5 +1709,127 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
     fontFamily: 'Nunito-Regular',
+  },
+});});
+
+
+  // ðŸ“‹ Bulk Import Styles
+  bulkImportButton: {
+    width: 48,
+    height: 48,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  bulkImportModalContainer: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  bulkImportSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 16,
+    fontFamily: 'Nunito-Regular',
+  },
+  bulkImportInput: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#111827',
+    minHeight: 150,
+    maxHeight: 200,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    fontFamily: 'Nunito-Regular',
+  },
+  previewSection: {
+    marginTop: 16,
+    maxHeight: 180,
+  },
+  previewTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#10b981',
+    marginBottom: 12,
+    fontFamily: 'Nunito-SemiBold',
+  },
+  previewList: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 8,
+    padding: 12,
+    maxHeight: 150,
+    borderWidth: 1,
+    borderColor: '#d1fae5',
+  },
+  previewItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 4,
+  },
+  previewBullet: {
+    fontSize: 16,
+    color: '#10b981',
+    marginRight: 8,
+    marginTop: 2,
+  },
+  previewItemText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1f2937',
+    fontFamily: 'Nunito-Regular',
+    lineHeight: 20,
+  },
+  bulkImportButtons: {
+    flexDirection: 'row',
+    marginTop: 20,
+    gap: 12,
+  },
+  bulkImportCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+  },
+  bulkImportCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6b7280',
+    fontFamily: 'Nunito-SemiBold',
+  },
+  bulkImportAddButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#10b981',
+    alignItems: 'center',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  bulkImportAddButtonDisabled: {
+    backgroundColor: '#d1d5db',
+    shadowOpacity: 0,
+  },
+  bulkImportAddText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    fontFamily: 'Nunito-SemiBold',
   },
 });
