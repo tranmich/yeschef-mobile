@@ -15,6 +15,7 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
+  Animated,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Icon, IconButton } from '../components/IconLibrary';
@@ -96,6 +97,34 @@ function MealPlanScreen({ navigation, route }) {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [households, setHouseholds] = useState([]);
   const [householdMembers, setHouseholdMembers] = useState([]);
+  
+  // 🆕 Toast notification (inline like GroceryListScreen)
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const toastAnimation = useRef(new Animated.Value(0)).current;
+
+  const showToastNotification = (message = 'Success ✓') => {
+    setToastMessage(message);
+    setShowToast(true);
+    
+    // Gentle fade in
+    Animated.timing(toastAnimation, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+
+    // Auto dismiss after 2.5 seconds
+    setTimeout(() => {
+      Animated.timing(toastAnimation, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => {
+        setShowToast(false);
+      });
+    }, 2500);
+  };
   
   // 🔄 LOCAL-FIRST ARCHITECTURE: Replace days state with local data management
   const {
@@ -1796,6 +1825,26 @@ function MealPlanScreen({ navigation, route }) {
         }}
       />
 
+      {/* Toast Notification (inline like GroceryListScreen) */}
+      {showToast && (
+        <Animated.View 
+          style={[
+            styles.toast,
+            {
+              opacity: toastAnimation,
+              transform: [{
+                translateY: toastAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [20, 0],
+                }),
+              }],
+            }
+          ]}
+        >
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </Animated.View>
+      )}
+
     </SafeAreaView>
     </ImageBackground>
   );
@@ -2448,6 +2497,33 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
     fontFamily: 'Nunito-Regular',
+  },
+
+  // Toast styles (matches GroceryListScreen mint toast)
+  toast: {
+    position: 'absolute',
+    bottom: 100,
+    left: '50%',
+    marginLeft: -100,
+    width: 200,
+    backgroundColor: '#10b981', // Mint green
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 9999,
+  },
+  
+  toastText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: 'Nunito-SemiBold',
   },
 });
 
