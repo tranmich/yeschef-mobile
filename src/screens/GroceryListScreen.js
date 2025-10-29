@@ -1710,7 +1710,7 @@ const styles = StyleSheet.create({
     elevation: 2,
     fontFamily: 'Nunito-Regular',
   },
-});});
+
 
 
   // ðŸ“‹ Bulk Import Styles
@@ -1832,4 +1832,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontFamily: 'Nunito-SemiBold',
   },
+});
+
 });
