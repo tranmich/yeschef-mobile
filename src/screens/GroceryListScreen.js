@@ -535,23 +535,7 @@ export default function GroceryListScreen({ route, navigation }) {
       console.log('🎯 GROCERY INVITE DEBUG: List title:', listTitle);
       
       if (!currentBackendList || !currentBackendList.id) {
-        Alert.alert(
-          'Save Required', 
-          'Please save your grocery list first before inviting collaborators.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { 
-              text: 'Save Now', 
-              onPress: async () => {
-                const saveResult = await saveToBackend();
-                if (saveResult.success && currentBackendList) {
-                  // Retry invitation after save
-                  handleInviteHousehold(household);
-                }
-              }
-            }
-          ]
-        );
+        showToastNotification('Save list first to invite');
         return;
       }
       
@@ -573,10 +557,7 @@ export default function GroceryListScreen({ route, navigation }) {
         showToastNotification(`Invited ${household.name} ✓`);
         console.log('🎯 GROCERY INVITE SUCCESS:', result.data);
       } else {
-        Alert.alert(
-          'Invitation Failed',
-          result.error || 'Failed to send invitation. Please try again.'
-        );
+        showToastNotification('Invitation failed');
         console.error('🎯 GROCERY INVITE FAILED:', result.error);
       }
       
@@ -584,7 +565,7 @@ export default function GroceryListScreen({ route, navigation }) {
       
     } catch (error) {
       console.error('🎯 GROCERY INVITE ERROR:', error);
-      Alert.alert('Error', 'Failed to send invitation');
+      showToastNotification('Failed to send invitation');
     }
   };
 
