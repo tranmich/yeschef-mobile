@@ -863,6 +863,39 @@ class YesChefAPI {
       meal_plan_id: listData.meal_plan_id || null
     };
 
+    // 🔧 AUTO-RENAME: Check for duplicate names and add (1), (2), etc.
+    if (backendData.name) {
+      try {
+        const existingLists = await this.getGroceryLists();
+        if (existingLists.success && existingLists.lists) {
+          const duplicates = existingLists.lists.filter(list => {
+            // Check for exact match or numbered versions
+            const baseName = backendData.name.replace(/\s*\(\d+\)$/, '');
+            const listBaseName = list.name.replace(/\s*\(\d+\)$/, '');
+            return listBaseName === baseName;
+          });
+          
+          if (duplicates.length > 0) {
+            // Find the highest number used
+            let highestNumber = 0;
+            duplicates.forEach(list => {
+              const match = list.name.match(/\((\d+)\)$/);
+              if (match) {
+                highestNumber = Math.max(highestNumber, parseInt(match[1]));
+              }
+            });
+            
+            // Add (1), (2), (3), etc.
+            const newNumber = highestNumber + 1;
+            backendData.name = `${backendData.name} (${newNumber})`;
+            this.log(`📝 Auto-renamed to avoid duplicate: "${backendData.name}"`);
+          }
+        }
+      } catch (error) {
+        this.log('⚠️ Could not check for duplicates, proceeding with original name');
+      }
+    }
+
     console.log('🔧 DEBUG: v2 Backend format data:', backendData);
 
     this.log('Saving grocery list (v2):', {
