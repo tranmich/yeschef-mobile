@@ -1312,23 +1312,7 @@ function MealPlanScreen({ navigation, route }) {
       console.log('🎯 INVITE DEBUG: Current plan title:', mealPlanTitle);
       
       if (!currentPlanId) {
-        Alert.alert(
-          'Save Required', 
-          'Please save your meal plan first before inviting collaborators.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { 
-              text: 'Save Now', 
-              onPress: async () => {
-                const saveResult = await handleSave();
-                if (saveResult && currentPlanId) {
-                  // Retry invitation after save
-                  handleInviteHousehold(household);
-                }
-              }
-            }
-          ]
-        );
+        showToastNotification('Save plan first to invite');
         return;
       }
       
@@ -1346,16 +1330,10 @@ function MealPlanScreen({ navigation, route }) {
       const result = await YesChefAPI.inviteToCollaborate(inviteData);
       
       if (result.success) {
-        Alert.alert(
-          'Invitation Sent!', 
-          `Successfully invited ${household.name} household (${household.members || 0} members) to collaborate on "${mealPlanTitle}". They will now be able to see and edit this meal plan!`
-        );
+        showToastNotification(`Invited ${household.name} ✓`);
         console.log('🎯 INVITE SUCCESS:', result.data);
       } else {
-        Alert.alert(
-          'Invitation Failed',
-          result.error || 'Failed to send invitation. Please try again.'
-        );
+        showToastNotification('Invitation failed');
         console.error('🎯 INVITE FAILED:', result.error);
       }
       
@@ -1363,7 +1341,7 @@ function MealPlanScreen({ navigation, route }) {
       
     } catch (error) {
       console.error('🎯 INVITE ERROR:', error);
-      Alert.alert('Error', 'Failed to send invitation');
+      showToastNotification('Failed to send invitation');
     }
   };
 
