@@ -34,6 +34,7 @@ export default function ProfileScreen({ navigation, user = null }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showFirstDeleteModal, setShowFirstDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deletePassword, setDeletePassword] = useState(''); // V2: Password required for deletion
   const [showAvatarCreator, setShowAvatarCreator] = useState(false);
   const [userProfile, setUserProfile] = useState({ background: 'default', icon: '🍎' });
   const [avatarLoading, setAvatarLoading] = useState(true);
@@ -188,11 +189,17 @@ export default function ProfileScreen({ navigation, user = null }) {
   const handleFirstDeleteModalConfirm = () => {
     setShowFirstDeleteModal(false);
     setDeleteConfirmText('');
+    setDeletePassword(''); // Clear password field
     setShowDeleteModal(true);
   };
 
   const handleDeleteModalConfirm = () => {
     if (deleteConfirmText === 'DELETE') {
+      // V2: Check if password is provided
+      if (!deletePassword || deletePassword.trim() === '') {
+        Alert.alert('Password Required', 'Please enter your password to confirm account deletion.');
+        return;
+      }
       setShowDeleteModal(false);
       executeAccountDeletion();
     } else {
@@ -203,15 +210,20 @@ export default function ProfileScreen({ navigation, user = null }) {
   const handleDeleteModalCancel = () => {
     setShowDeleteModal(false);
     setDeleteConfirmText('');
+    setDeletePassword(''); // Clear password when canceling
   };
 
   const executeAccountDeletion = async () => {
     try {
       setIsLoading(true);
       
-      const result = await YesChefAPI.deleteAccount();
+      // V2: Pass password to deleteAccount
+      const result = await YesChefAPI.deleteAccount(deletePassword);
       
       if (result.success) {
+        // Account deleted successfully - auth data already cleared by API
+        setIsLoading(false);
+        
         Alert.alert(
           'Account Deleted',
           'Your account has been permanently deleted. Thank you for using YesChef!',
@@ -219,15 +231,13 @@ export default function ProfileScreen({ navigation, user = null }) {
             {
               text: 'OK',
               onPress: () => {
-                // Clear auth data and navigate to login
-                YesChefAPI.clearAuthData();
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: 'Login' }]
-                });
+                // Navigate back to login screen
+                // Use replace instead of reset to avoid navigation warnings
+                navigation.replace('Auth', { screen: 'Login' });
               }
             }
-          ]
+          ],
+          { cancelable: false }
         );
       } else {
         Alert.alert('Error', result.error || 'Failed to delete account');
@@ -625,7 +635,7 @@ export default function ProfileScreen({ navigation, user = null }) {
             <View style={styles.deleteModal}>
               <Text style={styles.deleteModalTitle}>Final Confirmation</Text>
               <Text style={styles.deleteModalDescription}>
-                Type "DELETE" exactly to permanently delete your account:
+                Type "DELETE" exactly and enter your password to permanently delete your account:
               </Text>
               
               <TextInput
@@ -635,6 +645,16 @@ export default function ProfileScreen({ navigation, user = null }) {
                 placeholder="Type DELETE here"
                 autoFocus={true}
                 autoCapitalize="characters"
+              />
+              
+              {/* V2: Password input for account deletion */}
+              <TextInput
+                style={[styles.deleteModalInput, { marginTop: 12 }]}
+                value={deletePassword}
+                onChangeText={setDeletePassword}
+                placeholder="Enter your password"
+                secureTextEntry={true}
+                autoCapitalize="none"
               />
               
               <View style={styles.deleteModalButtons}>
@@ -648,14 +668,14 @@ export default function ProfileScreen({ navigation, user = null }) {
                 <TouchableOpacity 
                   style={[
                     styles.deleteModalConfirmButton,
-                    deleteConfirmText === 'DELETE' ? {} : styles.deleteModalConfirmButtonDisabled
+                    (deleteConfirmText === 'DELETE' && deletePassword) ? {} : styles.deleteModalConfirmButtonDisabled
                   ]} 
                   onPress={handleDeleteModalConfirm}
-                  disabled={deleteConfirmText !== 'DELETE'}
+                  disabled={deleteConfirmText !== 'DELETE' || !deletePassword}
                 >
                   <Text style={[
                     styles.deleteModalConfirmText,
-                    deleteConfirmText === 'DELETE' ? {} : styles.deleteModalConfirmTextDisabled
+                    (deleteConfirmText === 'DELETE' && deletePassword) ? {} : styles.deleteModalConfirmTextDisabled
                   ]}>
                     Delete Account
                   </Text>

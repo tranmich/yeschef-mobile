@@ -11,8 +11,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import YesChefAPI from '../services/YesChefAPI';
+import WhiteboardAPI from '../services/WhiteboardAPI';
 import { Icon } from '../components/IconLibrary';
 import FullScreenEditor from '../components/FullScreenEditor';
+import CommentsSection from '../components/collaboration/CommentsSection';
+import TagPills from '../components/collaboration/TagPills';
+import PresenceBar from '../components/collaboration/PresenceBar';
 
 const RecipeViewScreen = ({ route, navigation }) => {
   const [recipe, setRecipe] = useState(null);
@@ -35,6 +39,12 @@ const RecipeViewScreen = ({ route, navigation }) => {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const toastAnimation = useRef(new Animated.Value(0)).current;
+
+  // 🎨 Collaboration state
+  const [whiteboardObject, setWhiteboardObject] = useState(null);
+  const [activeViewers, setActiveViewers] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [recipeTags, setRecipeTags] = useState([]);
 
   const showToastNotification = (message = 'Saved ✓') => {
     setToastMessage(message);
@@ -240,6 +250,36 @@ const RecipeViewScreen = ({ route, navigation }) => {
     }
   }, [route.params]);
 
+  // 🎨 Load collaboration data (whiteboard object, user info)
+  useEffect(() => {
+    if (recipe?.id) {
+      loadCollaborationData();
+    }
+  }, [recipe?.id]);
+
+  const loadCollaborationData = async () => {
+    try {
+      // Load current user
+      const user = await YesChefAPI.getCurrentUser();
+      if (user) {
+        setCurrentUser(user);
+      }
+
+      // Check if recipe is on a whiteboard
+      const wbResponse = await WhiteboardAPI.getRecipeWhiteboardObject(recipe.id);
+      if (wbResponse.success && wbResponse.whiteboardObject) {
+        setWhiteboardObject(wbResponse.whiteboardObject);
+        setRecipeTags(wbResponse.whiteboardObject.tags || []);
+        
+        // Load active viewers (can be enhanced with Pusher later)
+        // For now, we'll leave it empty - Task #12 will add real-time presence
+        setActiveViewers([]);
+      }
+    } catch (error) {
+      console.error('Failed to load collaboration data:', error);
+    }
+  };
+
   const loadRecipe = async (recipeId) => {
     try {
       setIsLoading(true);
@@ -346,6 +386,50 @@ const RecipeViewScreen = ({ route, navigation }) => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // 🎨 Collaboration Handlers
+  const handleAddTag = async (tag) => {
+    if (!whiteboardObject) {
+      Alert.alert('Info', 'This recipe needs to be added to a whiteboard first to use tags');
+      return;
+    }
+
+    const newTags = [...recipeTags, tag];
+    setRecipeTags(newTags);
+
+    try {
+      await WhiteboardAPI.updateTags(whiteboardObject.id, newTags);
+      showToastNotification('Tag added ✓');
+    } catch (error) {
+      console.error('Failed to add tag:', error);
+      setRecipeTags(recipeTags); // Revert on error
+      showToastNotification('Failed to add tag');
+    }
+  };
+
+  const handleRemoveTag = async (tagToRemove) => {
+    const newTags = recipeTags.filter(tag => tag !== tagToRemove);
+    setRecipeTags(newTags);
+
+    try {
+      await WhiteboardAPI.updateTags(whiteboardObject.id, newTags);
+      showToastNotification('Tag removed ✓');
+    } catch (error) {
+      console.error('Failed to remove tag:', error);
+      setRecipeTags(recipeTags); // Revert on error
+      showToastNotification('Failed to remove tag');
+    }
+  };
+
+  const handleTagPress = (tag) => {
+    // Could navigate to a filtered recipe list in the future
+    console.log('Tag pressed:', tag);
+    Alert.alert('Tag Filter', `Filtering by "${tag}" - Coming soon!`);
+  };
+
+  const handleCommentAdded = (comment) => {
+    showToastNotification('Comment added ✓');
   };
 
   const exitCookingMode = () => {
@@ -522,6 +606,26 @@ const RecipeViewScreen = ({ route, navigation }) => {
           )}
         </View>
 
+        {/* 🎨 Collaboration Features: Presence & Tags */}
+        {activeViewers.length > 0 && (
+          <PresenceBar 
+            users={activeViewers}
+            text="viewing this recipe"
+            style={styles.presenceBar}
+          />
+        )}
+
+        {whiteboardObject && (
+          <TagPills
+            tags={recipeTags}
+            onTagPress={handleTagPress}
+            onAddTag={handleAddTag}
+            onRemoveTag={handleRemoveTag}
+            editable={true}
+            style={styles.tagPills}
+          />
+        )}
+
         {/* Ingredients */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -565,6 +669,15 @@ const RecipeViewScreen = ({ route, navigation }) => {
             <Text style={styles.sourceText}>📖 Source: {recipe.source}</Text>
           </View>
         )}
+
+        {/* 🎨 Family Discussion (Comments) */}
+        <CommentsSection
+          objectType="recipe"
+          objectId={recipe.id}
+          currentUser={currentUser}
+          onCommentAdded={handleCommentAdded}
+          style={styles.commentsSection}
+        />
       </ScrollView>
 
       {/* Start Cooking Button */}
@@ -901,6 +1014,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Nunito-SemiBold',
     textAlign: 'center',
+  },
+
+  // 🎨 Collaboration Component Styles
+  presenceBar: {
+    marginHorizontal: 16,
+    marginVertical: 12,
+  },
+  tagPills: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  commentsSection: {
+    marginHorizontal: 16,
+    marginBottom: 80, // Extra space for cooking button
   },
 });
 

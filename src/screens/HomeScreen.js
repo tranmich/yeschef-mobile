@@ -16,6 +16,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Icon } from '../components/IconLibrary';
 import { ThemedText } from '../components/Typography';
 import YesChefAPI from '../services/YesChefAPI';
+import WhiteboardAPI from '../services/WhiteboardAPI';
+import ActivityCard from '../components/collaboration/ActivityCard';
 import { getCommunityBackgroundColor } from '../utils/communityStyles';
 
 export default function HomeScreen({ navigation, user = null, onLogout = null }) {
@@ -26,9 +28,10 @@ export default function HomeScreen({ navigation, user = null, onLogout = null })
   const [communityRecipes, setCommunityRecipes] = useState([]);
   const [isLoadingCommunity, setIsLoadingCommunity] = useState(true);
 
-  // 📰 Latest Updates State  
-  const [latestUpdates, setLatestUpdates] = useState([]);
-  const [isLoadingUpdates, setIsLoadingUpdates] = useState(true);
+  // 📰 Household Activity State (replacing Latest Updates)
+  const [householdActivities, setHouseholdActivities] = useState([]);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(true);
+  const [householdId, setHouseholdId] = useState(null);
 
   // Get safe area insets for proper positioning
   const insets = useSafeAreaInsets();
@@ -184,71 +187,59 @@ export default function HomeScreen({ navigation, user = null, onLogout = null })
     }
   };
 
-  // 📰 Load Latest Updates from API
-  const loadLatestUpdates = async () => {
+  // 📰 Load Household Activity from API
+  const loadHouseholdActivity = async () => {
     try {
-      setIsLoadingUpdates(true);
+      setIsLoadingActivities(true);
       
-      // Call real API endpoint  
-      const response = await YesChefAPI.get('/api/latest-updates');
-      
-      if (response.success) {
-        setLatestUpdates(response.updates || []);
+      // Get user's household ID first
+      if (!householdId) {
+        const userResponse = await YesChefAPI.getCurrentUser();
+        if (userResponse && userResponse.household_id) {
+          setHouseholdId(userResponse.household_id);
+          
+          // Load activities
+          const response = await WhiteboardAPI.getHouseholdActivity(userResponse.household_id, 10);
+          
+          if (response.success) {
+            setHouseholdActivities(response.activities || []);
+          } else {
+            console.error('Failed to load household activities:', response.error);
+            setHouseholdActivities([]);
+          }
+        } else {
+          console.log('No household ID found for user');
+          setHouseholdActivities([]);
+        }
       } else {
-        console.error('Failed to load latest updates:', response.error);
-        setLatestUpdates([]);
+        // Household ID already known
+        const response = await WhiteboardAPI.getHouseholdActivity(householdId, 10);
+        
+        if (response.success) {
+          setHouseholdActivities(response.activities || []);
+        } else {
+          console.error('Failed to load household activities:', response.error);
+          setHouseholdActivities([]);
+        }
       }
     } catch (error) {
-      console.error('Failed to load latest updates:', error);
-      
-      // Fallback to mock data for development
-      if (__DEV__) {
-        setLatestUpdates([
-          { 
-            id: 'fallback_1', 
-            type: 'content',
-            title: 'Sheet pan formula', 
-            content: 'When you don\'t feel like cooking, throw some protein, a veggie, and your favorite spice on a sheet pan.',
-            category: 'tip',
-            icon: '💡'
-          },
-        { 
-          id: 'fallback_2', 
-          type: 'content',
-          title: 'The fastest sauce in the world', 
-          content: 'A little garlic in olive oil and a splash of pasta water is all it takes.',
-          category: 'technique', 
-          icon: '🔥'
-        },
-        { 
-          id: 'fallback_3', 
-          type: 'activity',
-          title: 'Community Update', 
-          content: 'New recipes have been shared in the community!',
-          category: 'social',
-          icon: '👨‍🍳'
-        },
-        ]);
-      } else {
-        // Production: Show empty state
-        setLatestUpdates([]);
-        console.warn('⚠️ Production build: No latest updates available');
-      }
+      console.error('Failed to load household activities:', error);
+      setHouseholdActivities([]);
     } finally {
-      setIsLoadingUpdates(false);
+      setIsLoadingActivities(false);
     }
   };
 
-  // Load community recipes on component mount
+  // Load community recipes and household activity on component mount
   useEffect(() => {
     loadCommunityRecipes();
-    loadLatestUpdates();
+    loadHouseholdActivity();
   }, []);
 
-  // 🔄 Refresh community recipes
+  // 🔄 Refresh community recipes and household activity
   const handleRefreshCommunity = () => {
     loadCommunityRecipes();
-    loadLatestUpdates();
+    loadHouseholdActivity();
   };
 
   // 📱 Mock data for community content (will be replaced with real data later)
@@ -389,7 +380,7 @@ export default function HomeScreen({ navigation, user = null, onLogout = null })
             </View>
           </View>
 
-          {/* 📰 Latest Updates Section - Scrollable */}
+          {/* 📰 Household Activity Section - Scrollable */}
           <ScrollView 
             style={styles.updatesScrollView}
             contentContainerStyle={styles.updatesScrollContainer}
@@ -397,23 +388,28 @@ export default function HomeScreen({ navigation, user = null, onLogout = null })
           >
             <View style={styles.sectionContainer}>
               <View style={styles.homeSection}>
-                <Text style={styles.homeSectionTitle}>📰 Latest Updates</Text>
-                {isLoadingUpdates ? (
+                <Text style={styles.homeSectionTitle}>� Family Activity</Text>
+                {isLoadingActivities ? (
                   <View style={styles.loadingContainer}>
-                    <Text style={styles.loadingText}>Loading updates...</Text>
+                    <Text style={styles.loadingText}>Loading activity...</Text>
                   </View>
-                ) : (
-                  latestUpdates.map((update) => (
-                    <TouchableOpacity key={update.id} style={styles.newsHomeCard}>
-                      <View style={styles.newsHomeHeader}>
-                        <View style={styles.newsHomeContent}>
-                          <Text style={styles.newsHomeTitle}>{update.title}</Text>
-                          <Text style={styles.newsHomeCategory}>{update.category}</Text>
-                        </View>
-                      </View>
-                      <Text style={styles.newsHomePreview}>{update.content}</Text>
-                    </TouchableOpacity>
+                ) : householdActivities.length > 0 ? (
+                  householdActivities.map((activity) => (
+                    <ActivityCard
+                      key={activity.id}
+                      activity={activity}
+                      onPress={() => console.log('Activity pressed:', activity)}
+                      style={styles.activityCard}
+                    />
                   ))
+                ) : (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyStateIcon}>💬</Text>
+                    <Text style={styles.emptyStateText}>No recent activity</Text>
+                    <Text style={styles.emptyStateSubtext}>
+                      Start collaborating on recipes, meal plans, and grocery lists!
+                    </Text>
+                  </View>
                 )}
               </View>
             </View>
@@ -721,6 +717,30 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 14,
     color: '#6B7280',
+  },
+  activityCard: {
+    marginBottom: 12,
+  },
+  emptyState: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyStateIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 4,
+    fontFamily: 'Nunito-SemiBold',
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    fontFamily: 'Nunito-Regular',
   },
   bottomSpacing: {
     height: 20,

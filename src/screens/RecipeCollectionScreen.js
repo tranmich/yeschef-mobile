@@ -46,8 +46,7 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
     { id: 'dinner', name: 'Dinner', icon: '🍽️', color: '#3B82F6' },
     { id: 'desserts', name: 'Desserts', icon: '🧁', color: '#8B5CF6' },
     { id: 'one-pot', name: 'One-Pot', icon: '🍲', color: '#EF4444' },
-    { id: 'quick', name: 'Quick', icon: '⚡', color: '#F97316' },
-    { id: 'favorites', name: 'Favorites', icon: '❤️', color: '#EC4899' }
+    { id: 'quick', name: 'Quick', icon: '⚡', color: '#F97316' }
   ];
 
   const [recipes, setRecipes] = useState([]);
@@ -788,13 +787,6 @@ const RecipeCollectionScreen = ({ navigation, route }) => {
       
       // Sort by creation date (newest first)
       return recentRecipes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    }
-    
-    if (categoryId === 'favorites') {
-      // Since is_favorite doesn't exist, use confidence_score as proxy
-      return safeRecipes.filter(recipe => 
-        recipe.confidence_score && recipe.confidence_score >= 80
-      );
     }
     
     if (categoryId === 'quick') {

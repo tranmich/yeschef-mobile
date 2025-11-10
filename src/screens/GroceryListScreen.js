@@ -813,7 +813,7 @@ export default function GroceryListScreen({ route, navigation }) {
           style={styles.optionsButton}
           onPress={() => setShowOptionsMenu(!showOptionsMenu)}
         >
-          <Text style={styles.optionsIcon}>â‹¯</Text>
+          <Icon name="ellipsis-vertical" size={24} color="#374151" />
         </TouchableOpacity>
       </View>
 
@@ -879,7 +879,7 @@ export default function GroceryListScreen({ route, navigation }) {
                   handleInviteToGroceryList();
                 }}
               >
-                <Text style={{ fontSize: 22, color: "#7C3AED", marginRight: 16 }}>ðŸ‘¥</Text>
+                <Icon name="person-add" size={22} color="#7C3AED" style={{marginRight: 16}} />
                 <Text style={styles.modalMenuText}>Invite Friends</Text>
               </TouchableOpacity>
               
@@ -1054,28 +1054,67 @@ export default function GroceryListScreen({ route, navigation }) {
                 Choose a list to load (current changes will be lost):
               </Text>
               
-              {/* List of available lists */}
+              {/* List of available lists - organized by type */}
               <ScrollView style={styles.loadListContainer} showsVerticalScrollIndicator={false}>
-                {availableLists.map((list, index) => (
-                  <TouchableOpacity
-                    key={list.id}
-                    style={styles.modalMenuItem}
-                    onPress={() => {
-                      setShowLoadModal(false);
-                      loadGroceryListById(list.id);
-                    }}
-                  >
-                    <Icon name="folder" size={20} color="#1E40AF" style={{marginRight: 12}} />
-                    <View style={{flex: 1}}>
-                      <Text style={styles.modalMenuText}>
-                        {list.name || `List ${list.id}`}
-                      </Text>
-                      <Text style={styles.listInfo}>
-                        {list.item_count || 0} items
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
+                {/* Household Lists Section */}
+                {availableLists.filter(list => list.household_id).length > 0 && (
+                  <>
+                    <Text style={styles.listSectionHeader}>👥 Household Lists</Text>
+                    {availableLists
+                      .filter(list => list.household_id)
+                      .map((list, index) => (
+                        <TouchableOpacity
+                          key={list.id}
+                          style={styles.modalMenuItem}
+                          onPress={() => {
+                            setShowLoadModal(false);
+                            loadGroceryListById(list.id);
+                          }}
+                        >
+                          <Icon name="people" size={20} color="#8B5CF6" style={{marginRight: 12}} />
+                          <View style={{flex: 1}}>
+                            <Text style={styles.modalMenuText}>
+                              {list.name || `List ${list.id}`}
+                            </Text>
+                            <Text style={styles.listInfo}>
+                              {list.stats?.total_items || 0} items
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))
+                    }
+                  </>
+                )}
+
+                {/* Personal Lists Section */}
+                {availableLists.filter(list => !list.household_id).length > 0 && (
+                  <>
+                    <Text style={styles.listSectionHeader}>📋 Personal Lists</Text>
+                    {availableLists
+                      .filter(list => !list.household_id)
+                      .map((list, index) => (
+                        <TouchableOpacity
+                          key={list.id}
+                          style={styles.modalMenuItem}
+                          onPress={() => {
+                            setShowLoadModal(false);
+                            loadGroceryListById(list.id);
+                          }}
+                        >
+                          <Icon name="clipboard" size={20} color="#1E40AF" style={{marginRight: 12}} />
+                          <View style={{flex: 1}}>
+                            <Text style={styles.modalMenuText}>
+                              {list.name || `List ${list.id}`}
+                            </Text>
+                            <Text style={styles.listInfo}>
+                              {list.stats?.total_items || 0} items
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))
+                    }
+                  </>
+                )}
               </ScrollView>
             </View>
           </View>
@@ -1149,7 +1188,7 @@ export default function GroceryListScreen({ route, navigation }) {
           setBulkImportPreview([]);
         }}
       >
-        <View style={styles.modalOverlay}>
+        <SafeAreaView style={{flex: 1, backgroundColor: 'white'}}>
           <View style={styles.bulkImportModalContainer}>
             {/* Header */}
             <View style={styles.modalHeader}>
@@ -1194,7 +1233,7 @@ export default function GroceryListScreen({ route, navigation }) {
                 <ScrollView style={styles.previewList} showsVerticalScrollIndicator={true}>
                   {bulkImportPreview.map((item, index) => (
                     <View key={index} style={styles.previewItem}>
-                      <Text style={styles.previewBullet}>â€¢</Text>
+                      <Icon name="square-outline" size={20} color="#10b981" style={styles.previewBullet} />
                       <Text style={styles.previewItemText}>{item}</Text>
                     </View>
                   ))}
@@ -1229,7 +1268,7 @@ export default function GroceryListScreen({ route, navigation }) {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
     </SafeAreaView>
@@ -1665,6 +1704,15 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     marginTop: 2,
   },
+  listSectionHeader: {
+    fontSize: 14,
+    fontWeight: '700',
+    fontFamily: 'Nunito-Bold',
+    color: '#374151',
+    marginTop: 16,
+    marginBottom: 8,
+    marginLeft: 4,
+  },
   emptyState: {
     padding: 40,
     alignItems: 'center',
@@ -1726,16 +1774,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(16, 185, 129, 0.2)',
   },
   bulkImportModalContainer: {
+    flex: 1,
     backgroundColor: 'white',
-    borderRadius: 16,
     padding: 20,
-    width: '90%',
-    maxHeight: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
   },
   bulkImportSubtitle: {
     fontSize: 14,
@@ -1757,7 +1798,7 @@ const styles = StyleSheet.create({
   },
   previewSection: {
     marginTop: 16,
-    maxHeight: 180,
+    flex: 1,
   },
   previewTitle: {
     fontSize: 14,
@@ -1767,10 +1808,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito-SemiBold',
   },
   previewList: {
+    flex: 1,
     backgroundColor: '#f0fdf4',
     borderRadius: 8,
     padding: 12,
-    maxHeight: 150,
     borderWidth: 1,
     borderColor: '#d1fae5',
   },
@@ -1780,10 +1821,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   previewBullet: {
-    fontSize: 16,
-    color: '#10b981',
     marginRight: 8,
-    marginTop: 2,
   },
   previewItemText: {
     flex: 1,
@@ -1795,6 +1833,7 @@ const styles = StyleSheet.create({
   bulkImportButtons: {
     flexDirection: 'row',
     marginTop: 20,
+    marginBottom: 10,
     gap: 12,
   },
   bulkImportCancelButton: {
@@ -1832,6 +1871,4 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontFamily: 'Nunito-SemiBold',
   },
-});
-
 });

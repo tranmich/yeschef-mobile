@@ -18,6 +18,7 @@ import {
 const ICON_MAPPINGS = {
   // UI Actions
   add: { family: Ionicons, name: 'add' },
+  plus: { family: Ionicons, name: 'add' },
   minus: { family: Ionicons, name: 'remove' },
   back: { family: Ionicons, name: 'arrow-back' },
   cancel: { family: Ionicons, name: 'close' },
@@ -26,6 +27,15 @@ const ICON_MAPPINGS = {
   delete: { family: Ionicons, name: 'trash-outline' },
   edit: { family: Ionicons, name: 'pencil-outline' },
   save: { family: Ionicons, name: 'checkmark' },
+  eye: { family: Ionicons, name: 'eye-outline' },
+  tag: { family: Ionicons, name: 'pricetag-outline' },
+  calendar: { family: Ionicons, name: 'calendar-outline' },
+  'shopping-cart': { family: Ionicons, name: 'cart-outline' },
+  activity: { family: Ionicons, name: 'pulse-outline' },
+  alert: { family: Ionicons, name: 'alert-circle-outline' },
+  clipboard: { family: Ionicons, name: 'clipboard-outline' },
+  'ellipsis-vertical': { family: Feather, name: 'more-vertical' },
+  'person-add': { family: MaterialIcons, name: 'person-add' },
   
   // Navigation
   forward: { family: Ionicons, name: 'arrow-forward' },
@@ -60,6 +70,8 @@ const ICON_MAPPINGS = {
   community: { family: Ionicons, name: 'people-outline' },
   share: { family: Ionicons, name: 'share-outline' },
   chat: { family: Ionicons, name: 'chatbubble-outline' },
+  comment: { family: Ionicons, name: 'chatbubble-outline' },
+  send: { family: Ionicons, name: 'send' },
   camera: { family: Ionicons, name: 'camera-outline' },
   download: { family: Ionicons, name: 'download-outline' },
   

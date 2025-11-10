@@ -92,11 +92,21 @@ class YesChefAPI {
     }
   }
 
+  // ========================================
+  // 🔐 AUTHENTICATION METHODS - V2 API
+  // ========================================
+  // Migrated to V2 API (October 31, 2025)
+  // - Uses /api/v2/auth/* endpoints
+  // - Token format: data.token (V2) vs access_token (V1)
+  // - Response format: wrapped in data object
+  // - Google OAuth still on V1 (not yet implemented in V2)
+  // ========================================
+  
   // Authentication Methods with debugging
   async login(email, password) {
     this.log('Attempting login for:', email);
     try {
-      const response = await this.debugFetch('/api/auth/login', {
+      const response = await this.debugFetch('/api/v2/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -107,18 +117,19 @@ class YesChefAPI {
       const data = await response.json();
       this.log('Login response data:', data);
       
-      if (response.ok) {
-        this.token = data.access_token;
-        this.user = data.user;
+      if (response.ok && data.success) {
+        // V2 API wraps response in data object
+        this.token = data.data.token;
+        this.user = data.data.user;
         
-        // Store securely for persistence
-        await this.storeAuthData(data);
+        // Store securely for persistence (convert to V1 format for compatibility)
+        await this.storeAuthData({ access_token: data.data.token, user: data.data.user });
         this.log('✅ Login successful!');
         
-        return { success: true, user: data.user };
+        return { success: true, user: data.data.user };
       } else {
         this.error('Login failed:', data);
-        return { success: false, error: data.error || 'Login failed' };
+        return { success: false, error: data.error || data.message || 'Login failed' };
       }
     } catch (error) {
       this.error('Login error:', error);
@@ -130,6 +141,7 @@ class YesChefAPI {
   async googleSignIn(googleUser) {
     this.log('🔐 Attempting Google Sign-In for:', googleUser.email);
     try {
+      // Note: Google OAuth not yet implemented in V2, keeping V1 for now
       const response = await this.debugFetch('/api/auth/google', {
         method: 'POST',
         headers: {
@@ -169,7 +181,7 @@ class YesChefAPI {
   async forgotPassword(email) {
     this.log('🔑 Requesting password reset for:', email);
     try {
-      const response = await this.debugFetch('/api/auth/forgot-password', {
+      const response = await this.debugFetch('/api/v2/auth/forgot-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -180,12 +192,12 @@ class YesChefAPI {
       const data = await response.json();
       this.log('Forgot password response:', data);
       
-      if (response.ok) {
+      if (response.ok && data.success) {
         this.log('✅ Password reset request successful!');
         return { success: true, message: data.message };
       } else {
         this.error('Forgot password failed:', data);
-        return { success: false, error: data.error || 'Failed to send reset link' };
+        return { success: false, error: data.error || data.message || 'Failed to send reset link' };
       }
     } catch (error) {
       this.error('Forgot password error:', error);
@@ -197,7 +209,7 @@ class YesChefAPI {
   async register(name, email, password) {
     this.log('📝 Attempting registration for:', email);
     try {
-      const response = await this.debugFetch('/api/auth/register', {
+      const response = await this.debugFetch('/api/v2/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -208,18 +220,19 @@ class YesChefAPI {
       const data = await response.json();
       this.log('Registration response data:', data);
       
-      if (response.ok) {
-        this.token = data.access_token;
-        this.user = data.user;
+      if (response.ok && data.success) {
+        // V2 API wraps response in data object
+        this.token = data.data.token;
+        this.user = data.data.user;
         
-        // Store securely for persistence
-        await this.storeAuthData(data);
+        // Store securely for persistence (convert to V1 format for compatibility)
+        await this.storeAuthData({ access_token: data.data.token, user: data.data.user });
         this.log('✅ Registration successful!');
         
-        return { success: true, user: data.user };
+        return { success: true, user: data.data.user };
       } else {
         this.error('Registration failed:', data);
-        return { success: false, error: data.error || 'Registration failed' };
+        return { success: false, error: data.error || data.message || 'Registration failed' };
       }
     } catch (error) {
       this.error('Registration error:', error);
@@ -234,7 +247,7 @@ class YesChefAPI {
       // Call backend logout endpoint first
       if (this.token) {
         this.log('Calling backend logout endpoint...');
-        await this.debugFetch('/api/auth/logout', {
+        await this.debugFetch('/api/v2/auth/logout', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${this.token}`,
@@ -502,36 +515,39 @@ class YesChefAPI {
     }
 
     try {
-      // For now, we'll use the existing import endpoint but delete the recipe if user cancels
-      // This is a workaround until we have a proper preview endpoint
-      const response = await this.debugFetch('/api/recipes/import/url', {
+      // v2: Use /api/v2/recipes/import/url
+      const response = await this.debugFetch('/api/v2/recipes/import/url', {
         method: 'POST',
         headers: {
           ...this.getAuthHeaders(),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ 
+          url,
+          user_id: this.user?.id 
+        }),
       });
 
-      const data = await response.json();
-      this.log('Extract response:', data);
+      const responseData = await response.json();
+      this.log('Extract response (v2):', responseData);
       
-      if (response.ok && data.success) {
-        this.log('✅ Recipe extracted (temporary save):', {
-          title: data.recipe_data?.title,
-          recipe_id: data.recipe_id,
-          confidence: data.confidence
+      // v2 response format: { success, data: { recipe, message } }
+      if (response.ok && responseData.success) {
+        const recipe = responseData.data?.recipe;
+        this.log('✅ Recipe extracted (v2):', {
+          title: recipe?.title,
+          id: recipe?.id
         });
         return { 
           success: true, 
-          recipe: data.recipe_data,
-          recipe_id: data.recipe_id, // We'll need this for deletion if user cancels
-          confidence: data.confidence,
-          extraction_method: data.extraction_method
+          recipe: recipe,
+          recipe_id: recipe?.id,
+          confidence: responseData.data?.confidence,
+          extraction_method: recipe?.extraction_method
         };
       } else {
-        this.error('Extract failed:', data);
-        return { success: false, error: data.error || 'Extraction failed' };
+        this.error('Extract failed (v2):', responseData);
+        return { success: false, error: responseData.error || 'Extraction failed' };
       }
     } catch (error) {
       this.error('Extract recipe error:', error);
@@ -547,31 +563,35 @@ class YesChefAPI {
     }
 
     try {
-      const response = await this.debugFetch('/api/recipes/import/url', {
+      // v2: Use /api/v2/recipes/import/url
+      const response = await this.debugFetch('/api/v2/recipes/import/url', {
         method: 'POST',
         headers: {
           ...this.getAuthHeaders(),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ 
+          url,
+          user_id: this.user?.id 
+        }),
       });
 
-      const data = await response.json();
-      this.log('Import response:', data);
+      const responseData = await response.json();
+      this.log('Import response (v2):', responseData);
       
-      if (response.ok && data.success) {
-        this.log('✅ Recipe imported successfully!', {
-          title: data.recipe_data?.title,
-          confidence: data.confidence,
-          processing_time: data.processing_time
+      // v2 response format: { success, data: { recipe, message } }
+      if (response.ok && responseData.success) {
+        const recipe = responseData.data?.recipe;
+        this.log('✅ Recipe imported successfully (v2)!', {
+          title: recipe?.title,
+          id: recipe?.id
         });
         return { 
           success: true, 
-          recipe: data.recipe_data,
-          recipe_id: data.recipe_id,
-          confidence: data.confidence,
-          needs_review: data.needs_review,
-          extraction_method: data.extraction_method
+          recipe: recipe,
+          recipe_id: recipe?.id,
+          needs_review: recipe?.needs_review,
+          extraction_method: recipe?.extraction_method
         };
       } else {
         this.error('Import failed:', data);
@@ -1218,20 +1238,37 @@ class YesChefAPI {
   }
 
   // =====================================================
-  // 👤 PROFILE API METHODS
+  // 👤 PROFILE API METHODS (V2)
   // =====================================================
 
   async getProfile() {
-    this.log('Getting user profile...');
+    this.log('Getting user profile (v2)...');
+    
+    if (!this.user?.id) {
+      this.error('No user ID available');
+      return { success: false, error: 'Not authenticated' };
+    }
+    
     try {
-      const response = await this.get('/api/profile');
+      // v2: Use /api/v2/profile/:userId
+      const response = await this.debugFetch(`/api/v2/profile/${this.user.id}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
       
-      if (response.success) {
-        this.log('✅ Profile loaded successfully!', response.profile);
-        return response;
+      const responseData = await response.json();
+      this.log('Profile response (v2):', responseData);
+      
+      // v2 format: { success, data: {...profile} }
+      if (response.ok && responseData.success) {
+        this.log('✅ Profile loaded successfully (v2)!', responseData.data);
+        return { 
+          success: true, 
+          profile: responseData.data  // V2: profile is in 'data'
+        };
       } else {
-        this.error('Get profile failed:', response.error);
-        return response;
+        this.error('Get profile failed (v2):', responseData);
+        return { success: false, error: responseData.error };
       }
     } catch (error) {
       this.error('Get profile error:', error);
@@ -1240,16 +1277,37 @@ class YesChefAPI {
   }
 
   async updateProfile(profileData) {
-    this.log('Updating user profile...', profileData);
+    this.log('Updating user profile (v2)...', profileData);
+    
+    if (!this.user?.id) {
+      this.error('No user ID available');
+      return { success: false, error: 'Not authenticated' };
+    }
+    
     try {
-      const response = await this.put('/api/profile', profileData);
+      // v2: Use /api/v2/profile/:userId
+      const response = await this.debugFetch(`/api/v2/profile/${this.user.id}`, {
+        method: 'PATCH',
+        headers: {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(profileData)
+      });
       
-      if (response.success) {
-        this.log('✅ Profile updated successfully!');
-        return response;
+      const responseData = await response.json();
+      this.log('Update profile response (v2):', responseData);
+      
+      // v2 format: { success, data: {...updatedProfile} }
+      if (response.ok && responseData.success) {
+        this.log('✅ Profile updated successfully (v2)!');
+        return { 
+          success: true, 
+          profile: responseData.data  // V2: updated profile in 'data'
+        };
       } else {
-        this.error('Update profile failed:', response.error);
-        return response;
+        this.error('Update profile failed (v2):', responseData);
+        return { success: false, error: responseData.error };
       }
     } catch (error) {
       this.error('Update profile error:', error);
@@ -1257,18 +1315,35 @@ class YesChefAPI {
     }
   }
 
-  // 📊 Get User Statistics
+  // 📊 Get User Statistics (V2)
   async getUserStats() {
-    this.log('Getting user statistics...');
+    this.log('Getting user statistics (v2)...');
+    
+    if (!this.user?.id) {
+      this.error('No user ID available');
+      return { success: false, error: 'Not authenticated' };
+    }
+    
     try {
-      const response = await this.get('/api/profile/stats');
+      // v2: Use /api/v2/profile/:userId/stats
+      const response = await this.debugFetch(`/api/v2/profile/${this.user.id}/stats`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
       
-      if (response.success) {
-        this.log('✅ User stats loaded successfully!', response.stats);
-        return response;
+      const responseData = await response.json();
+      this.log('Stats response (v2):', responseData);
+      
+      // v2 format: { success, data: {...stats} }
+      if (response.ok && responseData.success) {
+        this.log('✅ User stats loaded successfully (v2)!', responseData.data);
+        return { 
+          success: true, 
+          stats: responseData.data  // V2: stats in 'data'
+        };
       } else {
-        this.error('Get user stats failed:', response.error);
-        return response;
+        this.error('Get user stats failed (v2):', responseData);
+        return { success: false, error: responseData.error };
       }
     } catch (error) {
       this.error('Get user stats error:', error);
@@ -1277,40 +1352,44 @@ class YesChefAPI {
   }
 
   async uploadProfilePhoto(imageUri) {
-    this.log('Uploading profile photo...', imageUri);
+    this.log('Uploading profile photo (v2)...', imageUri);
+    
+    if (!this.user?.id) {
+      this.error('No user ID available');
+      return { success: false, error: 'Not authenticated' };
+    }
+    
     try {
-      // Create FormData for file upload
-      const formData = new FormData();
-      formData.append('photo', {
-        uri: imageUri,
-        type: 'image/jpeg',
-        name: 'profile.jpg',
-      });
-
-      const token = await this.getToken();
-      if (!token) {
-        this.error('No authentication token available');
-        return { success: false, error: 'Authentication required' };
-      }
-
-      const response = await fetch(`${this.baseURL}/api/profile/photo`, {
+      // Read image as base64
+      // Note: This is a placeholder - actual implementation depends on React Native Image library
+      const avatarData = imageUri; // In production, convert to base64 data URI
+      
+      // v2: Use /api/v2/profile/:userId/avatar
+      const response = await this.debugFetch(`/api/v2/profile/${this.user.id}/avatar`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json'
         },
-        body: formData,
+        body: JSON.stringify({
+          avatar_data: avatarData,
+          filename: 'profile.jpg'
+        })
       });
 
-      const data = await response.json();
-      this.log('Profile photo upload response:', data);
+      const responseData = await response.json();
+      this.log('Profile photo upload response (v2):', responseData);
 
-      if (response.ok) {
-        this.log('✅ Profile photo uploaded successfully!');
-        return { success: true, ...data };
+      // v2 format: { success, data: { avatar_url } }
+      if (response.ok && responseData.success) {
+        this.log('✅ Profile photo uploaded successfully (v2)!');
+        return { 
+          success: true, 
+          avatar_url: responseData.data?.avatar_url 
+        };
       } else {
-        this.error('Profile photo upload failed:', data);
-        return { success: false, error: data.error || 'Failed to upload photo' };
+        this.error('Profile photo upload failed (v2):', responseData);
+        return { success: false, error: responseData.error || 'Failed to upload photo' };
       }
     } catch (error) {
       this.error('Profile photo upload error:', error);
@@ -1337,17 +1416,26 @@ class YesChefAPI {
   }
 
   // 🗑️ Delete user account permanently
-  async deleteAccount() {
+  async deleteAccount(password) {
     this.log('🗑️ Initiating account deletion...');
     
     if (!this.isAuthenticated()) {
       return { success: false, error: 'Authentication required' };
     }
 
+    // V2 API requires password confirmation for security
+    if (!password) {
+      return { success: false, error: 'Password is required to delete account' };
+    }
+
     try {
-      const response = await this.debugFetch('/api/auth/delete-account', {
+      const response = await this.debugFetch('/api/v2/auth/account', {
         method: 'DELETE',
-        headers: this.getAuthHeaders(),
+        headers: {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password }), // V2 requires password confirmation
       });
 
       if (response.ok) {
@@ -1494,26 +1582,29 @@ class YesChefAPI {
 
   // Search languages for voice recording
   async searchLanguages(query = '') {
-    this.log('Searching languages:', query);
+    this.log('Searching languages (v2):', query);
     
     try {
-      const response = await this.debugFetch(`/api/recipes/voice/languages/search?q=${encodeURIComponent(query)}`, {
+      // v2: Use /api/v2/recipes/voice/languages/search
+      const response = await this.debugFetch(`/api/v2/recipes/voice/languages/search?q=${encodeURIComponent(query)}`, {
         method: 'GET',
       });
 
-      const data = await response.json();
-      this.log('Language search response:', data);
+      const responseData = await response.json();
+      this.log('Language search response (v2):', responseData);
       
-      if (response.ok && data.success) {
-        this.log(`✅ Found ${data.count} languages`);
+      // v2 response format: { success, data: { languages } }
+      if (response.ok && responseData.success) {
+        const languages = responseData.data?.languages || [];
+        this.log(`✅ Found ${languages.length} languages (v2)`);
         return { 
           success: true, 
-          languages: data.languages,
-          count: data.count
+          languages: languages,
+          count: languages.length
         };
       } else {
-        this.error('Language search failed:', data);
-        return { success: false, error: data.error || 'Language search failed' };
+        this.error('Language search failed (v2):', responseData);
+        return { success: false, error: responseData.error || 'Language search failed' };
       }
     } catch (error) {
       this.error('Language search error:', error);
@@ -1556,7 +1647,8 @@ class YesChefAPI {
       
       this.log(`Uploading ${sessionData.segments.length} audio segments...`);
       
-      const response = await this.debugFetch('/api/recipes/voice/session/process', {
+      // v2: Use /api/v2/recipes/voice/session/process
+      const response = await this.debugFetch('/api/v2/recipes/voice/session/process', {
         method: 'POST',
         headers: {
           ...this.getAuthHeaders(),
@@ -1565,26 +1657,28 @@ class YesChefAPI {
         body: formData,
       });
 
-      const data = await response.json();
-      this.log('Voice session process response:', data);
+      const responseData = await response.json();
+      this.log('Voice session process response (v2):', responseData);
       
-      if (response.ok && data.success) {
-        this.log('✅ Voice session processed successfully!', {
-          transcript_length: data.combined_transcript?.length,
-          confidence: data.confidence,
-          segments: data.segments?.length
+      // v2 response format: { success, data: { session_id, transcript, language, confidence } }
+      if (response.ok && responseData.success) {
+        const data = responseData.data || {};
+        this.log('✅ Voice session processed successfully (v2)!', {
+          transcript_length: data.transcript?.length,
+          confidence: data.confidence
         });
         return { 
           success: true, 
-          transcript: data.auto_edited || data.combined_transcript,
-          combined_transcript: data.combined_transcript,
+          transcript: data.transcript,
+          combined_transcript: data.transcript,
           confidence: data.confidence,
           segments: data.segments,
-          language: data.language
+          language: data.language,
+          session_id: data.session_id
         };
       } else {
-        this.error('Voice session processing failed:', data);
-        return { success: false, error: data.error || 'Session processing failed' };
+        this.error('Voice session processing failed (v2):', responseData);
+        return { success: false, error: responseData.error || 'Session processing failed' };
       }
     } catch (error) {
       this.error('Voice session processing error:', error);
@@ -1594,14 +1688,15 @@ class YesChefAPI {
 
   // Generate recipe from approved transcript
   async generateRecipeFromTranscript(transcript, metadata) {
-    this.log('Generating recipe from transcript');
+    this.log('Generating recipe from transcript (v2)');
     
     if (!this.isAuthenticated()) {
       return { success: false, error: 'Authentication required - please login first' };
     }
 
     try {
-      const response = await this.debugFetch('/api/recipes/voice/generate', {
+      // v2: Use /api/v2/recipes/voice/generate
+      const response = await this.debugFetch('/api/v2/recipes/voice/generate', {
         method: 'POST',
         headers: {
           ...this.getAuthHeaders(),
@@ -1609,31 +1704,34 @@ class YesChefAPI {
         },
         body: JSON.stringify({
           transcript,
-          metadata
+          language: metadata?.language || 'en',
+          user_id: this.user?.id
         }),
       });
 
-      const data = await response.json();
-      this.log('Recipe generation response:', data);
+      const responseData = await response.json();
+      this.log('Recipe generation response (v2):', responseData);
       
-      if (response.ok && data.success) {
-        this.log('✅ Recipe generated from voice!', {
-          title: data.recipe_data?.title,
-          ingredients: data.recipe_data?.ingredients?.length,
-          instructions: data.recipe_data?.instructions?.length,
-          confidence: data.confidence
+      // v2 response format: { success, data: { recipe, confidence, message } }
+      if (response.ok && responseData.success) {
+        const recipe = responseData.data?.recipe;
+        this.log('✅ Recipe generated from voice (v2)!', {
+          title: recipe?.title,
+          ingredients: recipe?.ingredients?.length,
+          instructions: recipe?.instructions?.length,
+          confidence: responseData.data?.confidence
         });
         return { 
           success: true, 
-          recipe: data.recipe_data,
-          recipe_id: data.recipe_id,
-          confidence: data.confidence,
-          needs_review: data.needs_review,
-          extraction_method: data.extraction_method
+          recipe: recipe,
+          recipe_id: recipe?.id,
+          confidence: responseData.data?.confidence,
+          needs_review: recipe?.needs_review,
+          extraction_method: 'voice'
         };
       } else {
-        this.error('Recipe generation failed:', data);
-        return { success: false, error: data.error || 'Recipe generation failed' };
+        this.error('Recipe generation failed (v2):', responseData);
+        return { success: false, error: responseData.error || 'Recipe generation failed' };
       }
     } catch (error) {
       this.error('Recipe generation error:', error);
@@ -1670,7 +1768,8 @@ class YesChefAPI {
       
       this.log(`📸 Uploading ${photos.length} photos for OCR processing...`);
       
-      const response = await this.debugFetch('/api/recipes/import/ocr', {
+      // v2: Use /api/v2/recipes/import/ocr
+      const response = await this.debugFetch('/api/v2/recipes/import/ocr', {
         method: 'POST',
         headers: {
           ...this.getAuthHeaders(),
@@ -1690,25 +1789,26 @@ class YesChefAPI {
         };
       }
 
-      const data = await response.json();
-      this.log('OCR processing response:', data);
+      const responseData = await response.json();
+      this.log('OCR processing response (v2):', responseData);
       
-      if (response.ok && data.success) {
-        this.log('✅ OCR images processed successfully!', {
-          recipe_title: data.recipe?.title,
-          confidence: data.confidence,
-          extraction_method: data.extraction_method
+      // v2 response format: { success, data: { recipe, confidence, message } }
+      if (response.ok && responseData.success) {
+        const recipe = responseData.data?.recipe;
+        this.log('✅ OCR images processed successfully (v2)!', {
+          recipe_title: recipe?.title,
+          confidence: responseData.data?.confidence
         });
         return { 
           success: true, 
-          recipe: data.recipe,
-          recipe_id: data.recipe_id,
-          confidence: data.confidence,
-          extraction_method: data.extraction_method
+          recipe: recipe,
+          recipe_id: recipe?.id,
+          confidence: responseData.data?.confidence,
+          extraction_method: 'ocr'
         };
       } else {
-        this.error('OCR processing failed:', data);
-        return { success: false, error: data.error || 'OCR processing failed' };
+        this.error('OCR processing failed (v2):', responseData);
+        return { success: false, error: responseData.error || 'OCR processing failed' };
       }
     } catch (error) {
       this.error('OCR processing error:', error);
