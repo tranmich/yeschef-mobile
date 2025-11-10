@@ -192,23 +192,28 @@ export default function HomeScreen({ navigation, user = null, onLogout = null })
     try {
       setIsLoadingActivities(true);
       
-      // Get user's household ID first
+      // Get user's household ID first if we don't have it
       if (!householdId) {
-        const userResponse = await YesChefAPI.getCurrentUser();
-        if (userResponse && userResponse.household_id) {
-          setHouseholdId(userResponse.household_id);
+        // Fetch user's households
+        const householdsResponse = await YesChefAPI.getUserHouseholds();
+        
+        if (householdsResponse.success && householdsResponse.households?.length > 0) {
+          // Use the first household (primary household)
+          const primaryHousehold = householdsResponse.households[0];
+          setHouseholdId(primaryHousehold.id);
           
-          // Load activities
-          const response = await WhiteboardAPI.getHouseholdActivity(userResponse.household_id, 10);
+          // Load activities for this household
+          const response = await WhiteboardAPI.getHouseholdActivity(primaryHousehold.id, 10);
           
           if (response.success) {
             setHouseholdActivities(response.activities || []);
+            console.log(`✅ Loaded ${response.activities?.length || 0} household activities`);
           } else {
             console.error('Failed to load household activities:', response.error);
             setHouseholdActivities([]);
           }
         } else {
-          console.log('No household ID found for user');
+          console.log('No household found for user');
           setHouseholdActivities([]);
         }
       } else {
@@ -217,6 +222,7 @@ export default function HomeScreen({ navigation, user = null, onLogout = null })
         
         if (response.success) {
           setHouseholdActivities(response.activities || []);
+          console.log(`✅ Loaded ${response.activities?.length || 0} household activities`);
         } else {
           console.error('Failed to load household activities:', response.error);
           setHouseholdActivities([]);

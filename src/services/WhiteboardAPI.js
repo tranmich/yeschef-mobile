@@ -17,10 +17,10 @@ class WhiteboardAPI {
    */
   static async getHouseholdActivity(householdId, limit = 20) {
     try {
-      const response = await YesChefAPI.get(`/api/v2/household/${householdId}/activity?limit=${limit}`);
+      const response = await YesChefAPI.get(`/api/v2/activity/households/${householdId}?limit=${limit}`);
       return {
         success: true,
-        activities: response.activities || [],
+        activities: response.activities || response.events || [],
       };
     } catch (error) {
       console.error('Failed to fetch household activity:', error);

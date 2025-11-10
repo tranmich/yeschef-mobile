@@ -1175,6 +1175,41 @@ class YesChefAPI {
     return this.user;
   }
 
+  // Get user's households
+  async getUserHouseholds() {
+    if (!this.isAuthenticated()) {
+      return { success: false, error: 'Authentication required' };
+    }
+
+    try {
+      const response = await this.debugFetch(`/api/v2/households/user/${this.user.id}`, {
+        headers: this.getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        this.log('✅ Households fetched:', {
+          count: data.data?.households?.length || 0
+        });
+        return { success: true, households: data.data?.households || [] };
+      } else {
+        const errorText = await response.text();
+        this.error('Get households failed:', {
+          status: response.status,
+          error: errorText
+        });
+        return { success: false, error: 'Failed to fetch households' };
+      }
+    } catch (error) {
+      this.error('Get households error:', error);
+      return { 
+        success: false, 
+        error: 'Cannot connect to backend',
+        details: error.message 
+      };
+    }
+  }
+
   // Enable/disable debug mode
   setDebugMode(enabled) {
     this.debugMode = enabled;
